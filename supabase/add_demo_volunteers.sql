@@ -1,0 +1,27 @@
+-- Add demo volunteers to the profiles table
+insert into public.profiles (
+   id,
+   name,
+   phone,
+   role,
+   skills,
+   age,
+   updated_at
+) values ( gen_random_uuid(),
+           'Dhruval',
+           '9913238001',
+           'volunteer',
+           array['Event Management','Communication'],
+           25,
+           now() ),( gen_random_uuid(),
+                     'Amogh',
+                     '9913238002',
+                     'volunteer',
+                     array['Technical Support','Photography'],
+                     23,
+                     now() ),( gen_random_uuid(),
+                               'Nirlipta',
+                               '9913238003',
+                               'volunteer',
+                               array['Coordination','First Aid'],
+  
