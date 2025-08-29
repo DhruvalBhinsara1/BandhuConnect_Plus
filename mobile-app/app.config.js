@@ -23,9 +23,7 @@ export default {
     web: {
       bundler: "metro"
     },
-    plugins: [
-      "expo-router"
-    ],
+    plugins: [],
     scheme: "bandhuconnect"
   }
 };
