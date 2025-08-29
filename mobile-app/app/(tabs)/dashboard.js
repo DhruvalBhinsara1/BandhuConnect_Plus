@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
+import { Colors, Theme } from '../../constants/Colors';
 
 export default function DashboardScreen() {
   const [volunteer, setVolunteer] = useState(null);
@@ -103,10 +105,10 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Welcome, {volunteer.name}!</Text>
         <View style={styles.statusContainer}>
-          <View style={[styles.statusBadge, { backgroundColor: isActive ? '#4CAF50' : '#f44336' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: isActive ? Colors.active : Colors.inactive }]}>
             <Text style={styles.statusText}>{isActive ? 'Active' : 'Inactive'}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: isOnDuty ? '#2196F3' : '#9E9E9E' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: isOnDuty ? Colors.onDuty : Colors.offDuty }]}>
             <Text style={styles.statusText}>{isOnDuty ? 'On Duty' : 'Off Duty'}</Text>
           </View>
         </View>
@@ -115,15 +117,23 @@ export default function DashboardScreen() {
       <View style={styles.checkInSection}>
         <TouchableOpacity 
           style={[styles.checkInButton, { 
-            backgroundColor: isOnDuty ? '#f44336' : '#4CAF50',
+            backgroundColor: isOnDuty ? Colors.accentSecondary : Colors.accent,
             opacity: isActive ? 1 : 0.5
           }]}
           onPress={handleCheckInOut}
           disabled={!isActive}
         >
-          <Text style={styles.checkInButtonText}>
-            {isOnDuty ? '🔴 Check Out' : '🟢 Check In'}
-          </Text>
+          <View style={styles.checkInButtonContent}>
+            <Ionicons 
+              name={isOnDuty ? 'log-out-outline' : 'log-in-outline'} 
+              size={24} 
+              color={Colors.textPrimary} 
+              style={styles.checkInIcon}
+            />
+            <Text style={styles.checkInButtonText}>
+              {isOnDuty ? 'Check Out' : 'Check In'}
+            </Text>
+          </View>
           <Text style={styles.checkInSubtext}>
             {isOnDuty ? 'End your shift' : 'Start your shift'}
           </Text>
@@ -155,19 +165,28 @@ export default function DashboardScreen() {
           style={styles.actionButton}
           onPress={() => router.push('/requests')}
         >
-          <Text style={styles.actionButtonText}>📋 View Requests</Text>
+          <View style={styles.actionButtonContent}>
+            <MaterialIcons name="assignment" size={20} color={Colors.accent} />
+            <Text style={styles.actionButtonText}>View Requests</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/location-update')}
         >
-          <Text style={styles.actionButtonText}>📍 Update Location</Text>
+          <View style={styles.actionButtonContent}>
+            <Ionicons name="location-outline" size={20} color={Colors.accent} />
+            <Text style={styles.actionButtonText}>Update Location</Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/emergency-contact')}
         >
-          <Text style={styles.actionButtonText}>🆘 Emergency Contact</Text>
+          <View style={styles.actionButtonContent}>
+            <MaterialIcons name="emergency" size={20} color={Colors.error} />
+            <Text style={styles.actionButtonText}>Emergency Contact</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -177,113 +196,126 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: Colors.primary,
   },
   header: {
-    padding: 20,
+    padding: Theme.spacing.lg,
     paddingTop: 40,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: Colors.secondary,
   },
   title: {
-    fontSize: 24,
+    fontSize: Theme.fontSize.xxl,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 15,
+    color: Colors.textPrimary,
+    marginBottom: Theme.spacing.md,
   },
   statusContainer: {
     flexDirection: 'row',
     gap: 10,
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: Theme.spacing.sm + 4,
     paddingVertical: 6,
-    borderRadius: 15,
+    borderRadius: Theme.borderRadius.md,
   },
   statusText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.xs,
     fontWeight: 'bold',
   },
   checkInSection: {
-    padding: 20,
+    padding: Theme.spacing.lg,
     alignItems: 'center',
   },
   checkInButton: {
     width: '100%',
-    padding: 20,
-    borderRadius: 15,
+    padding: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.lg,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: Theme.spacing.sm,
+    backgroundColor: Colors.accent,
   },
-  checkInButtonText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
+  checkInButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 5,
   },
+  checkInIcon: {
+    marginRight: Theme.spacing.sm,
+  },
+  checkInButtonText: {
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.xl,
+    fontWeight: 'bold',
+  },
   checkInSubtext: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.sm,
     opacity: 0.8,
   },
   inactiveText: {
-    color: '#f44336',
-    fontSize: 14,
+    color: Colors.error,
+    fontSize: Theme.fontSize.sm,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: Theme.spacing.sm,
   },
   statsSection: {
-    padding: 20,
+    padding: Theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: Theme.fontSize.lg,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 15,
+    color: Colors.textPrimary,
+    marginBottom: Theme.spacing.md,
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 15,
+    gap: Theme.spacing.md,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#2C2C2E',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: Colors.secondary,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.sm,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: Theme.fontSize.xxl,
     fontWeight: 'bold',
-    color: '#007BFF',
+    color: Colors.accent,
     marginBottom: 5,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#B3B3B3',
+    fontSize: Theme.fontSize.xs,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   quickActions: {
-    padding: 20,
+    padding: Theme.spacing.lg,
   },
   actionButton: {
-    backgroundColor: '#2C2C2E',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: Colors.secondary,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.sm,
+    marginBottom: Theme.spacing.sm,
+  },
+  actionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    textAlign: 'center',
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.md,
+    marginLeft: Theme.spacing.sm,
   },
   loadingText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.lg,
   },
   errorText: {
-    color: '#f44336',
-    fontSize: 18,
+    color: Colors.error,
+    fontSize: Theme.fontSize.lg,
     textAlign: 'center',
   },
 });
