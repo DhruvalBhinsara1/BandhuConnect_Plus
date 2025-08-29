@@ -20,15 +20,45 @@ export default function VolunteerManagement() {
         .from('profiles')
         .select('*')
         .eq('role', 'volunteer')
-        .order('name', { nullsFirst: false });
+        .order('name');
       
       if (error) throw error;
       setVolunteers(data || []);
     } catch (error) {
       console.error('Error fetching volunteers:', error);
-      alert('Failed to fetch volunteers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateVolunteerStatus = async (volunteerId, statusType, newStatus) => {
+    try {
+      const updateData = {};
+      updateData[statusType] = newStatus;
+      
+      // If volunteer becomes inactive, automatically set them off duty
+      if (statusType === 'volunteer_status' && newStatus === 'inactive') {
+        updateData.duty_status = 'off_duty';
+      }
+      
+      // If volunteer is put on duty, automatically set them to active
+      if (statusType === 'duty_status' && newStatus === 'on_duty') {
+        updateData.volunteer_status = 'active';
+      }
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', volunteerId);
+
+      if (error) throw error;
+      
+      // Refresh the volunteers list
+      fetchVolunteers();
+      alert(`Volunteer status updated successfully!`);
+    } catch (error) {
+      console.error('Error updating volunteer status:', error);
+      alert('Error updating volunteer status. Please try again.');
     }
   };
 
@@ -144,18 +174,49 @@ export default function VolunteerManagement() {
                 </p>
               </div>
               <div style={styles.volunteerActions}>
-                <button
-                  onClick={() => setSelectedVolunteer(volunteer)}
-                  style={styles.viewButton}
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleDeleteVolunteer(volunteer.id)}
-                  style={styles.deleteButton}
-                >
-                  Remove
-                </button>
+                {/* Status Override Controls */}
+                <div style={styles.statusControls}>
+                  <div style={styles.statusGroup}>
+                    <label style={styles.statusLabel}>Status:</label>
+                    <button
+                      onClick={() => updateVolunteerStatus(volunteer.id, 'volunteer_status', 
+                        volunteer.volunteer_status === 'active' ? 'inactive' : 'active')}
+                      style={{
+                        ...styles.statusButton,
+                        backgroundColor: volunteer.volunteer_status === 'active' ? '#4CAF50' : '#f44336'
+                      }}
+                    >
+                      {volunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
+                    </button>
+                  </div>
+                  <div style={styles.statusGroup}>
+                    <label style={styles.statusLabel}>Duty:</label>
+                    <button
+                      onClick={() => updateVolunteerStatus(volunteer.id, 'duty_status', 
+                        volunteer.duty_status === 'on_duty' ? 'off_duty' : 'on_duty')}
+                      style={{
+                        ...styles.statusButton,
+                        backgroundColor: volunteer.duty_status === 'on_duty' ? '#2196F3' : '#9E9E9E'
+                      }}
+                    >
+                      {volunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
+                    </button>
+                  </div>
+                </div>
+                <div style={styles.actionButtons}>
+                  <button
+                    onClick={() => setSelectedVolunteer(volunteer)}
+                    style={styles.viewButton}
+                  >
+                    View Details
+                  </button>
+                  <button
+                    onClick={() => handleDeleteVolunteer(volunteer.id)}
+                    style={styles.deleteButton}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             </div>
           ))
@@ -509,6 +570,38 @@ const styles = {
     margin: '5px 0',
   },
   volunteerActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+    minWidth: '200px',
+  },
+  statusControls: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginBottom: '10px',
+  },
+  statusGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  statusLabel: {
+    fontSize: '12px',
+    color: '#CCCCCC',
+    minWidth: '40px',
+  },
+  statusButton: {
+    padding: '4px 12px',
+    border: 'none',
+    borderRadius: '4px',
+    color: 'white',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'all 0.2s',
+  },
+  actionButtons: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
