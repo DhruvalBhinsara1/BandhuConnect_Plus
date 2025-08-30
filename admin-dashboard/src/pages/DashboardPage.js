@@ -35,27 +35,27 @@ export default function DashboardPage() {
           Sign Out
         </button>
       </div>
-      
+
       <div style={styles.navigation}>
-        <button 
+        <button
           onClick={() => setActiveTab('overview')}
           style={activeTab === 'overview' ? styles.activeNavButton : styles.navButton}
         >
           📊 Overview
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('volunteers')}
           style={activeTab === 'volunteers' ? styles.activeNavButton : styles.navButton}
         >
           👥 Volunteers
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('requests')}
           style={activeTab === 'requests' ? styles.activeNavButton : styles.navButton}
         >
           📋 Requests
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('analytics')}
           style={activeTab === 'analytics' ? styles.activeNavButton : styles.navButton}
         >
@@ -81,11 +81,22 @@ function Overview({ setActiveTab }) {
     resolvedToday: 0
   });
   const [volunteers, setVolunteers] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    fetchStats();
-    fetchVolunteers();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      await Promise.all([fetchStats(), fetchVolunteers()]);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -97,7 +108,7 @@ function Overview({ setActiveTab }) {
 
       // Try to get status-based counts, fallback to totals if columns don't exist
       let activeCount = 0, inactiveCount = 0, onDutyCount = 0, offDutyCount = 0;
-      
+
       try {
         const { count: active } = await supabase
           .from('profiles')
@@ -153,13 +164,17 @@ function Overview({ setActiveTab }) {
         .select('*')
         .eq('role', 'volunteer')
         .limit(6);
-      
+
       if (error) throw error;
       setVolunteers(data || []);
     } catch (error) {
       console.error('Error fetching volunteers:', error);
     }
   };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div style={styles.overviewContainer}>
@@ -186,29 +201,29 @@ function Overview({ setActiveTab }) {
           <p style={styles.statSubtext}>Available volunteers</p>
         </div>
       </div>
-      
+
       <div style={styles.quickActions}>
         <h3 style={styles.sectionTitle}>Quick Actions</h3>
         <div style={styles.actionButtons}>
-          <button 
+          <button
             style={styles.actionButton}
             onClick={() => setActiveTab('volunteers')}
           >
             👥 Add Volunteer
           </button>
-          <button 
+          <button
             style={styles.actionButton}
             onClick={() => setActiveTab('requests')}
           >
             📋 View All Requests
           </button>
-          <button 
+          <button
             style={styles.actionButton}
             onClick={() => setActiveTab('analytics')}
           >
             📊 Generate Report
           </button>
-          <button 
+          <button
             style={styles.actionButton}
             onClick={() => alert('System settings coming soon!')}
           >
@@ -221,7 +236,7 @@ function Overview({ setActiveTab }) {
       <div style={styles.volunteersSection}>
         <div style={styles.sectionHeader}>
           <h3 style={styles.sectionTitle}>Recent Volunteers</h3>
-          <button 
+          <button
             style={styles.viewAllButton}
             onClick={() => setActiveTab('volunteers')}
           >
@@ -257,7 +272,7 @@ function Overview({ setActiveTab }) {
           )) : (
             <div style={styles.emptyState}>
               <p style={styles.emptyText}>No volunteers found. Add some volunteers to get started!</p>
-              <button 
+              <button
                 style={styles.addVolunteerButton}
                 onClick={() => setActiveTab('volunteers')}
               >
@@ -301,6 +316,21 @@ function Analytics() {
         Analytics dashboard will show volunteer performance, request trends,
         response times, and other key metrics.
       </p>
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '100vh',
+      backgroundColor: Colors.primary,
+      color: Colors.textPrimary,
+    }}>
+      <h2>Loading...</h2>
     </div>
   );
 }

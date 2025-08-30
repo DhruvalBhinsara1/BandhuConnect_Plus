@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
 import { volunteerService } from '../../services/volunteerService';
+import { supabase } from '../../services/supabase';
+import { Logger } from '../../utils/logger';
 import { User, Assignment } from '../../types';
 
 const VolunteerManagement: React.FC = () => {
@@ -15,9 +17,13 @@ const VolunteerManagement: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [volunteers, setVolunteers] = useState<User[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'available' | 'busy'>('all');
+  const [autoAssigning, setAutoAssigning] = useState(false);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>('volunteers');
 
   useEffect(() => {
     loadVolunteers();
+    loadRequests();
   }, []);
 
   const loadVolunteers = async () => {
@@ -54,9 +60,28 @@ const VolunteerManagement: React.FC = () => {
     await getAssignments();
   };
 
+  const loadRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('assistance_requests')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading requests:', error);
+        return;
+      }
+      
+      setRequests(data || []);
+    } catch (error) {
+      console.error('Error loading requests:', error);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadVolunteers(), getAssignments()]);
+    await Promise.all([loadVolunteers(), loadRequests(), getAssignments()]);
     setRefreshing(false);
   };
 
@@ -156,6 +181,142 @@ const VolunteerManagement: React.FC = () => {
       tasksList,
       [{ text: 'OK' }]
     );
+  };
+
+  const handleBatchAutoAssign = async () => {
+    if (autoAssigning) return;
+    
+    setAutoAssigning(true);
+    Logger.autoAssignment.start(0);
+    
+    try {
+      // Get pending requests first
+      const { data: requests, error: requestError } = await supabase
+        .from('assistance_requests')
+        .select('*')
+        .eq('status', 'pending');
+        
+      if (requestError || !requests) {
+        throw new Error('Failed to fetch pending requests');
+      }
+      
+      if (requests.length === 0) {
+        Alert.alert('No Pending Requests', 'There are no pending requests to assign.');
+        return;
+      }
+      
+      Logger.autoAssignment.start(requests.length);
+      
+      let assigned = 0;
+      let failed = 0;
+      
+      for (let i = 0; i < requests.length; i++) {
+        const request = requests[i];
+        Logger.autoAssignment.requestProcessing(request, i + 1, requests.length);
+        
+        try {
+          const { data: result, error } = await supabase.rpc('auto_assign_request_enhanced', {
+            p_request_id: request.id,
+            p_min_match_score: 0.3
+          });
+          
+          if (error) {
+            Logger.autoAssignment.matchResult(false, undefined, undefined, error.message);
+            failed++;
+          } else if (result && result.volunteer_id) {
+            Logger.autoAssignment.matchResult(true, result.volunteer_name, result.match_score);
+            assigned++;
+          } else {
+            Logger.autoAssignment.matchResult(false, undefined, undefined, 'No suitable volunteer found');
+            failed++;
+          }
+        } catch (assignError) {
+          Logger.autoAssignment.matchResult(false, undefined, undefined, 'Assignment error');
+          failed++;
+        }
+      }
+      
+      Logger.autoAssignment.batchComplete(assigned, failed, []);
+      Alert.alert(
+        'Auto-Assignment Complete',
+        `Successfully assigned ${assigned} out of ${requests.length} pending requests.${failed > 0 ? `\n\n${failed} requests could not be assigned (no suitable volunteers found).` : ''}`,
+        [{ text: 'OK', onPress: () => { loadVolunteers(); loadRequests(); } }]
+      );
+    } catch (error) {
+      Logger.autoAssignment.matchResult(false, undefined, undefined, 'Batch assignment error');
+      Alert.alert('Error', 'Failed to perform auto-assignment. Please try again.');
+    } finally {
+      setAutoAssigning(false);
+      // Refresh requests after auto-assignment
+      await loadRequests();
+    }
+  };
+
+  const renderRequestItem = ({ item }: { item: any }) => {
+    const getRequestTypeColor = (type: string) => {
+      const colors = {
+        general: '#6b7280',
+        guidance: '#3b82f6',
+        lost_person: '#ef4444',
+        medical: '#dc2626',
+        sanitation: '#059669'
+      };
+      return colors[type as keyof typeof colors] || '#6b7280';
+    };
+
+    const formatTimeAgo = (dateString: string) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${diffDays}d ago`;
+    };
+
+    return (
+      <View style={styles.requestCard}>
+        <View style={styles.requestHeader}>
+          <View style={[styles.requestTypeBadge, { backgroundColor: getRequestTypeColor(item.request_type || item.type || 'general') + '20' }]}>
+            <Text style={[styles.requestTypeText, { color: getRequestTypeColor(item.request_type || item.type) }]}>
+              {(item.request_type || item.type || 'general').replace('_', ' ').toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.requestTime}>{formatTimeAgo(item.created_at)}</Text>
+        </View>
+        
+        <Text style={styles.requestDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+        
+        <View style={styles.requestFooter}>
+          <View style={styles.requestLocation}>
+            <Ionicons name="location-outline" size={14} color="#6b7280" />
+            <Text style={styles.requestLocationText}>
+              {item.location || 'Location not specified'}
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.assignButton}
+            onPress={() => handleManualAssign(item)}
+          >
+            <Text style={styles.assignButtonText}>Assign</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const handleManualAssign = (request: any) => {
+    // Navigate to task assignment with pre-selected request
+    navigation.navigate('TaskAssignment', { 
+      selectedRequest: request,
+      mode: 'manual_assign'
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -299,34 +460,91 @@ const VolunteerManagement: React.FC = () => {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Tab Selector */}
+        <View style={styles.tabSelector}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'volunteers' && styles.activeTab]}
+            onPress={() => setActiveTab('volunteers')}
+          >
+            <Text style={[styles.tabText, activeTab === 'volunteers' && styles.activeTabText]}>Volunteers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+            onPress={() => setActiveTab('requests')}
+          >
+            <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Pending Requests</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Auto-Assignment Section - Only show on requests tab */}
+        {activeTab === 'requests' && (
+          <View style={styles.autoAssignSection}>
+            <TouchableOpacity 
+              style={[styles.autoAssignButton, autoAssigning && styles.autoAssignButtonDisabled]}
+              onPress={handleBatchAutoAssign}
+              disabled={autoAssigning}
+            >
+              <Ionicons 
+                name={autoAssigning ? "hourglass" : "flash"} 
+                size={16} 
+                color={autoAssigning ? "#9ca3af" : "white"} 
+              />
+              <Text style={[styles.autoAssignButtonText, autoAssigning && styles.autoAssignButtonTextDisabled]}>
+                {autoAssigning ? 'Auto-Assigning...' : 'Auto-Assign All (Batch)'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
-      {/* Volunteer List */}
-      <FlatList
-        data={filteredVolunteers}
-        renderItem={renderVolunteerItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color="#6b7280" />
-            <Text style={styles.emptyTitle}>No volunteers found</Text>
-            <Text style={styles.emptySubtitle}>
-              {filter === 'active' 
-                ? 'No active volunteers at the moment'
-                : filter === 'available'
-                ? 'No available volunteers'
-                : filter === 'busy'
-                ? 'No busy volunteers'
-                : 'No volunteers registered yet'
-              }
-            </Text>
-          </View>
-        }
-      />
+      {/* Content based on active tab */}
+      {activeTab === 'volunteers' ? (
+        <FlatList
+          data={filteredVolunteers}
+          renderItem={renderVolunteerItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={64} color="#6b7280" />
+              <Text style={styles.emptyTitle}>No volunteers found</Text>
+              <Text style={styles.emptySubtitle}>
+                {filter === 'active' 
+                  ? 'No active volunteers at the moment'
+                  : filter === 'available'
+                  ? 'No available volunteers'
+                  : filter === 'busy'
+                  ? 'No busy volunteers'
+                  : 'No volunteers registered yet'
+                }
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          data={requests}
+          renderItem={renderRequestItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="clipboard-outline" size={64} color="#6b7280" />
+              <Text style={styles.emptyTitle}>No pending requests</Text>
+              <Text style={styles.emptySubtitle}>
+                All requests have been assigned or completed
+              </Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -373,8 +591,127 @@ const styles = StyleSheet.create({
   activeFilterTabText: {
     color: '#2563eb',
   },
+  autoAssignSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  autoAssignButton: {
+    backgroundColor: '#3b82f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  autoAssignButtonDisabled: {
+    backgroundColor: '#d1d5db',
+  },
+  autoAssignButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  autoAssignButtonTextDisabled: {
+    color: '#9ca3af',
+  },
+  tabSelector: {
+    flexDirection: 'row',
+    marginTop: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  requestCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  requestTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  requestTypeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  requestTime: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  requestDescription: {
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  requestLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  requestLocationText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  assignButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  assignButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 12,
+  },
   listContainer: {
     padding: 16,
+    paddingTop: 8,
   },
   card: {
     backgroundColor: 'white',

@@ -1,14 +1,17 @@
 -- Check what skills volunteers actually have vs what's required
 SELECT 
-    'Current Volunteer Skills' as analysis_type,
-    p.name,
-    p.volunteer_status,
-    p.skills
-FROM profiles p
-WHERE p.role = 'volunteer' 
-    AND p.is_active = true 
-    AND p.volunteer_status IN ('available', 'busy')
-ORDER BY p.volunteer_status, p.name;
+  -- Check current volunteer skills to identify issues
+SELECT 
+    name, 
+    email, 
+    skills, 
+    volunteer_status,
+    is_active
+FROM profiles 
+WHERE role = 'volunteer' 
+    AND is_active = true 
+    AND volunteer_status IN ('available', 'busy')
+ORDER BY volunteer_status, name;
 
 -- Show required skills for each request type
 SELECT 

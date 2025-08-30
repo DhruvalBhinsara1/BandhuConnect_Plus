@@ -90,7 +90,7 @@ BEGIN
             'priya.volunteer@demo.com', 
             '+919900000003', 
             'volunteer', 
-            ARRAY['tech', 'crowd_management'], 
+            ARRAY['guidance', 'crowd_management'], 
             'available', 
             ST_SetSRID(ST_MakePoint(72.5750, 23.0250), 4326), 
             4.9, 
@@ -230,8 +230,8 @@ END $$;
 -- CREATE DEMO REQUESTS (WITHOUT AUTO-TRIGGERS)
 -- =============================================
 
--- Temporarily disable triggers to avoid function dependency
-ALTER TABLE assistance_requests DISABLE TRIGGER notify_volunteers_on_new_request;
+-- Temporarily disable triggers to avoid function dependency (skip if trigger doesn't exist)
+-- ALTER TABLE assistance_requests DISABLE TRIGGER notify_volunteers_on_new_request;
 
 -- Demo Request 1: Transportation (Pending)
 DO $$
@@ -274,7 +274,7 @@ BEGIN
             'lost_person',
             'Lost child - urgent help needed',
             'My 6-year-old son is missing. Last seen near the main entrance wearing blue shirt and khaki shorts.',
-            'emergency',
+            'high',
             'assigned',
             ST_SetSRID(ST_MakePoint(72.5680, 23.0320), 4326),
             'Main Temple Entrance Gate'
@@ -293,8 +293,8 @@ BEGIN
     END IF;
 END $$;
 
--- Re-enable triggers
-ALTER TABLE assistance_requests ENABLE TRIGGER notify_volunteers_on_new_request;
+-- Re-enable triggers (skip if trigger doesn't exist)
+-- ALTER TABLE assistance_requests ENABLE TRIGGER notify_volunteers_on_new_request;
 
 -- =============================================
 -- CREATE DEMO CHAT CHANNELS AND MESSAGES

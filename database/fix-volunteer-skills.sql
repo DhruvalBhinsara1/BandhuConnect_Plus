@@ -54,11 +54,29 @@ UPDATE profiles
 SET skills = ARRAY['search_rescue', 'crowd_management', 'communication', 'local_knowledge', 'general']
 WHERE id IN (SELECT id FROM rescue_volunteers);
 
+-- Fix volunteer skills to use valid enum values
+-- Replace 'tech' with 'guidance' for Priya Sharma
+
+UPDATE profiles 
+SET skills = ARRAY['guidance', 'crowd_management']
+WHERE email = 'priya.volunteer@demo.com';
+
+-- Also ensure all volunteers are available for testing
+UPDATE profiles 
+SET volunteer_status = 'available', is_active = true
+WHERE role = 'volunteer' AND email IN ('raj.volunteer@demo.com', 'priya.volunteer@demo.com');
+
 -- Verify the updates
 SELECT 'After Update - New Skills' as status, name, volunteer_status, skills 
 FROM profiles 
 WHERE role = 'volunteer' AND is_active = true
 ORDER BY volunteer_status, name;
+
+-- Verify the fix
+SELECT name, email, skills, volunteer_status, is_active
+FROM profiles 
+WHERE role = 'volunteer' 
+ORDER BY name;
 
 -- Test skill matching for our problem requests
 SELECT 
