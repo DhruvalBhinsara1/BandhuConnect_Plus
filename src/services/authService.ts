@@ -21,15 +21,14 @@ export class AuthService {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
-            user_id: authData.user.id,
+            id: authData.user.id,
             name: userData.name,
             email,
             phone: userData.phone,
             role: userData.role,
             skills: userData.skills || [],
-            age: userData.age,
             is_active: true,
-            status: userData.role === 'volunteer' ? 'available' : 'active',
+            volunteer_status: userData.role === 'volunteer' ? 'available' : 'offline',
           });
 
         if (profileError) throw profileError;
@@ -105,7 +104,7 @@ export class AuthService {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single();
 
       if (error) throw error;
@@ -122,7 +121,7 @@ export class AuthService {
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('user_id', userId)
+        .eq('id', userId)
         .select()
         .single();
 
