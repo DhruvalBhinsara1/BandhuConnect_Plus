@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Platform, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
@@ -16,37 +16,38 @@ export default function App() {
       <StatusBar style="dark" />
       <View style={styles.container}>
         <View style={[styles.appWrapper, isWeb && isLargeScreen && styles.webContainer]}>
-          {/* Top illustration area */}
-          <View style={styles.illustrationContainer}>
-            <View style={styles.illustrationPlaceholder}>
-              <Text style={styles.illustrationEmoji}>👨‍👩‍👧‍👦</Text>
-              <Text style={styles.illustrationText}>Community Support</Text>
-            </View>
+          {/* Background image area */}
+          <View style={styles.imageBackgroundContainer}>
+            <Image 
+              source={require('./assets/3900483.jpg')}
+              style={styles.backgroundImage}
+              resizeMode="cover"
+            />
           </View>
 
           {/* Main content area */}
           <View style={styles.contentContainer}>
             <Text style={styles.title}>BandhuConnect+</Text>
             <Text style={styles.subtitle}>
-              Connecting volunteers, admins, and pilgrims for seamless assistance and coordination during large events.
+              Connecting volunteers and pilgrims for seamless assistance and coordination during large events.
             </Text>
 
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.loginButton}
                 onPress={() => handlePress('Admin Login')}
               >
                 <Text style={styles.buttonText}>Admin Login</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.loginButton}
                 onPress={() => handlePress('Volunteer Login')}
               >
                 <Text style={styles.buttonText}>Volunteer Login</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.loginButton}
                 onPress={() => handlePress('Pilgrim Login')}
               >
@@ -69,7 +70,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5DC',
+    backgroundColor: '#1A2332',
     alignItems: 'center', // Center content horizontally for web
     justifyContent: 'center', // Center content vertically for web
   },
@@ -77,6 +78,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     maxWidth: '100%', // Full width on mobile
+    height: '100%',
   },
   webContainer: {
     maxWidth: 480, // Limit width on web to mobile-like experience
@@ -91,72 +93,70 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   illustrationContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F5F5DC',
     paddingTop: 60,
     paddingBottom: 20,
-    minHeight: 300, // Ensure minimum height
+    height: '50%',
   },
-  illustrationPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 200,
-    height: 200,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+  illustrationImage: {
+    width: '100%',
+    height: '100%',
+    flex: 1,
   },
-  illustrationEmoji: {
-    fontSize: 60,
-    marginBottom: 10,
+  imageBackgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+    backgroundColor: '#F5F5DC',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    overflow: 'hidden',
   },
-  illustrationText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
   },
   contentContainer: {
-    flex: 1,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#1A2332',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 0 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 0 : 0,
     paddingHorizontal: 30,
-    paddingTop: 40,
-    paddingBottom: 30,
+    paddingTop: 30,
+    paddingBottom: 20,
+    minHeight: '50%',
     justifyContent: 'space-between',
-    minHeight: 400, // Ensure minimum height for content
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#8A9BAE',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 40,
+    lineHeight: 18,
+    marginBottom: 20,
     paddingHorizontal: 10,
   },
   buttonContainer: {
-    gap: 15,
-    marginBottom: 40,
+    gap: 10,
+    marginBottom: 10,
     paddingHorizontal: Platform.OS === 'web' ? 20 : 0,
   },
   loginButton: {
     backgroundColor: '#2196F3',
-    paddingVertical: 18,
+    paddingVertical: 12,
     borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#000',
@@ -170,14 +170,15 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   languageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    marginTop: 'auto',
   },
   languageIcon: {
     fontSize: 20,
