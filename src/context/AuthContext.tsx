@@ -9,6 +9,8 @@ interface AuthContextType extends AuthState {
   verifyOtp: (phone: string, token: string) => Promise<{ data: any; error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<{ data: any; error: any }>;
+  setUserRole: (role: 'admin' | 'volunteer' | 'pilgrim') => void;
+  selectedRole: 'admin' | 'volunteer' | 'pilgrim' | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +23,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'volunteer' | 'pilgrim' | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -125,6 +128,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return result;
   };
 
+  const setUserRole = (role: 'admin' | 'volunteer' | 'pilgrim') => {
+    setSelectedRole(role);
+  };
+
   const value: AuthContextType = {
     user,
     session,
@@ -135,6 +142,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     verifyOtp,
     signOut,
     updateProfile,
+    setUserRole,
+    selectedRole,
   };
 
   return (
