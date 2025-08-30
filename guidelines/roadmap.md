@@ -1,1 +1,97 @@
+<<<<<<< Updated upstream
 Development Roadmap for BandhuConnect+We are building an MVP of BandhuConnect+, an application for Volunteers, Administrators, andPilgrims/Attendees during large public gatherings. The app will have three modules:1. Development Method• Approach: MVP-first Agile development (start small, iterate fast).• Focus: Core features first (auth, requests, task assignment, volunteer lifecycle, maps).• Phases: Pilgrim app → Admin dashboard → Volunteer features → Real-time chat + maps→ Enhancements (push notifications, multi-language).2. Tech Stack• Frontend (Mobile Apps – Volunteers & Pilgrims): React Native + Expo• Frontend (Admin Dashboard): React.js + Tailwind CSS• Backend & Database: Supabase (PostgreSQL, Auth, Realtime, Storage)• Authentication: Supabase Auth (Phone OTP + Email/Password)• File Storage: Supabase Storage (photos, lost child reports, sanitation reports)• Maps & Location: Google Maps API (real-time volunteer/request tracking)• Notifications: Expo Push Notifications (React Native)• Deployment:o Web → Vercel (Admin Dashboard)o Mobile → Expo EAS Build / App Stores3. Database Schema (Supabase / PostgreSQL)Important Terms• PK (Primary Key): A unique identifier for each row in the table.• FK (Foreign Key): A reference to a primary key in another table, used to connect relatedrecords.usersColumn Type Notesid uuid (pk) Supabase default user IDname text Full nameemail text Unique, nullablephone text Unique, requiredrole enum (‘volunteer’, ‘admin’, ‘pilgrim’)skills text\[\] Array, only for volunteersage int Nullablelat float8 Current location (updated live)lng float8 Current location (updated live)created\_at timestamp Default now()requestsColumn Type Notesid uuid (pk) Unique request IDuser\_iduuid (fk →users.id)Pilgrim who created requesttype enum(‘medical’, ‘safety’, ‘lost\_child’, ‘directions’, ‘sanitation’,‘general’)description text NullableColumn Type Notesphoto\_url text Optionallocation geography(point) Lat/Lngstatus enum (‘pending’, ‘assigned’, ‘in\_progress’, ‘resolved’)created\_at timestamp Default now()volunteer\_tasksColumn Type Notesid uuid (pk) Unique task IDrequest\_id uuid (fk → requests.id) Linked requestvolunteer\_id uuid (fk → users.id) Volunteer handling itstatus enum (‘assigned’, ‘accepted’, ‘on\_duty’, ‘completed’)duty\_start timestamp Set when volunteer checks induty\_end timestamp Set when volunteer ends taskcompleted\_by uuid (fk → users.id) Volunteer who ended taskcompleted\_at timestamp When task was endedmessages (for chat)Column Type Notesid uuid (pk) Unique message IDsender\_id uuid (fk → users.id) From userreceiver\_id uuid (fk → users.id) To user/groupcontent text Message bodyColumn Type Notescreated\_at timestamp Default now()4. Task Lifecycle1. Assigned → Admin assigns a volunteer.2. Accepted → Volunteer accepts task.3. On Duty → Volunteer checks in when starting.4. Completed → Volunteer presses End Task.o Updates volunteer\_tasks.status = completedo Auto-sets completed\_by = volunteer\_id and completed\_at = now()o Related request.status = resolvedAdmins cannot complete tasks. They can only assign/reassign.5. Core FeaturesVolunteers (Mobile App)• Sign up/login.• Dashboard: Assigned tasks, duty status.• Buttons: Accept Task → Check-In → End Task.• Live map with current + task location.• Chat (general volunteer chatroom).Admins (Web Dashboard)• See active/inactive volunteers.• Track requests and their status.• Assign/reassign volunteers to requests.• Override skills, statuses (but not completion).Pilgrims/Attendees (Mobile App)• Request help (with auto GPS + description/photo).• Lost child reports with photo + details.• Report sanitation issues.• Track volunteer ETA on map.• Multi-language support.6. API & Realtime Flows• Request Flow: Pilgrim creates request → request goes to requests → Admin sees indashboard (Realtime).• Assignment Flow: Admin assigns volunteer → volunteer\_tasks entry created →Volunteer app updates (Realtime).• Completion Flow: Volunteer ends task → task + request auto-closed → Admin + Pilgrimsee resolved status (Realtime).• Chat Flow: Messages stored in messages table → live updates via Supabase Realtime.7. Roadmap (Hackathon MVP order)1. Setup Supabase project + schema.2. Pilgrim app: Sign-up + request creation.3. Admin dashboard: View requests + assign volunteers.4. Volunteer app: Accept → Check-In → End Task.5. Add Google Maps for location tracking.6. Add Realtime updates + chat.7. Add notifications + multi-language support.
+=======
+# Development Roadmap for BandhuConnect+
+
+BandhuConnect+ is a cross-platform application serving Volunteers, Administrators, and Pilgrims/Attendees during large public events. This roadmap incorporates React Native with Expo SDK 53, web support, and modern UI practices.
+
+## 1. Development Method
+
+- Agile MVP-first approach: build core features first and iterate fast.
+- Prioritize:
+  - Authentication
+  - Request management
+  - Task assignment
+  - Volunteer lifecycle
+  - Map integration
+- Development phases:
+  1. Pilgrim app (sign-up, request creation)
+  2. Admin dashboard (view requests, assign volunteers)
+  3. Volunteer app (task acceptance, duty status)
+  4. Real-time chat and maps
+  5. Enhancements: Push notifications, multi-language support
+
+## 2. Tech Stack
+
+- Frontend (Volunteers & Pilgrims): React Native v0.71 with Expo SDK 53 targeting iOS, Android, and Web.
+- Frontend (Admin Dashboard): React.js + Tailwind CSS for fast web development.
+- Backend: Supabase for PostgreSQL, Auth, Realtime, and Storage.
+- Authentication: Supabase Auth with Phone OTP + Email/Password.
+- File Storage: Supabase Storage for photos and reports.
+- Maps & Location: Google Maps API integrated via `react-native-maps`.
+- Notifications: Expo Push Notifications.
+- Deployment:
+  - Web (Admin): Vercel
+  - Mobile Apps: Expo EAS Build and app stores.
+
+## 3. Database Schema (Supabase / PostgreSQL)
+
+| Table           | Important Columns                      | Notes                                  |
+|-----------------|-------------------------------------|---------------------------------------|
+| users           | id (uuid), name, email, phone, role, skills (array), age, lat, lng | Role enum values: volunteer, admin, pilgrim |
+| requests        | id, user_id (fk), type, description, photo_url, location (geography), status, created_at | Types: medical, safety, lost_child, sanitation, etc. |
+| volunteer_tasks | id, request_id (fk), volunteer_id (fk), status, timestamps, completed_by | Tracks tasks assigned to volunteers   |
+| messages        | id, sender_id (fk), receiver_id (fk), content, created_at | Chat messages                         |
+
+## 4. Task Lifecycle
+
+1. Assigned - Admin assigns volunteer.
+2. Accepted - Volunteer accepts.
+3. On Duty - Volunteer checks in.
+4. Completed - Volunteer ends task; status updates propagate.
+
+## 5. Core Features
+
+### Volunteers (Mobile App)
+
+- Sign up and login.
+- Dashboard with active tasks and status.
+- Accept Task, Check-In, End Task buttons.
+- Live map with current location and task location.
+- General real-time chat.
+
+### Admins (Web Dashboard)
+
+- Active/inactive volunteer counts.
+- Request monitoring and volunteer assignment.
+- Skill and status overrides (not task completion).
+
+### Pilgrims/Attendees (Mobile App)
+
+- Request help with GPS and photo upload.
+- Lost child reporting with photo and details.
+- Report sanitation issues.
+- Track volunteer ETA on map.
+- Language selection (basic MVP).
+
+## 6. API & Realtime Flows
+
+- Pilgrim requests → stored in `requests` → realtime update for admin.
+- Volunteer assignments → update `volunteer_tasks` → realtime for volunteer clients.
+- Task completion → status changes broadcast.
+- Messages stored and streamed realtime.
+
+## 7. Roadmap (Hackathon MVP Order)
+
+1. Setup Supabase project and schema.
+2. Pilgrim app: sign-up and request creation.
+3. Admin dashboard: view and assign requests.
+4. Volunteer app: accept, check-in, and end tasks.
+5. Integrate Google Maps for location display.
+6. Add real-time updates and chat.
+7. Enhance with push notifications and multi-language support.
+
+---
+
+Following this updated roadmap with Expo SDK 53, cross-platform support, and modern UI tooling will enable a successful, functional BandhuConnect+ MVP build within the hackathon timeframe.
+>>>>>>> Stashed changes
