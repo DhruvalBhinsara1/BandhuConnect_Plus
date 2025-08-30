@@ -8,6 +8,7 @@ export default function VolunteerManagement() {
   const [skillFilter, setSkillFilter] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState(null);
+  const [notification, setNotification] = useState(null);
 
   // Fetch volunteers from database
   useEffect(() => {
@@ -54,8 +55,11 @@ export default function VolunteerManagement() {
       if (error) throw error;
       
       // Refresh the volunteers list
-      fetchVolunteers();
-      alert(`Volunteer status updated successfully!`);
+      await fetchVolunteers();
+      
+      // Show subtle notification
+      setNotification('Status updated successfully');
+      setTimeout(() => setNotification(null), 3000);
     } catch (error) {
       console.error('Error updating volunteer status:', error);
       alert('Error updating volunteer status. Please try again.');
@@ -206,26 +210,40 @@ export default function VolunteerManagement() {
                 
                 <div style={styles.tableCell}>
                   <div style={styles.statusContainer}>
-                    <button
-                      onClick={() => updateVolunteerStatus(volunteer.id, 'volunteer_status', 
-                        volunteer.volunteer_status === 'active' ? 'inactive' : 'active')}
-                      style={{
-                        ...styles.compactStatusButton,
-                        backgroundColor: volunteer.volunteer_status === 'active' ? '#238636' : '#656D76'
-                      }}
-                    >
-                      {volunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
-                    </button>
-                    <button
-                      onClick={() => updateVolunteerStatus(volunteer.id, 'duty_status', 
-                        volunteer.duty_status === 'on_duty' ? 'off_duty' : 'on_duty')}
-                      style={{
-                        ...styles.compactStatusButton,
-                        backgroundColor: volunteer.duty_status === 'on_duty' ? '#1F6FEB' : '#656D76'
-                      }}
-                    >
-                      {volunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
-                    </button>
+                    <div style={styles.switchContainer}>
+                      <span style={styles.switchLabel}>
+                        {volunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                      <div 
+                        style={{
+                          ...styles.toggleSwitch,
+                          backgroundColor: volunteer.volunteer_status === 'active' ? '#238636' : '#656D76',
+                        }}
+                        onClick={() => updateVolunteerStatus(volunteer.id, 'volunteer_status', volunteer.volunteer_status === 'active' ? 'inactive' : 'active')}
+                      >
+                        <div style={{
+                          ...styles.toggleSlider,
+                          transform: volunteer.volunteer_status === 'active' ? 'translateX(20px)' : 'translateX(2px)',
+                        }} />
+                      </div>
+                    </div>
+                    <div style={styles.switchContainer}>
+                      <span style={styles.switchLabel}>
+                        {volunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
+                      </span>
+                      <div 
+                        style={{
+                          ...styles.toggleSwitch,
+                          backgroundColor: volunteer.duty_status === 'on_duty' ? '#5A9BC4' : '#656D76',
+                        }}
+                        onClick={() => updateVolunteerStatus(volunteer.id, 'duty_status', volunteer.duty_status === 'on_duty' ? 'off_duty' : 'on_duty')}
+                      >
+                        <div style={{
+                          ...styles.toggleSlider,
+                          transform: volunteer.duty_status === 'on_duty' ? 'translateX(20px)' : 'translateX(2px)',
+                        }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
@@ -259,7 +277,6 @@ export default function VolunteerManagement() {
           onClose={() => setShowAddForm(false)}
           onSuccess={() => {
             setShowAddForm(false);
-            fetchVolunteers();
           }}
         />
       )}
@@ -269,8 +286,14 @@ export default function VolunteerManagement() {
         <VolunteerDetailsModal
           volunteer={selectedVolunteer}
           onClose={() => setSelectedVolunteer(null)}
-          onUpdate={fetchVolunteers}
         />
+      )}
+      
+      {/* Subtle notification */}
+      {notification && (
+        <div style={styles.notification}>
+          {notification}
+        </div>
       )}
     </div>
   );
@@ -478,10 +501,11 @@ function VolunteerDetailsModal({ volunteer, onClose, onUpdate }) {
 
 const styles = {
   container: {
-    padding: '16px',
+    padding: '24px',
     backgroundColor: '#0F1419',
-    color: '#E6EDF3',
     minHeight: '100vh',
+    color: '#E6EDF3',
+    fontFamily: 'Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   header: {
     display: 'flex',
@@ -514,13 +538,14 @@ const styles = {
   },
   searchInput: {
     flex: 1,
-    minWidth: '250px',
-    padding: '10px 12px',
-    borderRadius: '6px',
-    border: '1px solid #30363D',
+    padding: '14px 18px',
     backgroundColor: '#1C2128',
+    border: '1px solid #30363D',
+    borderRadius: '8px',
     color: '#E6EDF3',
-    fontSize: '14px',
+    fontSize: '18px',
+    fontFamily: 'Lato, sans-serif',
+    outline: 'none',
   },
   filterSelect: {
     padding: '10px 12px',
@@ -542,20 +567,28 @@ const styles = {
     border: '1px solid #30363D',
     flexWrap: 'wrap',
   },
-  compactStatItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
+  statCard: {
+    backgroundColor: '#1C2128',
+    padding: '18px 22px',
+    borderRadius: '8px',
+    border: '1px solid #30363D',
+    textAlign: 'center',
+    minWidth: '140px',
+  },
+  statNumber: {
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#5A9BC4',
+    margin: '0 0 6px 0',
+    fontFamily: 'Lato, sans-serif',
   },
   statLabel: {
-    fontSize: '13px',
-    color: '#7D8590',
-    fontWeight: '500',
-  },
-  statValue: {
     fontSize: '16px',
-    color: '#388BFD',
-    fontWeight: '600',
+    color: '#8B949E',
+    margin: 0,
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+    fontFamily: 'Lato, sans-serif',
   },
   // Table layout
   tableContainer: {
@@ -563,9 +596,6 @@ const styles = {
     borderRadius: '8px',
     border: '1px solid #30363D',
     overflow: 'hidden',
-    '@media (max-width: 768px)': {
-      overflow: 'auto',
-    },
   },
   volunteersTable: {
     display: 'flex',
@@ -578,13 +608,18 @@ const styles = {
     padding: '12px 16px',
     backgroundColor: '#0F1419',
     borderBottom: '1px solid #30363D',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: '600',
-    color: '#7D8590',
+    color: '#8B949E',
+    fontFamily: 'Lato, sans-serif',
   },
-  headerCell: {
+  tableHeaderCell: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#8B949E',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+    fontFamily: 'Lato, sans-serif',
   },
   tableRow: {
     display: 'grid',
@@ -655,39 +690,63 @@ const styles = {
     alignItems: 'center',
   },
   skillTag: {
-    backgroundColor: '#388BFD',
-    color: '#E6EDF3',
-    padding: '2px 8px',
+    backgroundColor: '#5A9BC4',
+    color: '#FFFFFF',
+    padding: '6px 12px',
     borderRadius: '12px',
-    fontSize: '11px',
+    fontSize: '14px',
     fontWeight: '500',
+    fontFamily: 'Lato, sans-serif',
+    margin: '2px 4px 2px 0',
+    display: 'inline-block',
   },
   moreSkills: {
-    fontSize: '11px',
-    color: '#7D8590',
-    fontWeight: '500',
+    color: '#8B949E',
+    fontSize: '14px',
+    fontStyle: 'italic',
+    fontFamily: 'Lato, sans-serif',
+    margin: '2px 0',
   },
   noSkills: {
     color: '#7D8590',
     fontSize: '12px',
     fontStyle: 'italic',
   },
-  // Status buttons
+  // Status switches
   statusContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '8px',
   },
-  compactStatusButton: {
-    padding: '4px 8px',
-    border: 'none',
-    borderRadius: '4px',
-    color: '#E6EDF3',
-    fontSize: '11px',
+  switchContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  switchLabel: {
+    fontSize: '12px',
+    color: '#8B949E',
+    fontFamily: 'Lato, sans-serif',
+    minWidth: '50px',
+    textAlign: 'left',
+  },
+  toggleSwitch: {
+    width: '44px',
+    height: '24px',
+    borderRadius: '12px',
     cursor: 'pointer',
-    fontWeight: '500',
-    transition: 'all 0.2s ease',
-    minWidth: '60px',
+    transition: 'background-color 0.3s ease',
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  toggleSlider: {
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    backgroundColor: '#FFFFFF',
+    transition: 'transform 0.3s ease',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
   },
   // Actions
   compactActions: {
@@ -699,27 +758,22 @@ const styles = {
     backgroundColor: '#238636',
     color: '#E6EDF3',
     border: 'none',
-    padding: '6px 8px',
+    padding: '8px 12px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '14px',
+    fontFamily: 'Lato, sans-serif',
     transition: 'all 0.2s ease',
   },
-  compactDeleteButton: {
-    backgroundColor: '#DA3633',
-    color: '#E6EDF3',
+  addButton: {
+    backgroundColor: '#4A90B8',
+    color: '#FFFFFF',
     border: 'none',
-    padding: '6px 8px',
-    borderRadius: '4px',
+    padding: '14px 28px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '12px',
-    transition: 'all 0.2s ease',
-  },
-  noVolunteers: {
-    textAlign: 'center',
-    color: '#B3B3B3',
     fontSize: '18px',
-    padding: '40px',
+    fontWeight: '600',
   },
   loading: {
     textAlign: 'center',
