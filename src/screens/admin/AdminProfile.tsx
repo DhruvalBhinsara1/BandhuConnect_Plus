@@ -194,14 +194,14 @@ const AdminProfile: React.FC = () => {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={[styles.actionButton, styles.outlineButton]} 
-              onPress={() => navigation.navigate('VolunteerManagement')}
+              onPress={() => navigation.navigate('Management')}
             >
               <Text style={styles.outlineButtonText}>Manage Volunteers</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.actionButton, styles.outlineButton]} 
-              onPress={() => navigation.navigate('RequestManagement')}
+              onPress={() => navigation.navigate('Requests')}
             >
               <Text style={styles.outlineButtonText}>Manage Requests</Text>
             </TouchableOpacity>
@@ -227,7 +227,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
+    paddingTop: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },

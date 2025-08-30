@@ -333,7 +333,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
+    paddingTop: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },

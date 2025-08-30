@@ -50,6 +50,19 @@ const AdminStack = () => (
   </Stack.Navigator>
 );
 
+const ManagementStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="VolunteerManagement" component={VolunteerManagement} />
+    <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
+  </Stack.Navigator>
+);
+
+const RequestStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="RequestManagement" component={RequestManagement} />
+  </Stack.Navigator>
+);
+
 const PilgrimStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Dashboard" component={PilgrimDashboard} />
@@ -126,8 +139,8 @@ const MainNavigator: React.FC = () => {
         })}
       >
         <Tab.Screen name="Home" component={AdminStack} />
-        <Tab.Screen name="Management" component={VolunteerManagement} />
-        <Tab.Screen name="Requests" component={RequestManagement} />
+        <Tab.Screen name="Management" component={ManagementStack} />
+        <Tab.Screen name="Requests" component={RequestStack} />
         <Tab.Screen name="Map" component={MapScreen} />
         <Tab.Screen name="Profile" component={AdminProfile} />
       </Tab.Navigator>

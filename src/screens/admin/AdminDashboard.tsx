@@ -145,6 +145,63 @@ const AdminDashboard: React.FC = () => {
         </View>
 
         <View style={styles.content}>
+          {/* Quick Actions */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Quick Actions</Text>
+            
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('RequestManagement')}
+                style={styles.actionButton}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#dbeafe' }]}>
+                  <Ionicons name="list" size={24} color="#3b82f6" />
+                </View>
+                <Text style={styles.actionText}>Manage Requests</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('VolunteerManagement')}
+                style={styles.actionButton}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#dcfce7' }]}>
+                  <Ionicons name="people" size={24} color="#10b981" />
+                </View>
+                <Text style={styles.actionText}>Manage Volunteers</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('TaskAssignment')}
+                style={styles.actionButton}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name="person-add" size={24} color="#f59e0b" />
+                </View>
+                <Text style={styles.actionText}>Assign Tasks</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.actionsRow, { marginTop: 16 }]}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Map')}
+                style={styles.actionButton}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#f3e8ff' }]}>
+                  <Ionicons name="map" size={24} color="#8b5cf6" />
+                </View>
+                <Text style={styles.actionText}>Live Map</Text>
+              </TouchableOpacity>
+
+              <View style={styles.actionButton}>
+                {/* Empty placeholder for symmetry */}
+              </View>
+
+              <View style={styles.actionButton}>
+                {/* Empty placeholder for symmetry */}
+              </View>
+            </View>
+          </View>
+
           {/* Volunteer Status Grid */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Volunteer Status</Text>
@@ -316,63 +373,6 @@ const AdminDashboard: React.FC = () => {
               ))}
             </View>
           )}
-
-          {/* Quick Actions */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Quick Actions</Text>
-            
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('RequestManagement')}
-                style={styles.actionButton}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#dbeafe' }]}>
-                  <Ionicons name="list" size={24} color="#3b82f6" />
-                </View>
-                <Text style={styles.actionText}>Manage Requests</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('VolunteerManagement')}
-                style={styles.actionButton}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#dcfce7' }]}>
-                  <Ionicons name="people" size={24} color="#10b981" />
-                </View>
-                <Text style={styles.actionText}>Manage Volunteers</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('TaskAssignment')}
-                style={styles.actionButton}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
-                  <Ionicons name="person-add" size={24} color="#f59e0b" />
-                </View>
-                <Text style={styles.actionText}>Assign Tasks</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.actionsRow, { marginTop: 16 }]}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Map')}
-                style={styles.actionButton}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#f3e8ff' }]}>
-                  <Ionicons name="map" size={24} color="#8b5cf6" />
-                </View>
-                <Text style={styles.actionText}>Live Map</Text>
-              </TouchableOpacity>
-
-              <View style={styles.actionButton}>
-                {/* Empty placeholder for symmetry */}
-              </View>
-
-              <View style={styles.actionButton}>
-                {/* Empty placeholder for symmetry */}
-              </View>
-            </View>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -404,6 +404,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
     paddingHorizontal: 24,
     paddingVertical: 32,
+    paddingTop: 40,
   },
   headerContent: {
     flexDirection: 'row',
