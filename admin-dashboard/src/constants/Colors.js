@@ -1,39 +1,39 @@
-// BandhuConnect+ Color Theme: Dark Mode with Vibrant Accents
+// BandhuConnect+ Color Theme: Dark Professional Theme
 export const Colors = {
-  // Primary Background Color (Dark Grey)
-  primary: '#1A1A1A',
+  // Primary Background Color (Very Dark Navy)
+  primary: '#0F1419',
   
-  // Secondary Background/Card Color (Mid-Dark Grey)  
-  secondary: '#2C2C2C',
+  // Secondary Background/Card Color (Dark Grey-Navy)  
+  secondary: '#1C2128',
   
-  // Primary Text Color (White)
-  textPrimary: '#FFFFFF',
+  // Primary Text Color (Off-White)
+  textPrimary: '#E6EDF3',
   
-  // Secondary Text Color (Light Grey)
-  textSecondary: '#B0B0B0',
+  // Secondary Text Color (Muted Grey)
+  textSecondary: '#7D8590',
   
-  // Primary Accent Color (Vibrant Green)
-  accent: '#3ECF8E',
+  // Primary Accent Color (Muted Blue)
+  accent: '#388BFD',
   
-  // Secondary Accent Color (Muted Green/Grey)
-  accentSecondary: '#5D7F66',
+  // Secondary Accent Color (Darker Muted Blue)
+  accentSecondary: '#1F6FEB',
   
-  // Status Colors
-  success: '#3ECF8E',
-  warning: '#FF7F00',
-  error: '#FF0000',
-  info: '#007BFF',
+  // Status Colors (Darker, more muted)
+  success: '#238636',
+  warning: '#9A6700',
+  error: '#DA3633',
+  info: '#1F6FEB',
   
   // Semantic Colors
-  onDuty: '#3ECF8E',
-  offDuty: '#5D7F66',
-  active: '#3ECF8E',
-  inactive: '#FF0000',
+  onDuty: '#238636',
+  offDuty: '#656D76',
+  active: '#238636',
+  inactive: '#656D76',
   
   // UI Element Colors
-  border: '#404040',
-  shadow: 'rgba(0, 0, 0, 0.3)',
-  overlay: 'rgba(0, 0, 0, 0.5)',
+  border: '#30363D',
+  shadow: 'rgba(0, 0, 0, 0.6)',
+  overlay: 'rgba(15, 20, 25, 0.9)',
 };
 
 // Theme object for consistent styling

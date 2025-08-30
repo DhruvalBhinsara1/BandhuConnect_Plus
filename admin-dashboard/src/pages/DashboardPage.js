@@ -23,7 +23,7 @@ export default function DashboardPage() {
       case 'analytics':
         return <Analytics />;
       default:
-        return <Overview />;
+        return <Overview setActiveTab={setActiveTab} />;
     }
   };
 
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 }
 
 // Overview Component
-function Overview() {
+function Overview({ setActiveTab }) {
   const [stats, setStats] = React.useState({
     activeVolunteers: 0,
     inactiveVolunteers: 0,
@@ -80,9 +80,11 @@ function Overview() {
     activeRequests: 0,
     resolvedToday: 0
   });
+  const [volunteers, setVolunteers] = React.useState([]);
 
   React.useEffect(() => {
     fetchStats();
+    fetchVolunteers();
   }, []);
 
   const fetchStats = async () => {
@@ -144,6 +146,21 @@ function Overview() {
     }
   };
 
+  const fetchVolunteers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'volunteer')
+        .limit(6);
+      
+      if (error) throw error;
+      setVolunteers(data || []);
+    } catch (error) {
+      console.error('Error fetching volunteers:', error);
+    }
+  };
+
   return (
     <div style={styles.overviewContainer}>
       <h2 style={styles.sectionTitle}>Dashboard Overview</h2>
@@ -173,18 +190,81 @@ function Overview() {
       <div style={styles.quickActions}>
         <h3 style={styles.sectionTitle}>Quick Actions</h3>
         <div style={styles.actionButtons}>
-          <button style={styles.actionButton}>
+          <button 
+            style={styles.actionButton}
+            onClick={() => setActiveTab('volunteers')}
+          >
             👥 Add Volunteer
           </button>
-          <button style={styles.actionButton}>
+          <button 
+            style={styles.actionButton}
+            onClick={() => setActiveTab('requests')}
+          >
             📋 View All Requests
           </button>
-          <button style={styles.actionButton}>
+          <button 
+            style={styles.actionButton}
+            onClick={() => setActiveTab('analytics')}
+          >
             📊 Generate Report
           </button>
-          <button style={styles.actionButton}>
+          <button 
+            style={styles.actionButton}
+            onClick={() => alert('System settings coming soon!')}
+          >
             ⚙️ System Settings
           </button>
+        </div>
+      </div>
+
+      {/* Volunteer Profiles Section */}
+      <div style={styles.volunteersSection}>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.sectionTitle}>Recent Volunteers</h3>
+          <button 
+            style={styles.viewAllButton}
+            onClick={() => setActiveTab('volunteers')}
+          >
+            View All
+          </button>
+        </div>
+        <div style={styles.volunteersGrid}>
+          {volunteers.length > 0 ? volunteers.map((volunteer, index) => (
+            <div key={volunteer.id || index} style={styles.volunteerCard}>
+              <div style={styles.volunteerAvatar}>
+                {volunteer.full_name ? volunteer.full_name.charAt(0).toUpperCase() : 'V'}
+              </div>
+              <div style={styles.volunteerInfo}>
+                <h4 style={styles.volunteerName}>
+                  {volunteer.full_name || 'Volunteer'}
+                </h4>
+                <p style={styles.volunteerPhone}>
+                  📞 {volunteer.phone || 'No phone'}
+                </p>
+                <p style={styles.volunteerEmail}>
+                  ✉️ {volunteer.email || 'No email'}
+                </p>
+                <div style={styles.volunteerStatus}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    backgroundColor: volunteer.volunteer_status === 'active' ? Colors.success : Colors.offDuty
+                  }}>
+                    {volunteer.volunteer_status || 'Active'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )) : (
+            <div style={styles.emptyState}>
+              <p style={styles.emptyText}>No volunteers found. Add some volunteers to get started!</p>
+              <button 
+                style={styles.addVolunteerButton}
+                onClick={() => setActiveTab('volunteers')}
+              >
+                Add First Volunteer
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -305,11 +385,16 @@ const styles = {
   },
   statCard: {
     backgroundColor: Colors.secondary,
-    padding: Theme.spacing.lg + 'px 8px',
-    borderRadius: Theme.borderRadius.md,
+    padding: `${Theme.spacing.lg} ${Theme.spacing.md}`,
+    borderRadius: Theme.borderRadius.lg,
     textAlign: 'center',
     border: `1px solid ${Colors.border}`,
-    boxShadow: `0 2px 8px ${Colors.shadow}`,
+    boxShadow: `0 4px 16px ${Colors.shadow}`,
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: `0 8px 24px ${Colors.shadow}`,
+    },
   },
   statNumber: {
     fontSize: '36px',
@@ -335,19 +420,24 @@ const styles = {
     color: Colors.textPrimary,
     border: 'none',
     padding: `${Theme.spacing.md} ${Theme.spacing.lg}`,
-    borderRadius: Theme.borderRadius.sm,
+    borderRadius: Theme.borderRadius.md,
     fontSize: Theme.fontSize.md,
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    fontWeight: 'bold',
-    boxShadow: `0 2px 4px ${Colors.shadow}`,
+    fontWeight: '600',
+    boxShadow: `0 4px 12px ${Colors.shadow}`,
+    '&:hover': {
+      backgroundColor: Colors.accentSecondary,
+      transform: 'translateY(-2px)',
+      boxShadow: `0 6px 16px ${Colors.shadow}`,
+    },
   },
   recentActivity: {
     backgroundColor: Colors.secondary,
-    padding: Theme.spacing.lg + 'px 8px',
-    borderRadius: Theme.borderRadius.md,
+    padding: `${Theme.spacing.lg} ${Theme.spacing.md}`,
+    borderRadius: Theme.borderRadius.lg,
     border: `1px solid ${Colors.border}`,
-    boxShadow: `0 2px 8px ${Colors.shadow}`,
+    boxShadow: `0 4px 16px ${Colors.shadow}`,
   },
   activityList: {
     margin: 0,
@@ -368,5 +458,108 @@ const styles = {
     lineHeight: '1.6',
     maxWidth: '600px',
     margin: '0 auto',
+  },
+  // New styles for volunteer profiles section
+  volunteersSection: {
+    marginBottom: Theme.spacing.xl,
+  },
+  sectionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Theme.spacing.lg,
+  },
+  viewAllButton: {
+    backgroundColor: 'transparent',
+    color: Colors.accent,
+    border: `1px solid ${Colors.accent}`,
+    padding: `${Theme.spacing.sm} ${Theme.spacing.md}`,
+    borderRadius: Theme.borderRadius.sm,
+    fontSize: Theme.fontSize.sm,
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    fontWeight: '500',
+  },
+  volunteersGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: Theme.spacing.md,
+  },
+  volunteerCard: {
+    backgroundColor: Colors.secondary,
+    padding: Theme.spacing.md,
+    borderRadius: Theme.borderRadius.lg,
+    border: `1px solid ${Colors.border}`,
+    boxShadow: `0 2px 8px ${Colors.shadow}`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+    transition: 'all 0.3s ease',
+  },
+  volunteerAvatar: {
+    width: '50px',
+    height: '50px',
+    borderRadius: '50%',
+    backgroundColor: Colors.accent,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.lg,
+    fontWeight: 'bold',
+    flexShrink: 0,
+  },
+  volunteerInfo: {
+    flex: 1,
+  },
+  volunteerName: {
+    color: Colors.textPrimary,
+    fontSize: Theme.fontSize.md,
+    fontWeight: 'bold',
+    margin: `0 0 ${Theme.spacing.xs} 0`,
+  },
+  volunteerPhone: {
+    color: Colors.textSecondary,
+    fontSize: Theme.fontSize.sm,
+    margin: `${Theme.spacing.xs} 0`,
+  },
+  volunteerEmail: {
+    color: Colors.textSecondary,
+    fontSize: Theme.fontSize.sm,
+    margin: `${Theme.spacing.xs} 0`,
+  },
+  volunteerStatus: {
+    marginTop: Theme.spacing.sm,
+  },
+  statusBadge: {
+    padding: `${Theme.spacing.xs} ${Theme.spacing.sm}`,
+    borderRadius: Theme.borderRadius.sm,
+    fontSize: Theme.fontSize.xs,
+    fontWeight: 'bold',
+    color: Colors.textPrimary,
+    textTransform: 'capitalize',
+  },
+  emptyState: {
+    gridColumn: '1 / -1',
+    textAlign: 'center',
+    padding: Theme.spacing.xl,
+    backgroundColor: Colors.secondary,
+    borderRadius: Theme.borderRadius.lg,
+    border: `1px solid ${Colors.border}`,
+  },
+  emptyText: {
+    color: Colors.textSecondary,
+    fontSize: Theme.fontSize.md,
+    marginBottom: Theme.spacing.lg,
+  },
+  addVolunteerButton: {
+    backgroundColor: Colors.accent,
+    color: Colors.textPrimary,
+    border: 'none',
+    padding: `${Theme.spacing.sm} ${Theme.spacing.lg}`,
+    borderRadius: Theme.borderRadius.md,
+    fontSize: Theme.fontSize.md,
+    cursor: 'pointer',
+    fontWeight: '600',
   },
 };

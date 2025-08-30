@@ -128,98 +128,128 @@ export default function VolunteerManagement() {
         </select>
       </div>
 
-      {/* Volunteers Stats */}
-      <div style={styles.stats}>
-        <div style={styles.statCard}>
-          <h3>Total Volunteers</h3>
-          <p style={styles.statNumber}>{volunteers.length}</p>
+      {/* Compact Stats Row */}
+      <div style={styles.compactStats}>
+        <div style={styles.compactStatItem}>
+          <span style={styles.statLabel}>Total:</span>
+          <span style={styles.statValue}>{volunteers.length}</span>
         </div>
-        <div style={styles.statCard}>
-          <h3>Active Today</h3>
-          <p style={styles.statNumber}>{volunteers.length}</p>
+        <div style={styles.compactStatItem}>
+          <span style={styles.statLabel}>Active:</span>
+          <span style={styles.statValue}>{volunteers.filter(v => v.volunteer_status === 'active').length}</span>
         </div>
-        <div style={styles.statCard}>
-          <h3>Available Now</h3>
-          <p style={styles.statNumber}>{volunteers.length}</p>
+        <div style={styles.compactStatItem}>
+          <span style={styles.statLabel}>On Duty:</span>
+          <span style={styles.statValue}>{volunteers.filter(v => v.duty_status === 'on_duty').length}</span>
+        </div>
+        <div style={styles.compactStatItem}>
+          <span style={styles.statLabel}>Filtered:</span>
+          <span style={styles.statValue}>{filteredVolunteers.length}</span>
         </div>
       </div>
 
-      {/* Volunteers List */}
-      <div style={styles.volunteersList}>
+      {/* Volunteers Table */}
+      <div style={styles.tableContainer}>
         {filteredVolunteers.length === 0 ? (
           <div style={styles.noVolunteers}>
             {searchTerm || skillFilter ? 'No volunteers match your filters' : 'No volunteers found'}
           </div>
         ) : (
-          filteredVolunteers.map(volunteer => (
-            <div key={volunteer.id} style={styles.volunteerCard}>
-              <div style={styles.volunteerInfo}>
-                <h3 style={styles.volunteerName}>{volunteer.name || 'Unnamed Volunteer'}</h3>
-                <p style={styles.volunteerPhone}>📞 {volunteer.phone}</p>
-                <div style={styles.volunteerSkills}>
-                  <strong>Skills: </strong>
-                  {volunteer.skills?.length > 0 ? (
-                    volunteer.skills.map(skill => (
-                      <span key={skill} style={styles.skillTag}>{skill}</span>
-                    ))
-                  ) : (
-                    <span style={styles.noSkills}>No skills listed</span>
-                  )}
+          <div style={styles.volunteersTable}>
+            {/* Table Header */}
+            <div style={styles.tableHeader}>
+              <div style={styles.headerCell}>Volunteer</div>
+              <div style={styles.headerCell}>Contact</div>
+              <div style={styles.headerCell}>Skills</div>
+              <div style={styles.headerCell}>Status</div>
+              <div style={styles.headerCell}>Actions</div>
+            </div>
+            
+            {/* Table Rows */}
+            {filteredVolunteers.map(volunteer => (
+              <div key={volunteer.id} style={styles.tableRow}>
+                <div style={styles.tableCell}>
+                  <div style={styles.volunteerProfile}>
+                    <div style={styles.avatar}>
+                      {(volunteer.name || 'V').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={styles.profileInfo}>
+                      <div style={styles.volunteerName}>{volunteer.name || 'Unnamed'}</div>
+                      <div style={styles.volunteerAge}>
+                        {volunteer.age ? `Age ${volunteer.age}` : 'Age not specified'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {volunteer.age && (
-                  <p style={styles.volunteerAge}>Age: {volunteer.age}</p>
-                )}
-                <p style={styles.volunteerUpdated}>
-                  Last updated: {new Date(volunteer.updated_at).toLocaleDateString()}
-                </p>
-              </div>
-              <div style={styles.volunteerActions}>
-                {/* Status Override Controls */}
-                <div style={styles.statusControls}>
-                  <div style={styles.statusGroup}>
-                    <label style={styles.statusLabel}>Status:</label>
+                
+                <div style={styles.tableCell}>
+                  <div style={styles.contactInfo}>
+                    <div style={styles.phone}>📞 {volunteer.phone}</div>
+                    <div style={styles.email}>✉️ {volunteer.email || 'No email'}</div>
+                  </div>
+                </div>
+                
+                <div style={styles.tableCell}>
+                  <div style={styles.skillsContainer}>
+                    {volunteer.skills?.length > 0 ? (
+                      volunteer.skills.slice(0, 2).map(skill => (
+                        <span key={skill} style={styles.skillTag}>{skill}</span>
+                      ))
+                    ) : (
+                      <span style={styles.noSkills}>No skills</span>
+                    )}
+                    {volunteer.skills?.length > 2 && (
+                      <span style={styles.moreSkills}>+{volunteer.skills.length - 2}</span>
+                    )}
+                  </div>
+                </div>
+                
+                <div style={styles.tableCell}>
+                  <div style={styles.statusContainer}>
                     <button
                       onClick={() => updateVolunteerStatus(volunteer.id, 'volunteer_status', 
                         volunteer.volunteer_status === 'active' ? 'inactive' : 'active')}
                       style={{
-                        ...styles.statusButton,
-                        backgroundColor: volunteer.volunteer_status === 'active' ? '#4CAF50' : '#f44336'
+                        ...styles.compactStatusButton,
+                        backgroundColor: volunteer.volunteer_status === 'active' ? '#238636' : '#656D76'
                       }}
                     >
                       {volunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
                     </button>
-                  </div>
-                  <div style={styles.statusGroup}>
-                    <label style={styles.statusLabel}>Duty:</label>
                     <button
                       onClick={() => updateVolunteerStatus(volunteer.id, 'duty_status', 
                         volunteer.duty_status === 'on_duty' ? 'off_duty' : 'on_duty')}
                       style={{
-                        ...styles.statusButton,
-                        backgroundColor: volunteer.duty_status === 'on_duty' ? '#2196F3' : '#9E9E9E'
+                        ...styles.compactStatusButton,
+                        backgroundColor: volunteer.duty_status === 'on_duty' ? '#1F6FEB' : '#656D76'
                       }}
                     >
                       {volunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
                     </button>
                   </div>
                 </div>
-                <div style={styles.actionButtons}>
-                  <button
-                    onClick={() => setSelectedVolunteer(volunteer)}
-                    style={styles.viewButton}
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => handleDeleteVolunteer(volunteer.id)}
-                    style={styles.deleteButton}
-                  >
-                    Remove
-                  </button>
+                
+                <div style={styles.tableCell}>
+                  <div style={styles.compactActions}>
+                    <button
+                      onClick={() => setSelectedVolunteer(volunteer)}
+                      style={styles.compactViewButton}
+                      title="View Details"
+                    >
+                      👁️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteVolunteer(volunteer.id)}
+                      style={styles.compactDeleteButton}
+                      title="Remove Volunteer"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
@@ -448,181 +478,242 @@ function VolunteerDetailsModal({ volunteer, onClose, onUpdate }) {
 
 const styles = {
   container: {
-    padding: '20px',
-    backgroundColor: '#121212',
-    color: '#FFFFFF',
+    padding: '16px',
+    backgroundColor: '#0F1419',
+    color: '#E6EDF3',
     minHeight: '100vh',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
+    marginBottom: '16px',
   },
   title: {
-    fontSize: '28px',
+    fontSize: '24px',
     margin: 0,
-    color: '#FFFFFF',
+    color: '#E6EDF3',
+    fontWeight: '600',
   },
   addButton: {
-    backgroundColor: '#007BFF',
-    color: '#FFFFFF',
+    backgroundColor: '#388BFD',
+    color: '#E6EDF3',
     border: 'none',
-    padding: '12px 24px',
+    padding: '10px 20px',
     borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: 'bold',
+    fontSize: '14px',
+    fontWeight: '600',
     cursor: 'pointer',
+    transition: 'all 0.2s ease',
   },
   controls: {
     display: 'flex',
-    gap: '15px',
-    marginBottom: '20px',
+    gap: '12px',
+    marginBottom: '16px',
     flexWrap: 'wrap',
   },
   searchInput: {
     flex: 1,
-    minWidth: '300px',
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #333',
-    backgroundColor: '#2C2C2E',
-    color: '#FFFFFF',
-    fontSize: '16px',
+    minWidth: '250px',
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: '1px solid #30363D',
+    backgroundColor: '#1C2128',
+    color: '#E6EDF3',
+    fontSize: '14px',
   },
   filterSelect: {
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #333',
-    backgroundColor: '#2C2C2E',
-    color: '#FFFFFF',
-    fontSize: '16px',
-    minWidth: '150px',
-  },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '15px',
-    marginBottom: '30px',
-  },
-  statCard: {
-    backgroundColor: '#1E1E1E',
-    padding: '20px',
-    borderRadius: '12px',
-    textAlign: 'center',
-  },
-  statNumber: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#007BFF',
-    margin: '10px 0 0 0',
-  },
-  volunteersList: {
-    display: 'grid',
-    gap: '15px',
-  },
-  volunteerCard: {
-    backgroundColor: '#1E1E1E',
-    padding: '20px',
-    borderRadius: '12px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  volunteerInfo: {
-    flex: 1,
-  },
-  volunteerName: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    margin: '0 0 8px 0',
-    color: '#FFFFFF',
-  },
-  volunteerPhone: {
-    fontSize: '16px',
-    color: '#B3B3B3',
-    margin: '5px 0',
-  },
-  volunteerSkills: {
-    margin: '10px 0',
-  },
-  skillTag: {
-    backgroundColor: '#007BFF',
-    color: '#FFFFFF',
-    padding: '4px 8px',
-    borderRadius: '16px',
-    fontSize: '12px',
-    marginRight: '6px',
-    display: 'inline-block',
-  },
-  noSkills: {
-    color: '#B3B3B3',
-    fontStyle: 'italic',
-  },
-  volunteerAge: {
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: '1px solid #30363D',
+    backgroundColor: '#1C2128',
+    color: '#E6EDF3',
     fontSize: '14px',
-    color: '#B3B3B3',
-    margin: '5px 0',
+    minWidth: '120px',
   },
-  volunteerUpdated: {
-    fontSize: '12px',
-    color: '#666',
-    margin: '5px 0',
-  },
-  volunteerActions: {
+  // Compact stats row
+  compactStats: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '15px',
-    minWidth: '200px',
+    gap: '24px',
+    marginBottom: '16px',
+    padding: '12px 16px',
+    backgroundColor: '#1C2128',
+    borderRadius: '8px',
+    border: '1px solid #30363D',
+    flexWrap: 'wrap',
   },
-  statusControls: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    marginBottom: '10px',
-  },
-  statusGroup: {
+  compactStatItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   },
-  statusLabel: {
-    fontSize: '12px',
-    color: '#CCCCCC',
-    minWidth: '40px',
+  statLabel: {
+    fontSize: '13px',
+    color: '#7D8590',
+    fontWeight: '500',
   },
-  statusButton: {
-    padding: '4px 12px',
-    border: 'none',
-    borderRadius: '4px',
-    color: 'white',
-    fontSize: '12px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
+  statValue: {
+    fontSize: '16px',
+    color: '#388BFD',
+    fontWeight: '600',
   },
-  actionButtons: {
+  // Table layout
+  tableContainer: {
+    backgroundColor: '#1C2128',
+    borderRadius: '8px',
+    border: '1px solid #30363D',
+    overflow: 'hidden',
+    '@media (max-width: 768px)': {
+      overflow: 'auto',
+    },
+  },
+  volunteersTable: {
     display: 'flex',
     flexDirection: 'column',
+  },
+  tableHeader: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 2fr 2fr 2fr 1fr',
+    gap: '16px',
+    padding: '12px 16px',
+    backgroundColor: '#0F1419',
+    borderBottom: '1px solid #30363D',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#7D8590',
+  },
+  headerCell: {
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  tableRow: {
+    display: 'grid',
+    gridTemplateColumns: '2fr 2fr 2fr 2fr 1fr',
+    gap: '16px',
+    padding: '16px',
+    borderBottom: '1px solid #30363D',
+    transition: 'background-color 0.2s ease',
+    cursor: 'pointer',
+  },
+  tableCell: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  // Volunteer profile in table
+  volunteerProfile: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  avatar: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    backgroundColor: '#388BFD',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#E6EDF3',
+    fontSize: '16px',
+    fontWeight: '600',
+    flexShrink: 0,
+  },
+  profileInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  },
+  volunteerName: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#E6EDF3',
+    margin: 0,
+  },
+  volunteerAge: {
+    fontSize: '12px',
+    color: '#7D8590',
+  },
+  // Contact info
+  contactInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  phone: {
+    fontSize: '13px',
+    color: '#E6EDF3',
+  },
+  email: {
+    fontSize: '12px',
+    color: '#7D8590',
+  },
+  // Skills
+  skillsContainer: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '4px',
+    alignItems: 'center',
+  },
+  skillTag: {
+    backgroundColor: '#388BFD',
+    color: '#E6EDF3',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '500',
+  },
+  moreSkills: {
+    fontSize: '11px',
+    color: '#7D8590',
+    fontWeight: '500',
+  },
+  noSkills: {
+    color: '#7D8590',
+    fontSize: '12px',
+    fontStyle: 'italic',
+  },
+  // Status buttons
+  statusContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+  compactStatusButton: {
+    padding: '4px 8px',
+    border: 'none',
+    borderRadius: '4px',
+    color: '#E6EDF3',
+    fontSize: '11px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+    minWidth: '60px',
+  },
+  // Actions
+  compactActions: {
+    display: 'flex',
     gap: '8px',
+    justifyContent: 'center',
   },
-  viewButton: {
-    backgroundColor: '#28A745',
-    color: '#FFFFFF',
+  compactViewButton: {
+    backgroundColor: '#238636',
+    color: '#E6EDF3',
     border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
+    padding: '6px 8px',
+    borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
+    transition: 'all 0.2s ease',
   },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-    color: '#FFFFFF',
+  compactDeleteButton: {
+    backgroundColor: '#DA3633',
+    color: '#E6EDF3',
     border: 'none',
-    padding: '8px 16px',
-    borderRadius: '6px',
+    padding: '6px 8px',
+    borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
+    transition: 'all 0.2s ease',
   },
   noVolunteers: {
     textAlign: 'center',

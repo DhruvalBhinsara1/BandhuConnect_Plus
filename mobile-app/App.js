@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
@@ -7,54 +7,59 @@ export default function App() {
     Alert.alert('Coming Soon', `${type} functionality will be available soon!`);
   };
 
+  const { width, height } = Dimensions.get('window');
+  const isWeb = Platform.OS === 'web';
+  const isLargeScreen = width > 768;
+
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>🤝</Text>
+        <View style={[styles.appWrapper, isWeb && isLargeScreen && styles.webContainer]}>
+          {/* Top illustration area */}
+          <View style={styles.illustrationContainer}>
+            <View style={styles.illustrationPlaceholder}>
+              <Text style={styles.illustrationEmoji}>👨‍👩‍👧‍👦</Text>
+              <Text style={styles.illustrationText}>Community Support</Text>
+            </View>
           </View>
-          <Text style={styles.title}>BandhuConnect+</Text>
-          <Text style={styles.subtitle}>
-            Connecting communities through seamless volunteer coordination and assistance management.
-          </Text>
-        </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.primaryButton]}
-            onPress={() => handlePress('Admin Portal')}
-          >
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonIcon}>⚙️</Text>
-              <Text style={styles.buttonText}>Admin Portal</Text>
+          {/* Main content area */}
+          <View style={styles.contentContainer}>
+            <Text style={styles.title}>BandhuConnect+</Text>
+            <Text style={styles.subtitle}>
+              Connecting volunteers, admins, and pilgrims for seamless assistance and coordination during large events.
+            </Text>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={styles.loginButton}
+                onPress={() => handlePress('Admin Login')}
+              >
+                <Text style={styles.buttonText}>Admin Login</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.loginButton}
+                onPress={() => handlePress('Volunteer Login')}
+              >
+                <Text style={styles.buttonText}>Volunteer Login</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.loginButton}
+                onPress={() => handlePress('Pilgrim Login')}
+              >
+                <Text style={styles.buttonText}>Pilgrim Login</Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => handlePress('Volunteer Access')}
-          >
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonIcon}>👥</Text>
-              <Text style={styles.buttonText}>Volunteer Access</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => handlePress('Request Assistance')}
-          >
-            <View style={styles.buttonContent}>
-              <Text style={styles.buttonIcon}>🙋</Text>
-              <Text style={styles.buttonText}>Request Assistance</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Connecting communities, one helping hand at a time</Text>
+            {/* Language selector */}
+            <TouchableOpacity style={styles.languageContainer}>
+              <Text style={styles.languageIcon}>🌐</Text>
+              <Text style={styles.languageText}>Language</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </>
@@ -64,95 +69,124 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    backgroundColor: '#F5F5DC',
+    alignItems: 'center', // Center content horizontally for web
+    justifyContent: 'center', // Center content vertically for web
   },
-  header: {
-    flex: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 40,
+  appWrapper: {
+    flex: 1,
+    width: '100%',
+    maxWidth: '100%', // Full width on mobile
   },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#1E1E1E',
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+  webContainer: {
+    maxWidth: 480, // Limit width on web to mobile-like experience
+    width: '100%',
+    alignSelf: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    borderRadius: Platform.OS === 'web' ? 0 : 0, // Remove border radius to fix corner issue
+    overflow: 'hidden',
   },
-  logoText: {
-    fontSize: 40,
+  illustrationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5DC',
+    paddingTop: 60,
+    paddingBottom: 20,
+    minHeight: 300, // Ensure minimum height
+  },
+  illustrationPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 200,
+    height: 200,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  illustrationEmoji: {
+    fontSize: 60,
+    marginBottom: 10,
+  },
+  illustrationText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#1A2332',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 0 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 0 : 0,
+    paddingHorizontal: 30,
+    paddingTop: 40,
+    paddingBottom: 30,
+    justifyContent: 'space-between',
+    minHeight: 400, // Ensure minimum height for content
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 15,
     textAlign: 'center',
+    marginBottom: 15,
   },
   subtitle: {
     fontSize: 16,
-    color: '#B3B3B3',
+    color: '#8A9BAE',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+    marginBottom: 40,
     paddingHorizontal: 10,
   },
   buttonContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    width: '100%',
     gap: 15,
+    marginBottom: 40,
+    paddingHorizontal: Platform.OS === 'web' ? 20 : 0,
   },
-  button: {
+  loginButton: {
+    backgroundColor: '#2196F3',
     paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    width: '100%',
+    borderRadius: 16,
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  primaryButton: {
-    backgroundColor: '#007BFF',
-  },
-  secondaryButton: {
-    backgroundColor: '#2C2C2E',
-    borderWidth: 1,
-    borderColor: '#444',
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonIcon: {
-    fontSize: 20,
-    marginRight: 10,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+    maxWidth: 400, // Limit button width on larger screens
+    alignSelf: 'center',
+    width: '100%',
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  footer: {
+  languageContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 20,
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-  footerText: {
-    fontSize: 14,
-    color: '#B3B3B3',
-    textAlign: 'center',
-    fontStyle: 'italic',
+  languageIcon: {
+    fontSize: 20,
+    marginRight: 8,
+    color: '#8A9BAE',
+  },
+  languageText: {
+    color: '#8A9BAE',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
