@@ -1,13 +1,67 @@
--- Simplified Demo Users for BandhuConnect+ Testing
--- This version doesn't use custom functions and can be run after schema.sql only
+-- Clean database and setup new help categories
+-- This script will clean all data except admin and update enums
 
 -- =============================================
--- DEMO USER CREDENTIALS
+-- CLEAN EXISTING DATA (KEEP ONLY ADMIN)
 -- =============================================
--- Create these users in Supabase Authentication > Users:
 
--- ADMIN:
--- Email: admin@demo.com, Password: demo123
+-- Delete all assignments
+DELETE FROM assignments;
+
+-- Delete all assistance requests
+DELETE FROM assistance_requests;
+
+-- Delete all chat messages
+DELETE FROM chat_messages;
+
+-- Delete all chat channels
+DELETE FROM chat_channels;
+
+-- Delete all notifications
+DELETE FROM notifications;
+
+-- Delete all profiles except admin
+DELETE FROM profiles WHERE role != 'admin';
+
+-- =============================================
+-- UPDATE REQUEST TYPE ENUM
+-- =============================================
+
+-- Drop and recreate the request_type enum with new values
+DROP TYPE IF EXISTS request_type CASCADE;
+CREATE TYPE request_type AS ENUM (
+    'medical',
+    'tech', 
+    'crowd_management',
+    'sanitation',
+    'general',
+    'lost_person'
+);
+
+-- Update the assistance_requests table column with new enum
+-- First check what the actual column name is, it might be 'request_type' instead of 'type'
+DO $$
+BEGIN
+    -- Try to alter the column, handling different possible column names
+    BEGIN
+        ALTER TABLE assistance_requests ALTER COLUMN type TYPE request_type USING type::text::request_type;
+        RAISE NOTICE 'Updated column "type" successfully';
+    EXCEPTION
+        WHEN undefined_column THEN
+            BEGIN
+                ALTER TABLE assistance_requests ALTER COLUMN request_type TYPE request_type USING request_type::text::request_type;
+                RAISE NOTICE 'Updated column "request_type" successfully';
+            EXCEPTION
+                WHEN undefined_column THEN
+                    RAISE NOTICE 'Neither "type" nor "request_type" column found. Please check your table schema.';
+            END;
+    END;
+END $$;
+
+-- =============================================
+-- CREATE DEMO USERS (AUTHENTICATION REQUIRED FIRST)
+-- =============================================
+-- You must create these users in Supabase Authentication > Users first:
 
 -- VOLUNTEERS:
 -- Email: raj.volunteer@demo.com, Password: demo123
@@ -18,36 +72,12 @@
 -- PILGRIMS:
 -- Email: ramesh.pilgrim@demo.com, Password: demo123
 -- Email: sita.pilgrim@demo.com, Password: demo123
--- Email: mohan.pilgrim@demo.com, Password: demo123
 
 -- =============================================
--- CREATE DEMO PROFILES
+-- CREATE DEMO VOLUNTEERS
 -- =============================================
 
--- Admin User
-DO $$
-DECLARE
-    user_id UUID;
-BEGIN
-    SELECT id INTO user_id FROM auth.users WHERE email = 'admin@demo.com';
-    IF user_id IS NOT NULL THEN
-        INSERT INTO profiles (id, name, email, phone, role, location) 
-        VALUES (
-            user_id, 
-            'Demo Admin', 
-            'admin@demo.com', 
-            '+919900000001', 
-            'admin', 
-            ST_SetSRID(ST_MakePoint(72.5714, 23.0225), 4326)
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            phone = EXCLUDED.phone,
-            role = EXCLUDED.role;
-        RAISE NOTICE 'Demo Admin created';
-    END IF;
-END $$;
-
--- Volunteer 1: Transportation Specialist
+-- Volunteer 1: Medical Specialist
 DO $$
 DECLARE
     user_id UUID;
@@ -67,16 +97,14 @@ BEGIN
             4.8, 
             25,
             true
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            skills = EXCLUDED.skills,
-            volunteer_status = EXCLUDED.volunteer_status,
-            is_active = EXCLUDED.is_active;
+        );
         RAISE NOTICE 'Volunteer Raj created';
+    ELSE
+        RAISE NOTICE 'User raj.volunteer@demo.com not found in auth.users';
     END IF;
 END $$;
 
--- Volunteer 2: Medical Helper
+-- Volunteer 2: Tech & Crowd Management
 DO $$
 DECLARE
     user_id UUID;
@@ -96,16 +124,14 @@ BEGIN
             4.9, 
             40,
             true
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            skills = EXCLUDED.skills,
-            volunteer_status = EXCLUDED.volunteer_status,
-            is_active = EXCLUDED.is_active;
+        );
         RAISE NOTICE 'Volunteer Priya created';
+    ELSE
+        RAISE NOTICE 'User priya.volunteer@demo.com not found in auth.users';
     END IF;
 END $$;
 
--- Volunteer 3: Accommodation Helper (Currently Busy)
+-- Volunteer 3: Sanitation Specialist
 DO $$
 DECLARE
     user_id UUID;
@@ -125,16 +151,14 @@ BEGIN
             4.3, 
             18,
             true
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            skills = EXCLUDED.skills,
-            volunteer_status = EXCLUDED.volunteer_status,
-            is_active = EXCLUDED.is_active;
+        );
         RAISE NOTICE 'Volunteer Amit created';
+    ELSE
+        RAISE NOTICE 'User amit.volunteer@demo.com not found in auth.users';
     END IF;
 END $$;
 
--- Volunteer 4: Guide (Currently Offline)
+-- Volunteer 4: Lost Person Specialist (Inactive)
 DO $$
 DECLARE
     user_id UUID;
@@ -154,14 +178,16 @@ BEGIN
             4.7, 
             32,
             false
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            skills = EXCLUDED.skills,
-            volunteer_status = EXCLUDED.volunteer_status,
-            is_active = EXCLUDED.is_active;
+        );
         RAISE NOTICE 'Volunteer Sneha created';
+    ELSE
+        RAISE NOTICE 'User sneha.volunteer@demo.com not found in auth.users';
     END IF;
 END $$;
+
+-- =============================================
+-- CREATE DEMO PILGRIMS
+-- =============================================
 
 -- Pilgrim 1: Elderly Person
 DO $$
@@ -178,9 +204,10 @@ BEGIN
             '+919900000006', 
             'pilgrim', 
             ST_SetSRID(ST_MakePoint(72.5720, 23.0280), 4326)
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name;
+        );
         RAISE NOTICE 'Pilgrim Ramesh created';
+    ELSE
+        RAISE NOTICE 'User ramesh.pilgrim@demo.com not found in auth.users';
     END IF;
 END $$;
 
@@ -199,41 +226,18 @@ BEGIN
             '+919900000007', 
             'pilgrim', 
             ST_SetSRID(ST_MakePoint(72.5680, 23.0320), 4326)
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name;
+        );
         RAISE NOTICE 'Pilgrim Sita created';
-    END IF;
-END $$;
-
--- Pilgrim 3: First-time Visitor
-DO $$
-DECLARE
-    user_id UUID;
-BEGIN
-    SELECT id INTO user_id FROM auth.users WHERE email = 'mohan.pilgrim@demo.com';
-    IF user_id IS NOT NULL THEN
-        INSERT INTO profiles (id, name, email, phone, role, location) 
-        VALUES (
-            user_id, 
-            'Mohan Lal (First Visit)', 
-            'mohan.pilgrim@demo.com', 
-            '+919900000008', 
-            'pilgrim', 
-            ST_SetSRID(ST_MakePoint(72.5820, 23.0180), 4326)
-        ) ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name;
-        RAISE NOTICE 'Pilgrim Mohan created';
+    ELSE
+        RAISE NOTICE 'User sita.pilgrim@demo.com not found in auth.users';
     END IF;
 END $$;
 
 -- =============================================
--- CREATE DEMO REQUESTS (WITHOUT AUTO-TRIGGERS)
+-- CREATE DEMO REQUESTS
 -- =============================================
 
--- Temporarily disable triggers to avoid function dependency
-ALTER TABLE assistance_requests DISABLE TRIGGER notify_volunteers_on_new_request;
-
--- Demo Request 1: Transportation (Pending)
+-- Demo Request 1: Medical (Pending)
 DO $$
 DECLARE
     pilgrim_id UUID;
@@ -241,7 +245,7 @@ DECLARE
 BEGIN
     SELECT id INTO pilgrim_id FROM auth.users WHERE email = 'ramesh.pilgrim@demo.com';
     IF pilgrim_id IS NOT NULL THEN
-        INSERT INTO assistance_requests (user_id, type, title, description, priority, status, location, address)
+        INSERT INTO assistance_requests (user_id, request_type, title, description, priority, status, location, address)
         VALUES (
             pilgrim_id,
             'medical',
@@ -252,11 +256,11 @@ BEGIN
             ST_SetSRID(ST_MakePoint(72.5720, 23.0280), 4326),
             'Main Temple Complex, Rest Area'
         ) RETURNING id INTO request_id;
-        RAISE NOTICE 'Demo transportation request created: %', request_id;
+        RAISE NOTICE 'Demo medical request created: %', request_id;
     END IF;
 END $$;
 
--- Demo Request 2: Medical (Assigned)
+-- Demo Request 2: Lost Person (Assigned)
 DO $$
 DECLARE
     pilgrim_id UUID;
@@ -268,7 +272,7 @@ BEGIN
     SELECT id INTO volunteer_id FROM auth.users WHERE email = 'priya.volunteer@demo.com';
     
     IF pilgrim_id IS NOT NULL AND volunteer_id IS NOT NULL THEN
-        INSERT INTO assistance_requests (user_id, type, title, description, priority, status, location, address)
+        INSERT INTO assistance_requests (user_id, request_type, title, description, priority, status, location, address)
         VALUES (
             pilgrim_id,
             'lost_person',
@@ -289,59 +293,7 @@ BEGIN
             NOW() - INTERVAL '10 minutes'
         ) RETURNING id INTO assignment_id;
         
-        RAISE NOTICE 'Demo medical request and assignment created: % -> %', request_id, assignment_id;
-    END IF;
-END $$;
-
--- Re-enable triggers
-ALTER TABLE assistance_requests ENABLE TRIGGER notify_volunteers_on_new_request;
-
--- =============================================
--- CREATE DEMO CHAT CHANNELS AND MESSAGES
--- =============================================
-
--- Create general chat channel
-DO $$
-DECLARE
-    admin_id UUID;
-    channel_id UUID;
-BEGIN
-    SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@demo.com';
-    IF admin_id IS NOT NULL THEN
-        INSERT INTO chat_channels (name, type, created_by)
-        VALUES ('Demo General Help', 'general', admin_id)
-        RETURNING id INTO channel_id;
-        
-        -- Add some demo messages
-        INSERT INTO chat_messages (channel_id, sender_id, content, message_type) VALUES
-        (channel_id, admin_id, 'Welcome to BandhuConnect+ demo! This is the general help channel.', 'text');
-        
-        RAISE NOTICE 'Demo chat channel created: %', channel_id;
-    END IF;
-END $$;
-
--- =============================================
--- CREATE DEMO NOTIFICATIONS
--- =============================================
-
--- Notifications for volunteers
-DO $$
-DECLARE
-    raj_id UUID;
-    priya_id UUID;
-BEGIN
-    SELECT id INTO raj_id FROM auth.users WHERE email = 'raj.volunteer@demo.com';
-    SELECT id INTO priya_id FROM auth.users WHERE email = 'priya.volunteer@demo.com';
-    
-    IF raj_id IS NOT NULL THEN
-        INSERT INTO notifications (user_id, title, body, type, data) VALUES
-        (raj_id, 'New Transportation Request', 'A new transportation request is available near your location', 'new_request', '{"priority": "medium"}'),
-        (raj_id, 'Welcome Volunteer!', 'Thank you for joining BandhuConnect+ as a volunteer. You can now help pilgrims in need.', 'welcome', '{}');
-    END IF;
-    
-    IF priya_id IS NOT NULL THEN
-        INSERT INTO notifications (user_id, title, body, type, data) VALUES
-        (priya_id, 'Request Assigned', 'You have been assigned to help with a medical request', 'request_assigned', '{"priority": "high"}');
+        RAISE NOTICE 'Demo lost person request and assignment created: % -> %', request_id, assignment_id;
     END IF;
 END $$;
 
@@ -351,19 +303,18 @@ END $$;
 
 DO $$
 BEGIN
-    RAISE NOTICE 'Demo users setup complete!';
-    RAISE NOTICE 'All demo users have password: demo123';
-    RAISE NOTICE 'Login credentials are in the comments at the top of this file.';
+    RAISE NOTICE 'Database cleaned and demo data created!';
+    RAISE NOTICE 'Make sure you created the auth users first in Supabase Auth panel';
 END $$;
 
--- Verification query to see all demo users
+-- Show all profiles
 SELECT 
     p.name,
     p.email,
     p.role,
     p.volunteer_status,
     p.skills,
-    p.rating,
+    p.is_active,
     CASE 
         WHEN p.role = 'volunteer' THEN 
             CASE p.volunteer_status
@@ -374,8 +325,6 @@ SELECT
         ELSE '👤 ' || UPPER(p.role::text)
     END as status_display
 FROM profiles p
-JOIN auth.users u ON p.id = u.id
-WHERE u.email LIKE '%@demo.com'
 ORDER BY 
     CASE p.role 
         WHEN 'admin' THEN 1 

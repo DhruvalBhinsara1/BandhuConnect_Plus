@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
-import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
-import { COLORS, STATUS_COLORS } from '../../constants';
+import { volunteerService } from '../../services/volunteerService';
 import { AdminStats } from '../../types';
 
 const AdminDashboard: React.FC = () => {
@@ -15,10 +13,17 @@ const AdminDashboard: React.FC = () => {
   const { requests, assignments, getRequests, getAssignments } = useRequest();
   
   const [refreshing, setRefreshing] = useState(false);
+  const [volunteers, setVolunteers] = useState<any[]>([]);
   const [stats, setStats] = useState<AdminStats>({
     totalVolunteers: 0,
     activeVolunteers: 0,
+    availableVolunteers: 0,
+    busyVolunteers: 0,
+    onDutyVolunteers: 0,
+    offlineVolunteers: 0,
     pendingRequests: 0,
+    assignedRequests: 0,
+    inProgressRequests: 0,
     completedRequests: 0,
     totalRequests: 0,
   });
@@ -29,23 +34,69 @@ const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     calculateStats();
-  }, [requests, assignments]);
+  }, [requests, assignments, volunteers]);
 
   const loadDashboardData = async () => {
     await Promise.all([
       getRequests(),
       getAssignments(),
+      loadVolunteers(),
     ]);
+  };
+
+  const loadVolunteers = async () => {
+    try {
+      const { data, error } = await volunteerService.getVolunteers();
+      if (error) {
+        console.error('Error loading volunteers:', error);
+        return;
+      }
+      setVolunteers(data || []);
+    } catch (error) {
+      console.error('Error loading volunteers:', error);
+    }
   };
 
   const calculateStats = () => {
     const pending = requests.filter(r => r.status === 'pending').length;
     const completed = requests.filter(r => r.status === 'completed').length;
+    const assigned = requests.filter(r => r.status === 'assigned').length;
+    const inProgress = requests.filter(r => r.status === 'in_progress').length;
+    
+    // Get volunteers with active assignments
+    const volunteersWithAssignments = new Set(
+      assignments
+        .filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status))
+        .map(a => a.volunteer_id)
+    );
+    
+    // Volunteer status breakdown with logical corrections
+    const availableVolunteers = volunteers.filter(v => 
+      v.is_active && 
+      (v.volunteer_status === 'available' || !volunteersWithAssignments.has(v.id))
+    ).length;
+    
+    const onDutyVolunteers = volunteers.filter(v => 
+      v.is_active && 
+      (v.volunteer_status === 'busy' || v.volunteer_status === 'on_duty' || volunteersWithAssignments.has(v.id))
+    ).length;
+    
+    const offlineVolunteers = volunteers.filter(v => 
+      v.volunteer_status === 'offline' || !v.is_active
+    ).length;
+    
+    const activeVolunteers = volunteers.filter(v => v.is_active === true).length;
     
     setStats({
-      totalVolunteers: 25, // Mock data
-      activeVolunteers: 18, // Mock data
+      totalVolunteers: volunteers.length,
+      activeVolunteers: activeVolunteers,
+      availableVolunteers: availableVolunteers,
+      busyVolunteers: 0, // Remove busy category since they should be on duty
+      onDutyVolunteers: onDutyVolunteers,
+      offlineVolunteers: offlineVolunteers,
       pendingRequests: pending,
+      assignedRequests: assigned,
+      inProgressRequests: inProgress,
       completedRequests: completed,
       totalRequests: requests.length,
     });
@@ -63,17 +114,17 @@ const AdminDashboard: React.FC = () => {
   ).slice(0, 3);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <ScrollView
-        className="flex-1"
+        style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* Header */}
-        <View className="bg-blue-600 px-6 py-8">
-          <View className="flex-row justify-between items-center mb-4">
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
             <View>
-              <Text className="text-white text-2xl font-bold">Admin Dashboard</Text>
-              <Text className="text-blue-100 text-lg">Welcome, {user?.name}</Text>
+              <Text style={styles.headerTitle}>Admin Dashboard</Text>
+              <Text style={styles.headerSubtitle}>Welcome, {user?.name}</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <Ionicons name="person-circle-outline" size={32} color="white" />
@@ -81,68 +132,122 @@ const AdminDashboard: React.FC = () => {
           </View>
 
           {/* Quick Stats */}
-          <View className="flex-row justify-between">
-            <View className="bg-white bg-opacity-20 px-4 py-3 rounded-lg flex-1 mr-2">
-              <Text className="text-white text-2xl font-bold">{stats.activeVolunteers}</Text>
-              <Text className="text-blue-100 text-sm">Active Volunteers</Text>
+          <View style={styles.quickStats}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.availableVolunteers}</Text>
+              <Text style={styles.statLabel}>Available Now</Text>
             </View>
-            <View className="bg-white bg-opacity-20 px-4 py-3 rounded-lg flex-1 ml-2">
-              <Text className="text-white text-2xl font-bold">{stats.pendingRequests}</Text>
-              <Text className="text-blue-100 text-sm">Pending Requests</Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.pendingRequests}</Text>
+              <Text style={styles.statLabel}>Pending Requests</Text>
             </View>
           </View>
         </View>
 
-        <View className="px-6 py-4">
-          {/* Stats Grid */}
-          <View className="flex-row flex-wrap justify-between mb-6">
-            <Card style={{ width: '48%', marginBottom: 16 }}>
-              <View className="items-center">
-                <Ionicons name="people" size={32} color={COLORS.primary} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
-                  {stats.totalVolunteers}
-                </Text>
-                <Text className="text-gray-600">Total Volunteers</Text>
+        <View style={styles.content}>
+          {/* Volunteer Status Grid */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Volunteer Status</Text>
+          </View>
+          <View style={styles.statsGrid}>
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="checkmark-circle" size={28} color="#10b981" />
+                <Text style={styles.gridNumber}>{stats.availableVolunteers}</Text>
+                <Text style={styles.gridLabel}>Available</Text>
               </View>
-            </Card>
+            </View>
 
-            <Card style={{ width: '48%', marginBottom: 16 }}>
-              <View className="items-center">
-                <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
-                  {stats.completedRequests}
-                </Text>
-                <Text className="text-gray-600">Completed</Text>
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="shield-checkmark" size={28} color="#8b5cf6" />
+                <Text style={styles.gridNumber}>{stats.onDutyVolunteers}</Text>
+                <Text style={styles.gridLabel}>On Duty</Text>
               </View>
-            </Card>
+            </View>
 
-            <Card style={{ width: '48%' }}>
-              <View className="items-center">
-                <Ionicons name="list" size={32} color={COLORS.warning} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
-                  {stats.totalRequests}
-                </Text>
-                <Text className="text-gray-600">Total Requests</Text>
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="moon" size={28} color="#6b7280" />
+                <Text style={styles.gridNumber}>{stats.offlineVolunteers}</Text>
+                <Text style={styles.gridLabel}>Offline</Text>
               </View>
-            </Card>
+            </View>
 
-            <Card style={{ width: '48%' }}>
-              <View className="items-center">
-                <Ionicons name="time" size={32} color={COLORS.error} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
-                  {stats.pendingRequests}
-                </Text>
-                <Text className="text-gray-600">Pending</Text>
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="people" size={28} color="#3b82f6" />
+                <Text style={styles.gridNumber}>{stats.activeVolunteers}</Text>
+                <Text style={styles.gridLabel}>Total Active</Text>
               </View>
-            </Card>
+            </View>
+          </View>
+
+          {/* Request Status Grid */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Request Status</Text>
+          </View>
+          <View style={styles.statsGrid}>
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="hourglass" size={28} color="#ef4444" />
+                <Text style={styles.gridNumber}>{stats.pendingRequests}</Text>
+                <Text style={styles.gridLabel}>Pending</Text>
+              </View>
+            </View>
+
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="person-add" size={28} color="#3b82f6" />
+                <Text style={styles.gridNumber}>{stats.assignedRequests}</Text>
+                <Text style={styles.gridLabel}>Assigned</Text>
+              </View>
+            </View>
+
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="play" size={28} color="#f59e0b" />
+                <Text style={styles.gridNumber}>{stats.inProgressRequests}</Text>
+                <Text style={styles.gridLabel}>In Progress</Text>
+              </View>
+            </View>
+
+            <View style={styles.gridCard}>
+              <View style={styles.cardContent}>
+                <Ionicons name="checkmark-done" size={28} color="#10b981" />
+                <Text style={styles.gridNumber}>{stats.completedRequests}</Text>
+                <Text style={styles.gridLabel}>Completed</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Summary Stats */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Overview</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCard}>
+              <Ionicons name="people" size={32} color="#3b82f6" />
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryNumber}>{stats.totalVolunteers}</Text>
+                <Text style={styles.summaryLabel}>Total Volunteers</Text>
+              </View>
+            </View>
+            <View style={styles.summaryCard}>
+              <Ionicons name="list" size={32} color="#f59e0b" />
+              <View style={styles.summaryContent}>
+                <Text style={styles.summaryNumber}>{stats.totalRequests}</Text>
+                <Text style={styles.summaryLabel}>Total Requests</Text>
+              </View>
+            </View>
           </View>
 
           {/* Recent Requests */}
-          <Card style={{ marginBottom: 24 }}>
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold text-gray-900">Recent Requests</Text>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Recent Requests</Text>
               <TouchableOpacity onPress={() => navigation.navigate('RequestManagement')}>
-                <Text className="text-blue-600 font-semibold">View All</Text>
+                <Text style={styles.linkText}>View All</Text>
               </TouchableOpacity>
             </View>
 
@@ -150,73 +255,58 @@ const AdminDashboard: React.FC = () => {
               recentRequests.map((request) => (
                 <TouchableOpacity
                   key={request.id}
-                  className="border-b border-gray-200 py-3 last:border-b-0"
+                  style={styles.requestItem}
                 >
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1">
-                      <Text className="font-semibold text-gray-900 mb-1">
+                  <View style={styles.requestContent}>
+                    <View style={styles.requestInfo}>
+                      <Text style={styles.requestTitle}>
                         {request.title}
                       </Text>
-                      <Text className="text-gray-600 text-sm mb-2">
+                      <Text style={styles.requestDescription}>
                         {request.description}
                       </Text>
-                      <View className="flex-row items-center">
-                        <View
-                          className="px-2 py-1 rounded-full mr-2"
-                          style={{ backgroundColor: STATUS_COLORS[request.status] + '20' }}
-                        >
-                          <Text
-                            className="text-xs font-medium capitalize"
-                            style={{ color: STATUS_COLORS[request.status] }}
-                          >
+                      <View style={styles.requestMeta}>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) + '20' }]}>
+                          <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
                             {request.status}
                           </Text>
                         </View>
-                        <Text className="text-gray-500 text-xs">
+                        <Text style={styles.dateText}>
                           {new Date(request.created_at).toLocaleDateString()}
                         </Text>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                    <Ionicons name="chevron-forward" size={20} color="#6b7280" />
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
-              <Text className="text-gray-500 text-center py-4">No recent requests</Text>
+              <Text style={styles.emptyText}>No recent requests</Text>
             )}
-          </Card>
+          </View>
 
           {/* Active Assignments */}
           {activeAssignments.length > 0 && (
-            <Card style={{ marginBottom: 24 }}>
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-lg font-bold text-gray-900">Active Assignments</Text>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Active Assignments</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('VolunteerManagement')}>
-                  <Text className="text-blue-600 font-semibold">Manage</Text>
+                  <Text style={styles.linkText}>Manage</Text>
                 </TouchableOpacity>
               </View>
 
               {activeAssignments.map((assignment) => (
-                <View
-                  key={assignment.id}
-                  className="border-b border-gray-200 py-3 last:border-b-0"
-                >
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1">
-                      <Text className="font-semibold text-gray-900 mb-1">
+                <View key={assignment.id} style={styles.assignmentItem}>
+                  <View style={styles.assignmentContent}>
+                    <View style={styles.assignmentInfo}>
+                      <Text style={styles.assignmentName}>
                         {assignment.volunteer?.name}
                       </Text>
-                      <Text className="text-gray-600 text-sm mb-2">
+                      <Text style={styles.assignmentTask}>
                         {assignment.request?.title}
                       </Text>
-                      <View
-                        className="px-2 py-1 rounded-full self-start"
-                        style={{ backgroundColor: STATUS_COLORS[assignment.status] + '20' }}
-                      >
-                        <Text
-                          className="text-xs font-medium capitalize"
-                          style={{ color: STATUS_COLORS[assignment.status] }}
-                        >
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(assignment.status) + '20' }]}>
+                        <Text style={[styles.statusText, { color: getStatusColor(assignment.status) }]}>
                           {assignment.status.replace('_', ' ')}
                         </Text>
                       </View>
@@ -224,49 +314,323 @@ const AdminDashboard: React.FC = () => {
                   </View>
                 </View>
               ))}
-            </Card>
+            </View>
           )}
 
           {/* Quick Actions */}
-          <Card>
-            <Text className="text-lg font-bold text-gray-900 mb-4">Quick Actions</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Quick Actions</Text>
             
-            <View className="flex-row justify-between">
+            <View style={styles.actionsRow}>
               <TouchableOpacity
                 onPress={() => navigation.navigate('RequestManagement')}
-                className="items-center flex-1"
+                style={styles.actionButton}
               >
-                <View className="bg-blue-100 p-3 rounded-full mb-2">
-                  <Ionicons name="list" size={24} color={COLORS.primary} />
+                <View style={[styles.actionIcon, { backgroundColor: '#dbeafe' }]}>
+                  <Ionicons name="list" size={24} color="#3b82f6" />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Manage Requests</Text>
+                <Text style={styles.actionText}>Manage Requests</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('VolunteerManagement')}
-                className="items-center flex-1"
+                style={styles.actionButton}
               >
-                <View className="bg-green-100 p-3 rounded-full mb-2">
-                  <Ionicons name="people" size={24} color={COLORS.secondary} />
+                <View style={[styles.actionIcon, { backgroundColor: '#dcfce7' }]}>
+                  <Ionicons name="people" size={24} color="#10b981" />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Manage Volunteers</Text>
+                <Text style={styles.actionText}>Manage Volunteers</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('Map')}
-                className="items-center flex-1"
+                onPress={() => navigation.navigate('TaskAssignment')}
+                style={styles.actionButton}
               >
-                <View className="bg-purple-100 p-3 rounded-full mb-2">
-                  <Ionicons name="map" size={24} color="#8b5cf6" />
+                <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name="person-add" size={24} color="#f59e0b" />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Live Map</Text>
+                <Text style={styles.actionText}>Assign Tasks</Text>
               </TouchableOpacity>
             </View>
-          </Card>
+
+            <View style={[styles.actionsRow, { marginTop: 16 }]}>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Map')}
+                style={styles.actionButton}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#f3e8ff' }]}>
+                  <Ionicons name="map" size={24} color="#8b5cf6" />
+                </View>
+                <Text style={styles.actionText}>Live Map</Text>
+              </TouchableOpacity>
+
+              <View style={styles.actionButton}>
+                {/* Empty placeholder for symmetry */}
+              </View>
+
+              <View style={styles.actionButton}>
+                {/* Empty placeholder for symmetry */}
+              </View>
+            </View>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
+// Helper function for status colors
+const getStatusColor = (status: string) => {
+  const statusColors = {
+    pending: '#f59e0b',
+    assigned: '#3b82f6',
+    accepted: '#10b981',
+    on_duty: '#8b5cf6',
+    completed: '#10b981',
+    cancelled: '#ef4444',
+  };
+  return statusColors[status as keyof typeof statusColors] || '#6b7280';
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  headerSubtitle: {
+    color: '#bfdbfe',
+    fontSize: 18,
+  },
+  quickStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  statNumber: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    color: '#bfdbfe',
+    fontSize: 14,
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  gridCard: {
+    width: '48%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardContent: {
+    alignItems: 'center',
+  },
+  gridNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 8,
+  },
+  gridLabel: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  linkText: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  requestItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+  },
+  requestContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  requestInfo: {
+    flex: 1,
+  },
+  requestTitle: {
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  requestDescription: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  requestMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  dateText: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  emptyText: {
+    color: '#9ca3af',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  assignmentItem: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+  },
+  assignmentContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  assignmentInfo: {
+    flex: 1,
+  },
+  assignmentName: {
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  assignmentTask: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  actionIcon: {
+    padding: 12,
+    borderRadius: 24,
+    marginBottom: 8,
+  },
+  actionText: {
+    color: '#374151',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  sectionHeader: {
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  summaryCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    flex: 1,
+    marginHorizontal: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  summaryNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+});
 
 export default AdminDashboard;

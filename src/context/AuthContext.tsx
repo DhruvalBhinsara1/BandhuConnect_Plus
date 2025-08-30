@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/authService';
 import { User, AuthState } from '../types';
 
@@ -26,11 +27,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [selectedRole, setSelectedRole] = useState<'admin' | 'volunteer' | 'pilgrim' | null>(null);
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session and restore saved role
     const getInitialSession = async () => {
       try {
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
+        
+        // Restore saved role if user is authenticated
+        if (currentUser) {
+          const savedRole = await AsyncStorage.getItem('selectedRole');
+          if (savedRole) {
+            setSelectedRole(savedRole as 'admin' | 'volunteer' | 'pilgrim');
+          } else if (currentUser.role) {
+            // Use user's role from profile if no saved role
+            setSelectedRole(currentUser.role);
+            await AsyncStorage.setItem('selectedRole', currentUser.role);
+          }
+        }
       } catch (error) {
         console.error('Error getting initial session:', error);
       } finally {
@@ -48,8 +61,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (session?.user) {
           const currentUser = await authService.getCurrentUser();
           setUser(currentUser);
+          
+          // Restore or set role for authenticated user
+          if (currentUser) {
+            const savedRole = await AsyncStorage.getItem('selectedRole');
+            if (savedRole) {
+              setSelectedRole(savedRole as 'admin' | 'volunteer' | 'pilgrim');
+            } else if (currentUser.role) {
+              setSelectedRole(currentUser.role);
+              await AsyncStorage.setItem('selectedRole', currentUser.role);
+            }
+          }
         } else {
           setUser(null);
+          setSelectedRole(null);
+          await AsyncStorage.removeItem('selectedRole');
         }
         
         setLoading(false);
@@ -113,6 +139,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await authService.signOut();
       setUser(null);
       setSession(null);
+      setSelectedRole(null);
+      await AsyncStorage.removeItem('selectedRole');
     } finally {
       setLoading(false);
     }
@@ -128,8 +156,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return result;
   };
 
-  const setUserRole = (role: 'admin' | 'volunteer' | 'pilgrim') => {
+  const setUserRole = async (role: 'admin' | 'volunteer' | 'pilgrim') => {
     setSelectedRole(role);
+    await AsyncStorage.setItem('selectedRole', role);
   };
 
   const value: AuthContextType = {
