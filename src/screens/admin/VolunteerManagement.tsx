@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
-import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
-import { COLORS, STATUS_COLORS } from '../../constants';
+import { volunteerService } from '../../services/volunteerService';
 import { User, Assignment } from '../../types';
 
 const VolunteerManagement: React.FC = () => {
@@ -23,50 +21,36 @@ const VolunteerManagement: React.FC = () => {
   }, []);
 
   const loadVolunteers = async () => {
-    // Mock volunteer data for demo
-    const mockVolunteers: User[] = [
-      {
-        id: '1',
-        user_id: '1',
-        name: 'John Smith',
-        email: 'john@example.com',
-        phone: '+1234567890',
-        role: 'volunteer',
-        skills: ['First Aid', 'Medical'],
-        status: 'available',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        user_id: '2',
-        name: 'Sarah Johnson',
-        email: 'sarah@example.com',
-        phone: '+1234567891',
-        role: 'volunteer',
-        skills: ['Security', 'Crowd Control'],
-        status: 'on_duty',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        user_id: '3',
-        name: 'Mike Davis',
-        email: 'mike@example.com',
-        phone: '+1234567892',
-        role: 'volunteer',
-        skills: ['Translation', 'Technical Support'],
-        status: 'available',
-        is_active: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
-    
-    setVolunteers(mockVolunteers);
+    try {
+      console.log('Loading volunteers...');
+      const { data, error } = await volunteerService.getVolunteers();
+      console.log('Load volunteers result:', { data: data?.length, error });
+      
+      if (data && !error && data.length > 0) {
+        console.log('Setting volunteers from database:');
+        data.forEach((volunteer, index) => {
+          console.log(`Volunteer ${index + 1}:`, {
+            id: volunteer.id,
+            name: volunteer.name,
+            volunteer_status: volunteer.volunteer_status,
+            is_active: volunteer.is_active
+          });
+        });
+        setVolunteers(data);
+      } else {
+        console.log('❌ No volunteers found in database!');
+        console.log('Please run final-setup.sql script first to create demo volunteers');
+        console.log('Error details:', error);
+        setVolunteers([]);
+        Alert.alert(
+          'No Volunteers Found', 
+          'Please run the final-setup.sql script first to create demo volunteers in the database.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error loading volunteers:', error);
+    }
     await getAssignments();
   };
 
@@ -77,16 +61,11 @@ const VolunteerManagement: React.FC = () => {
   };
 
   const getFilteredVolunteers = () => {
-    switch (filter) {
-      case 'active':
-        return volunteers.filter(v => v.is_active);
-      case 'available':
-        return volunteers.filter(v => v.status === 'available');
-      case 'busy':
-        return volunteers.filter(v => v.status === 'on_duty' || v.status === 'busy');
-      default:
-        return volunteers;
-    }
+    if (filter === 'all') return volunteers;
+    if (filter === 'active') return volunteers.filter(v => v.is_active);
+    if (filter === 'available') return volunteers.filter(v => v.is_active && v.volunteer_status === 'available');
+    if (filter === 'busy') return volunteers.filter(v => v.is_active && (v.volunteer_status === 'on_duty' || v.volunteer_status === 'busy'));
+    return volunteers;
   };
 
   const getVolunteerAssignments = (volunteerId: string) => {
@@ -94,6 +73,13 @@ const VolunteerManagement: React.FC = () => {
   };
 
   const handleToggleStatus = (volunteer: User) => {
+    console.log('Toggle status clicked for volunteer:', {
+      id: volunteer.id,
+      name: volunteer.name,
+      current_status: volunteer.is_active,
+      volunteer_status: volunteer.volunteer_status
+    });
+    
     Alert.alert(
       'Update Status',
       `Change ${volunteer.name}'s status?`,
@@ -101,18 +87,47 @@ const VolunteerManagement: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Toggle Active',
-          onPress: () => {
-            setVolunteers(prev => 
-              prev.map(v => 
-                v.id === volunteer.id 
-                  ? { ...v, is_active: !v.is_active }
-                  : v
-              )
-            );
+          onPress: async () => {
+            try {
+              const newStatus = !volunteer.is_active;
+              console.log('About to update volunteer:', volunteer.id, 'to status:', newStatus);
+              
+              const result = await volunteerService.updateVolunteerStatus(volunteer.id, newStatus);
+              
+              if (result.error) {
+                console.error('Update failed with error:', result.error);
+                Alert.alert('Error', 'Failed to update volunteer status. Please try again.');
+              } else {
+                console.log('Update successful, reloading volunteers...');
+                // Reload volunteers from database to get latest data
+                await loadVolunteers();
+                Alert.alert('Success', `Volunteer status updated to ${newStatus ? 'Active' : 'Inactive'}`);
+              }
+            } catch (error) {
+              console.error('Unexpected error during update:', error);
+              Alert.alert('Error', 'An unexpected error occurred.');
+            }
           }
         }
       ]
     );
+  };
+
+  const getStatusColor = (status: string) => {
+    const statusColors = {
+      available: '#10b981',
+      on_duty: '#8b5cf6',
+      busy: '#f59e0b',
+      offline: '#6b7280',
+    };
+    return statusColors[status as keyof typeof statusColors] || '#6b7280';
+  };
+
+  const getStatusText = (volunteer: User) => {
+    if (!volunteer.is_active) return 'Offline';
+    return volunteer.volunteer_status === 'on_duty' ? 'On Duty' : 
+           volunteer.volunteer_status === 'available' ? 'Available' : 
+           volunteer.volunteer_status === 'busy' ? 'Busy' : 'Offline';
   };
 
   const renderVolunteerItem = ({ item }: { item: User }) => {
@@ -122,111 +137,98 @@ const VolunteerManagement: React.FC = () => {
     );
 
     return (
-      <Card style={{ marginBottom: 12 }}>
-        <View className="flex-row justify-between items-start mb-3">
-          <View className="flex-1">
-            <View className="flex-row items-center mb-2">
-              <Text className="font-bold text-gray-900 text-lg mr-2">
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardContent}>
+            <View style={styles.nameRow}>
+              <Text style={styles.volunteerName}>
                 {item.name}
               </Text>
-              <View
-                className="px-2 py-1 rounded-full"
-                style={{ 
-                  backgroundColor: item.is_active ? COLORS.success + '20' : COLORS.error + '20' 
-                }}
-              >
-                <Text
-                  className="text-xs font-medium"
-                  style={{ 
-                    color: item.is_active ? COLORS.success : COLORS.error 
-                  }}
-                >
+              <View style={[styles.statusBadge, { 
+                backgroundColor: item.is_active ? '#10b981' + '20' : '#ef4444' + '20' 
+              }]}>
+                <Text style={[styles.statusText, { 
+                  color: item.is_active ? '#10b981' : '#ef4444' 
+                }]}>
                   {item.is_active ? 'Active' : 'Inactive'}
                 </Text>
               </View>
             </View>
             
-            <Text className="text-gray-600 mb-2">{item.email}</Text>
-            <Text className="text-gray-600 mb-2">{item.phone}</Text>
+            <Text style={styles.contactInfo}>{item.email}</Text>
+            <Text style={styles.contactInfo}>{item.phone}</Text>
             
-            <View className="flex-row items-center mb-2">
-              <Text className="text-gray-500 text-sm mr-2">Status:</Text>
-              <View
-                className="px-2 py-1 rounded-full"
-                style={{ backgroundColor: STATUS_COLORS[item.status] + '20' }}
-              >
-                <Text
-                  className="text-xs font-medium capitalize"
-                  style={{ color: STATUS_COLORS[item.status] }}
-                >
-                  {item.status.replace('_', ' ')}
-                </Text>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusLabel}>Status:</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.volunteer_status || 'offline') }]}>
+                <Text style={styles.statusText}>{getStatusText(item)}</Text>
               </View>
             </View>
 
             {item.skills && item.skills.length > 0 && (
-              <View className="flex-row flex-wrap mb-2">
+              <View style={styles.skillsContainer}>
                 {item.skills.slice(0, 3).map((skill) => (
-                  <View
-                    key={skill}
-                    className="bg-blue-100 px-2 py-1 rounded-full mr-1 mb-1"
-                  >
-                    <Text className="text-blue-800 text-xs">{skill}</Text>
+                  <View key={skill} style={styles.skillBadge}>
+                    <Text style={styles.skillText}>{skill}</Text>
                   </View>
                 ))}
                 {item.skills.length > 3 && (
-                  <Text className="text-gray-500 text-xs">+{item.skills.length - 3} more</Text>
+                  <Text style={styles.moreSkillsText}>+{item.skills.length - 3} more</Text>
                 )}
               </View>
             )}
 
-            <View className="flex-row items-center">
-              <Ionicons name="briefcase" size={14} color={COLORS.textSecondary} />
-              <Text className="text-gray-500 text-sm ml-1">
+            <View style={styles.tasksRow}>
+              <Ionicons name="briefcase" size={14} color="#6b7280" />
+              <Text style={styles.tasksText}>
                 {activeAssignments.length} active task{activeAssignments.length !== 1 ? 's' : ''}
               </Text>
             </View>
           </View>
 
           <TouchableOpacity onPress={() => handleToggleStatus(item)}>
-            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+            <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" />
           </TouchableOpacity>
         </View>
 
-        <View className="flex-row justify-between">
-          <Button
-            title="View Tasks"
-            onPress={() => {/* Navigate to volunteer tasks */}}
-            variant="outline"
-            size="small"
-            style={{ flex: 1, marginRight: 8 }}
-          />
-          <Button
-            title="Assign Task"
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={[styles.button, styles.outlineButton]} onPress={() => {/* Navigate to volunteer tasks */}}>
+            <Text style={styles.outlineButtonText}>View Tasks</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.button, 
+              (!item.is_active || item.volunteer_status === 'on_duty') ? styles.disabledButton : styles.primaryButton
+            ]} 
+            disabled={!item.is_active || item.volunteer_status === 'on_duty'}
             onPress={() => {/* Navigate to task assignment */}}
-            size="small"
-            style={{ flex: 1 }}
-          />
+          >
+            <Text style={[
+              (!item.is_active || item.volunteer_status === 'on_duty') ? styles.disabledButtonText : styles.primaryButtonText
+            ]}>
+              Assign Task
+            </Text>
+          </TouchableOpacity>
         </View>
-      </Card>
+      </View>
     );
   };
 
   const filteredVolunteers = getFilteredVolunteers();
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row justify-between items-center">
-          <Text className="text-2xl font-bold text-gray-900">Volunteer Management</Text>
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Volunteer Management</Text>
           <TouchableOpacity onPress={handleRefresh}>
-            <Ionicons name="refresh" size={24} color={COLORS.primary} />
+            <Ionicons name="refresh" size={24} color="#3b82f6" />
           </TouchableOpacity>
         </View>
 
         {/* Filter Tabs */}
-        <View className="flex-row mt-4">
+        <View style={styles.filterTabs}>
           {[
             { key: 'all', label: 'All' },
             { key: 'active', label: 'Active' },
@@ -236,16 +238,14 @@ const VolunteerManagement: React.FC = () => {
             <TouchableOpacity
               key={tab.key}
               onPress={() => setFilter(tab.key as any)}
-              className={`mr-4 pb-2 ${filter === tab.key ? 'border-b-2 border-blue-500' : ''}`}
+              style={[styles.filterTab, filter === tab.key && styles.activeFilterTab]}
             >
-              <Text className={`font-medium ${
-                filter === tab.key ? 'text-blue-600' : 'text-gray-600'
-              }`}>
+              <Text style={[styles.filterTabText, filter === tab.key && styles.activeFilterTabText]}>
                 {tab.label} ({
                   tab.key === 'all' ? volunteers.length :
                   tab.key === 'active' ? volunteers.filter(v => v.is_active).length :
-                  tab.key === 'available' ? volunteers.filter(v => v.status === 'available').length :
-                  volunteers.filter(v => v.status === 'on_duty' || v.status === 'busy').length
+                  tab.key === 'available' ? volunteers.filter(v => v.is_active && v.volunteer_status === 'available').length :
+                  volunteers.filter(v => v.is_active && (v.volunteer_status === 'on_duty' || v.volunteer_status === 'busy')).length
                 })
               </Text>
             </TouchableOpacity>
@@ -258,15 +258,15 @@ const VolunteerManagement: React.FC = () => {
         data={filteredVolunteers}
         renderItem={renderVolunteerItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
         ListEmptyComponent={
-          <View className="items-center justify-center py-12">
-            <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-lg mt-4">No volunteers found</Text>
-            <Text className="text-gray-400 text-center mt-2">
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={64} color="#6b7280" />
+            <Text style={styles.emptyTitle}>No volunteers found</Text>
+            <Text style={styles.emptySubtitle}>
               {filter === 'active' 
                 ? 'No active volunteers at the moment'
                 : filter === 'available'
@@ -282,5 +282,184 @@ const VolunteerManagement: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    backgroundColor: 'white',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    marginTop: 16,
+  },
+  filterTab: {
+    marginRight: 16,
+    paddingBottom: 8,
+  },
+  activeFilterTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#3b82f6',
+  },
+  filterTabText: {
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeFilterTabText: {
+    color: '#2563eb',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  volunteerName: {
+    fontWeight: 'bold',
+    color: '#111827',
+    fontSize: 18,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  contactInfo: {
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusLabel: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  skillBadge: {
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  skillText: {
+    color: '#1e40af',
+    fontSize: 12,
+  },
+  moreSkillsText: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  tasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tasksText: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    marginRight: 8,
+  },
+  primaryButton: {
+    backgroundColor: '#3b82f6',
+  },
+  outlineButtonText: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  disabledButton: {
+    backgroundColor: '#d1d5db',
+  },
+  disabledButtonText: {
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    color: '#9ca3af',
+    fontSize: 18,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    color: '#d1d5db',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+});
 
 export default VolunteerManagement;

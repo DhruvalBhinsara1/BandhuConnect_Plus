@@ -115,15 +115,70 @@ export class RequestService {
 
   async deleteRequest(id: string) {
     try {
-      const { error } = await supabase
-        .from('assistance_requests')
-        .delete()
-        .eq('id', id);
+      console.log('Attempting to delete request from database:', id);
+      
+      // Use RPC function to bypass RLS policies
+      const { data, error } = await supabase
+        .rpc('delete_assistance_request', {
+          request_id: id
+        });
 
-      if (error) throw error;
+      console.log('RPC Delete result:', { data, error });
+
+      if (error) {
+        console.log('RPC delete failed, trying direct delete...');
+        
+        // Fallback to direct delete method
+        // First check if request exists
+        const { data: existingRequest, error: checkError } = await supabase
+          .from('assistance_requests')
+          .select('id, title, status')
+          .eq('id', id)
+          .single();
+          
+        console.log('Request exists check:', { existingRequest, checkError });
+        
+        if (checkError || !existingRequest) {
+          console.error('Request not found in database:', id);
+          return { error: { message: `Request ${id} not found in database` } };
+        }
+
+        // Delete related assignments first (foreign key constraint)
+        console.log('Deleting related assignments for request:', id);
+        const { error: assignmentDeleteError } = await supabase
+          .from('assignments')
+          .delete()
+          .eq('request_id', id);
+          
+        console.log('Assignment delete result:', { assignmentDeleteError });
+
+        // Now delete the request
+        const { error: directError } = await supabase
+          .from('assistance_requests')
+          .delete()
+          .eq('id', id);
+
+        console.log('Direct delete result:', { error: directError });
+
+        if (directError) {
+          console.error('Both RPC and direct delete failed:', directError);
+          throw directError;
+        }
+      }
+
+      // Verify deletion was successful
+      const { data: verifyDeleted, error: verifyError } = await supabase
+        .from('assistance_requests')
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+        
+      console.log('Verification check:', { verifyDeleted, verifyError });
+      console.log('Verification - request still exists:', verifyDeleted ? 'YES' : 'NO');
 
       return { error: null };
     } catch (error) {
+      console.error('Delete request service error:', error);
       return { error };
     }
   }

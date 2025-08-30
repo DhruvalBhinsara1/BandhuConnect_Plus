@@ -18,6 +18,7 @@ interface RequestContextType {
   }) => Promise<{ data: any; error: any }>;
   getRequests: (filters?: any) => Promise<void>;
   getAssignments: (filters?: any) => Promise<void>;
+  deleteRequest: (id: string) => Promise<{ error: any }>;
   updateAssignmentStatus: (id: string, status: string) => Promise<{ data: any; error: any }>;
   acceptAssignment: (id: string) => Promise<{ data: any; error: any }>;
   startTask: (id: string) => Promise<{ data: any; error: any }>;
@@ -104,6 +105,25 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
     return await updateAssignmentStatus(id, 'completed');
   };
 
+  const deleteRequest = async (id: string) => {
+    setLoading(true);
+    try {
+      console.log('Deleting request:', id);
+      const result = await requestService.deleteRequest(id);
+      console.log('Delete result:', result);
+      
+      if (!result.error) {
+        setRequests(prev => prev.filter(request => request.id !== id));
+        console.log('Request deleted successfully from state');
+      } else {
+        console.error('Failed to delete request:', result.error);
+      }
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       // Subscribe to real-time updates
@@ -152,6 +172,7 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
     createRequest,
     getRequests,
     getAssignments,
+    deleteRequest,
     updateAssignmentStatus,
     acceptAssignment,
     startTask,

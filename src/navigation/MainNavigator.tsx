@@ -14,6 +14,7 @@ import VolunteerProfile from '../screens/volunteer/VolunteerProfile';
 import AdminDashboard from '../screens/admin/AdminDashboard';
 import VolunteerManagement from '../screens/admin/VolunteerManagement';
 import RequestManagement from '../screens/admin/RequestManagement';
+import TaskAssignment from '../screens/admin/TaskAssignment';
 import AdminProfile from '../screens/admin/AdminProfile';
 
 // Pilgrim Screens
@@ -44,6 +45,7 @@ const AdminStack = () => (
     <Stack.Screen name="Dashboard" component={AdminDashboard} />
     <Stack.Screen name="VolunteerManagement" component={VolunteerManagement} />
     <Stack.Screen name="RequestManagement" component={RequestManagement} />
+    <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
     <Stack.Screen name="Profile" component={AdminProfile} />
   </Stack.Navigator>
 );

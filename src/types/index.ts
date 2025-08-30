@@ -1,6 +1,6 @@
 export type UserRole = 'volunteer' | 'admin' | 'pilgrim';
 
-export type RequestType = 'medical' | 'safety' | 'lost_child' | 'sanitation' | 'general';
+export type RequestType = 'medical' | 'tech' | 'crowd_management' | 'sanitation' | 'general' | 'lost_person';
 
 export type RequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -23,7 +23,8 @@ export interface User {
     latitude: number;
     longitude: number;
   };
-  status: string;
+  status?: string; // Keep for backward compatibility
+  volunteer_status?: string; // Database field for volunteers
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -108,7 +109,13 @@ export interface VolunteerStats {
 export interface AdminStats {
   totalVolunteers: number;
   activeVolunteers: number;
+  availableVolunteers: number;
+  busyVolunteers: number;
+  onDutyVolunteers: number;
+  offlineVolunteers: number;
   pendingRequests: number;
+  assignedRequests: number;
+  inProgressRequests: number;
   completedRequests: number;
   totalRequests: number;
 }
