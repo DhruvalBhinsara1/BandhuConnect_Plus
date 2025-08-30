@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, TextInput, ActivityIndicator, StyleSheet, SafeAreaView, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+  RefreshControl,
+  SafeAreaView,
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../../services/supabase';
-import { AssistanceRequest, User, Assignment } from '../../types';
+import { assignmentService } from '../../services/assignmentService';
+import { requestService } from '../../services/requestService';
+import { volunteerService } from '../../services/volunteerService';
 import { autoAssignmentService } from '../../services/autoAssignmentService';
-import { Logger } from '../../utils/logger';
+import { supabase } from '../../services/supabase';
+import { AssistanceRequest, User } from '../../types';
 
 const TaskAssignment: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -22,10 +35,6 @@ const TaskAssignment: React.FC = () => {
     title: '',
     description: '',
     priority: 'medium',
-    location: null as { latitude: number; longitude: number } | null,
-    locationText: '',
-    scheduledTime: null as Date | null,
-    scheduledTimeText: '',
   });
 
   useEffect(() => {
@@ -35,24 +44,17 @@ const TaskAssignment: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Load pending requests
-      const { data: requestsData } = await supabase
-        .from('assistance_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-      
-      if (requestsData) setRequests(requestsData);
+      const [requestsResult, volunteersResult] = await Promise.all([
+        requestService.getRequests(),
+        volunteerService.getVolunteers()
+      ]);
 
-      // Load available volunteers
-      const { data: volunteersData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'volunteer')
-        .eq('is_active', true)
-        .in('volunteer_status', ['available', 'busy']);
-      
-      if (volunteersData) setVolunteers(volunteersData);
+      if (requestsResult.data) {
+        setRequests(requestsResult.data.filter((req: any) => req.status === 'pending'));
+      }
+      if (volunteersResult.data) {
+        setVolunteers(volunteersResult.data);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to load data');
     } finally {
@@ -92,16 +94,7 @@ const TaskAssignment: React.FC = () => {
     try {
       setLoading(true);
       
-      console.log('🤖 Starting auto-assignment for request:', {
-        id: request.id,
-        title: request.title,
-        type: request.type,
-        priority: request.priority
-      });
-      
       const result = await autoAssignmentService.autoAssignRequest(request.id);
-      
-      console.log('🤖 Auto-assignment result:', result);
       
       if (result.success) {
         Alert.alert(
@@ -110,12 +103,10 @@ const TaskAssignment: React.FC = () => {
         );
         loadData();
       } else {
-        console.error('❌ Auto-assignment failed:', result.message);
         Alert.alert('Auto-Assignment Failed', result.message);
       }
     } catch (error) {
-      console.error('❌ Auto-assignment system error:', error);
-      Alert.alert('Error', `Auto-assignment failed: ${error.message || 'Unknown error'}`);
+      Alert.alert('Error', 'Auto-assignment failed due to system error');
     } finally {
       setLoading(false);
     }
@@ -124,150 +115,69 @@ const TaskAssignment: React.FC = () => {
   const batchAutoAssign = async () => {
     try {
       setLoading(true);
-      Logger.autoAssignment.start(requests.length);
       
       const { data, error } = await supabase.rpc('batch_auto_assign_requests', {
-        p_max_assignments: 10,
+        p_max_assignments: 5,
         p_min_match_score: 0.6
       });
-
-      Logger.database.result('batch_auto_assign_requests', { data, error });
-
+      
       if (error) {
-        Logger.autoAssignment.error(error, 'batch assignment');
-        Alert.alert('Error', `Batch auto-assignment failed: ${error.message}`);
+        Alert.alert('Error', 'Batch auto-assignment failed');
         return;
       }
-
-      const results = data || [];
-      const successful = results.filter((r: any) => r.success).length;
       
-      Logger.autoAssignment.batchComplete(successful, results.length, results);
-
-      // Check for duplicate request types that might cause React key issues
-      const requestTypes = requests.map(r => r.type);
-      const duplicateTypes = requestTypes.filter((type, index) => requestTypes.indexOf(type) !== index);
-      if (duplicateTypes.length > 0) {
-        Logger.react.duplicateKey('TaskAssignment', 'request types', duplicateTypes);
-      }
-
+      const successful = data?.filter((result: any) => result.success).length || 0;
+      const total = data?.length || 0;
+      
       Alert.alert(
-        'Batch Assignment Complete', 
-        `Successfully assigned ${successful} out of ${results.length} requests`
+        'Batch Auto-Assignment Complete',
+        `Successfully assigned ${successful} out of ${total} requests`
       );
       
       loadData();
     } catch (error) {
-      Logger.autoAssignment.error(error, 'batch assignment');
-      Alert.alert('Error', 'Failed to perform batch auto-assignment');
+      Alert.alert('Error', 'Batch auto-assignment failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const parseLocationFromText = (locationText: string) => {
-    // Simple text-based location parsing - in future will integrate with maps
-    const coords = locationText.match(/(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/);
-    if (coords) {
-      return {
-        latitude: parseFloat(coords[1]),
-        longitude: parseFloat(coords[2])
-      };
-    }
-    // Default to center coordinates if no valid coords found
-    return { latitude: 23.0225, longitude: 72.5714 }; // Ahmedabad coordinates
-  };
-
-  const parseTimeFromText = (timeText: string) => {
-    // Simple time parsing - in future will have proper date/time picker
-    const now = new Date();
-    const timeMatch = timeText.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-    if (timeMatch) {
-      let hours = parseInt(timeMatch[1]);
-      const minutes = parseInt(timeMatch[2]);
-      const ampm = timeMatch[3]?.toUpperCase();
-      
-      if (ampm === 'PM' && hours !== 12) hours += 12;
-      if (ampm === 'AM' && hours === 12) hours = 0;
-      
-      const scheduledDate = new Date(now);
-      scheduledDate.setHours(hours, minutes, 0, 0);
-      
-      // If time is in the past, schedule for tomorrow
-      if (scheduledDate < now) {
-        scheduledDate.setDate(scheduledDate.getDate() + 1);
-      }
-      
-      return scheduledDate;
-    }
-    // Default to 1 hour from now
-    return new Date(now.getTime() + 60 * 60 * 1000);
-  };
-
   const createAndAssignCustomTask = async () => {
-    if (!customTask.title || !selectedVolunteer || !customTask.locationText) {
-      Alert.alert('Error', 'Please fill all required fields including location');
+    if (!customTask.title || !selectedVolunteer) {
+      Alert.alert('Error', 'Please fill all required fields and select a volunteer');
       return;
     }
 
     try {
       setLoading(true);
       
-      console.log('📝 Creating custom task:', {
-        ...customTask,
-        volunteer: selectedVolunteer.name
-      });
-      
-      // Parse location and time from text inputs
-      const parsedLocation = parseLocationFromText(customTask.locationText);
-      const parsedTime = customTask.scheduledTimeText ? 
-        parseTimeFromText(customTask.scheduledTimeText) : 
-        new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
-      
       const requestResult = await requestService.createRequest({
-        type: customTask.type as any,
+        type: customTask.type,
         title: customTask.title,
         description: customTask.description,
-        priority: customTask.priority as any,
-        location: parsedLocation,
+        priority: customTask.priority,
+        location: { latitude: 0, longitude: 0 },
       });
 
-      console.log('📝 Request creation result:', requestResult);
-
       if (requestResult.error || !requestResult.data) {
-        console.error('❌ Failed to create request:', requestResult.error);
-        Alert.alert('Error', `Failed to create custom task: ${requestResult.error?.message || 'Unknown error'}`);
+        Alert.alert('Error', 'Failed to create custom task');
         return;
       }
 
       const assignResult = await assignmentService.createAssignment(requestResult.data.id, selectedVolunteer.id);
       
-      console.log('📝 Assignment result:', assignResult);
-      
       if (assignResult.error) {
-        console.error('❌ Failed to assign task:', assignResult.error);
-        Alert.alert('Error', `Task created but failed to assign: ${assignResult.error?.message || 'Unknown error'}`);
+        Alert.alert('Error', 'Task created but failed to assign');
         return;
       }
 
-      console.log('✅ Custom task created and assigned successfully');
       Alert.alert('Success', `Custom task created and assigned to ${selectedVolunteer.name}`);
       setShowCustomTaskModal(false);
       setSelectedVolunteer(null);
-      setCustomTask({ 
-        type: 'general', 
-        title: '', 
-        description: '', 
-        priority: 'medium',
-        location: null,
-        locationText: '',
-        scheduledTime: null,
-        scheduledTimeText: ''
-      });
+      setCustomTask({ type: 'general', title: '', description: '', priority: 'medium' });
       loadData();
     } catch (error) {
-      console.error('❌ Custom task creation system error:', error);
-      Alert.alert('Error', `Failed to create and assign task: ${error.message || 'Unknown error'}`);
+      Alert.alert('Error', 'Failed to create and assign task');
     } finally {
       setLoading(false);
     }
@@ -316,8 +226,8 @@ const TaskAssignment: React.FC = () => {
           <Text style={styles.emptyText}>No pending requests</Text>
         </View>
       ) : (
-        requests.map((request, index) => (
-          <View key={`${request.id}-${index}`} style={styles.requestCard}>
+        requests.map((request) => (
+          <View key={request.id} style={styles.requestCard}>
             <TouchableOpacity
               style={styles.requestContent}
               onPress={() => handleAssignRequest(request)}
@@ -382,9 +292,9 @@ const TaskAssignment: React.FC = () => {
           <Text style={styles.emptyText}>Create your first custom task</Text>
         </View>
       ) : (
-        volunteers.map((volunteer, index) => (
+        volunteers.map((volunteer) => (
           <TouchableOpacity
-            key={`${volunteer.id}-${index}`}
+            key={volunteer.id}
             style={[
               styles.volunteerOption,
               selectedVolunteer?.id === volunteer.id && styles.selectedVolunteerOption
@@ -460,9 +370,9 @@ const TaskAssignment: React.FC = () => {
             <Text style={styles.modalSubtitle}>Choose a volunteer for: {selectedRequest?.title}</Text>
             
             <ScrollView style={styles.volunteerList}>
-              {volunteers.map((volunteer, index) => (
+              {volunteers.map((volunteer) => (
                 <TouchableOpacity
-                  key={`volunteer-${volunteer.id}-${index}`}
+                  key={volunteer.id}
                   style={styles.volunteerOption}
                   onPress={() => assignToVolunteer(volunteer)}
                 >
@@ -509,10 +419,12 @@ const TaskAssignment: React.FC = () => {
                 onValueChange={(value) => setCustomTask({...customTask, type: value})}
               >
                 <Picker.Item label="General" value="general" />
-                <Picker.Item label="Guidance" value="guidance" />
-                <Picker.Item label="Lost Person" value="lost_person" />
                 <Picker.Item label="Medical" value="medical" />
-                <Picker.Item label="Sanitation" value="sanitation" />
+                <Picker.Item label="Transportation" value="transportation" />
+                <Picker.Item label="Food" value="food" />
+                <Picker.Item label="Accommodation" value="accommodation" />
+                <Picker.Item label="Guidance" value="guidance" />
+                <Picker.Item label="Emergency" value="emergency" />
               </Picker>
             </View>
 
@@ -545,28 +457,6 @@ const TaskAssignment: React.FC = () => {
                 <Picker.Item label="High" value="high" />
               </Picker>
             </View>
-
-            <Text style={styles.inputLabel}>Location *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={customTask.locationText}
-              onChangeText={(text) => setCustomTask({...customTask, locationText: text})}
-              placeholder="Enter location (e.g., 'Main Temple' or '23.0225,72.5714')"
-            />
-            <Text style={styles.helperText}>
-              Enter location name or coordinates (lat,lng). Future versions will include map picker.
-            </Text>
-
-            <Text style={styles.inputLabel}>Scheduled Time (Optional)</Text>
-            <TextInput
-              style={styles.textInput}
-              value={customTask.scheduledTimeText}
-              onChangeText={(text) => setCustomTask({...customTask, scheduledTimeText: text})}
-              placeholder="Enter time (e.g., '2:30 PM' or '14:30')"
-            />
-            <Text style={styles.helperText}>
-              Leave empty for immediate scheduling. Future versions will include date/time picker.
-            </Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity 
@@ -925,13 +815,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
-  },
-  helperText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-    marginBottom: 8,
-    fontStyle: 'italic',
   },
 });
 
