@@ -6,8 +6,9 @@ import { supabase } from '../../services/supabase';
 import { AssistanceRequest, User, Assignment } from '../../types';
 import { autoAssignmentService } from '../../services/autoAssignmentService';
 import { Logger } from '../../utils/logger';
+import AutoAssignModal from './AutoAssignModal';
 
-const TaskAssignment: React.FC = () => {
+const TaskAssignment: React.FC = ({ route }: any) => {
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<'assign' | 'create'>('assign');
   const [requests, setRequests] = useState<any[]>([]);
@@ -17,6 +18,7 @@ const TaskAssignment: React.FC = () => {
   const [selectedVolunteer, setSelectedVolunteer] = useState<any>(null);
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [showCustomTaskModal, setShowCustomTaskModal] = useState(false);
+  const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
   const [customTask, setCustomTask] = useState({
     type: 'general',
     title: '',
@@ -28,9 +30,20 @@ const TaskAssignment: React.FC = () => {
     scheduledTimeText: '',
   });
 
+  // Handle navigation params for volunteer-specific auto-assignment
+  const routeParams = route?.params;
+  const preSelectedVolunteer = routeParams?.selectedVolunteer;
+  const assignmentMode = routeParams?.mode;
+
   useEffect(() => {
     loadData();
-  }, []);
+    
+    // If coming from volunteer management with auto-assign mode
+    if (preSelectedVolunteer && assignmentMode === 'auto_assign_to_volunteer') {
+      setSelectedVolunteer(preSelectedVolunteer);
+      setShowAutoAssignModal(true);
+    }
+  }, [preSelectedVolunteer, assignmentMode]);
 
   const loadData = async () => {
     try {
@@ -587,6 +600,17 @@ const TaskAssignment: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Auto-Assign Modal for Volunteer-Specific Assignment */}
+      <AutoAssignModal
+        visible={showAutoAssignModal}
+        onClose={() => {
+          setShowAutoAssignModal(false);
+          setSelectedVolunteer(null);
+        }}
+        selectedVolunteer={selectedVolunteer}
+        onAssignmentComplete={loadData}
+      />
     </SafeAreaView>
   );
 };
@@ -600,6 +624,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 24,
     paddingHorizontal: 24,
     paddingVertical: 16,
     backgroundColor: 'white',

@@ -56,8 +56,16 @@ const VolunteerManagement: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadVolunteers();
+    await Promise.all([loadVolunteers(), getAssignments()]);
     setRefreshing(false);
+  };
+
+  const handleAssignTask = (volunteer: User) => {
+    // Navigate to TaskAssignment screen with volunteer pre-selected for auto-assignment
+    navigation.navigate('TaskAssignment', { 
+      selectedVolunteer: volunteer,
+      mode: 'auto_assign_to_volunteer'
+    });
   };
 
   const getFilteredVolunteers = () => {
@@ -72,44 +80,81 @@ const VolunteerManagement: React.FC = () => {
     return assignments.filter(a => a.volunteer_id === volunteerId);
   };
 
-  const handleToggleStatus = (volunteer: User) => {
-    console.log('Toggle status clicked for volunteer:', {
-      id: volunteer.id,
-      name: volunteer.name,
-      current_status: volunteer.is_active,
-      volunteer_status: volunteer.volunteer_status
-    });
-    
+  const handleVolunteerOptions = (volunteer: User) => {
     Alert.alert(
-      'Update Status',
-      `Change ${volunteer.name}'s status?`,
+      `${volunteer.name} Options`,
+      'Choose an action:',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Toggle Active',
+          text: `${volunteer.is_active ? 'Deactivate' : 'Activate'}`,
           onPress: async () => {
             try {
               const newStatus = !volunteer.is_active;
-              console.log('About to update volunteer:', volunteer.id, 'to status:', newStatus);
-              
               const result = await volunteerService.updateVolunteerStatus(volunteer.id, newStatus);
               
               if (result.error) {
-                console.error('Update failed with error:', result.error);
                 Alert.alert('Error', 'Failed to update volunteer status. Please try again.');
               } else {
-                console.log('Update successful, reloading volunteers...');
-                // Reload volunteers from database to get latest data
                 await loadVolunteers();
-                Alert.alert('Success', `Volunteer status updated to ${newStatus ? 'Active' : 'Inactive'}`);
+                Alert.alert('Success', `Volunteer ${newStatus ? 'activated' : 'deactivated'} successfully`);
               }
             } catch (error) {
-              console.error('Unexpected error during update:', error);
               Alert.alert('Error', 'An unexpected error occurred.');
             }
           }
+        },
+        {
+          text: 'View Profile',
+          onPress: () => handleViewProfile(volunteer)
+        },
+        {
+          text: 'Contact Info',
+          onPress: () => handleContactInfo(volunteer)
         }
       ]
+    );
+  };
+
+  const handleViewProfile = (volunteer: User) => {
+    Alert.alert(
+      `${volunteer.name} Profile`,
+      `Email: ${volunteer.email}\nPhone: ${volunteer.phone}\nSkills: ${volunteer.skills?.join(', ') || 'None'}\nStatus: ${getStatusText(volunteer)}`,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleContactInfo = (volunteer: User) => {
+    Alert.alert(
+      `Contact ${volunteer.name}`,
+      `Email: ${volunteer.email}\nPhone: ${volunteer.phone}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Copy Email', onPress: () => Alert.alert('Copied', 'Email copied to clipboard') },
+        { text: 'Copy Phone', onPress: () => Alert.alert('Copied', 'Phone copied to clipboard') }
+      ]
+    );
+  };
+
+  const handleViewTasks = (volunteer: User) => {
+    const volunteerAssignments = getVolunteerAssignments(volunteer.id);
+    const activeAssignments = volunteerAssignments.filter(a => 
+      ['assigned', 'accepted', 'on_duty'].includes(a.status)
+    );
+    
+    if (activeAssignments.length === 0) {
+      Alert.alert('No Active Tasks', `${volunteer.name} has no active tasks at the moment.`);
+      return;
+    }
+    
+    const tasksList = activeAssignments.map((assignment, index) => 
+      `${index + 1}. ${assignment.request?.description || 'Task'} (${assignment.status})`
+    ).join('\n');
+    
+    Alert.alert(
+      `${volunteer.name}'s Active Tasks`,
+      tasksList,
+      [{ text: 'OK' }]
     );
   };
 
@@ -160,21 +205,24 @@ const VolunteerManagement: React.FC = () => {
             
             <View style={styles.statusRow}>
               <Text style={styles.statusLabel}>Status:</Text>
-              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.volunteer_status || 'offline') }]}>
-                <Text style={styles.statusText}>{getStatusText(item)}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.volunteer_status || 'offline') + '20' }]}>
+                <Text style={[styles.statusText, { color: getStatusColor(item.volunteer_status || 'offline') }]}>{getStatusText(item)}</Text>
               </View>
             </View>
 
             {item.skills && item.skills.length > 0 && (
               <View style={styles.skillsContainer}>
-                {item.skills.slice(0, 3).map((skill) => (
-                  <View key={skill} style={styles.skillBadge}>
-                    <Text style={styles.skillText}>{skill}</Text>
-                  </View>
-                ))}
-                {item.skills.length > 3 && (
-                  <Text style={styles.moreSkillsText}>+{item.skills.length - 3} more</Text>
-                )}
+                <Text style={styles.skillsLabel}>Skills:</Text>
+                <View style={styles.skillsList}>
+                  {item.skills.slice(0, 3).map((skill) => (
+                    <View key={skill} style={styles.skillBadge}>
+                      <Text style={styles.skillText}>{skill}</Text>
+                    </View>
+                  ))}
+                  {item.skills.length > 3 && (
+                    <Text style={styles.moreSkillsText}>+{item.skills.length - 3} more</Text>
+                  )}
+                </View>
               </View>
             )}
 
@@ -186,25 +234,25 @@ const VolunteerManagement: React.FC = () => {
             </View>
           </View>
 
-          <TouchableOpacity onPress={() => handleToggleStatus(item)}>
+          <TouchableOpacity onPress={() => handleVolunteerOptions(item)}>
             <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.buttonRow}>
-          <TouchableOpacity style={[styles.button, styles.outlineButton]} onPress={() => {/* Navigate to volunteer tasks */}}>
+          <TouchableOpacity style={[styles.button, styles.outlineButton]} onPress={() => handleViewTasks(item)}>
             <Text style={styles.outlineButtonText}>View Tasks</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[
               styles.button, 
-              (!item.is_active || item.volunteer_status === 'on_duty') ? styles.disabledButton : styles.primaryButton
+              (!item.is_active || item.volunteer_status === 'busy' || item.volunteer_status === 'on_duty') ? styles.disabledButton : styles.primaryButton
             ]} 
-            disabled={!item.is_active || item.volunteer_status === 'on_duty'}
-            onPress={() => {/* Navigate to task assignment */}}
+            disabled={!item.is_active || item.volunteer_status === 'busy' || item.volunteer_status === 'on_duty'}
+            onPress={() => handleAssignTask(item)}
           >
             <Text style={[
-              (!item.is_active || item.volunteer_status === 'on_duty') ? styles.disabledButtonText : styles.primaryButtonText
+              (!item.is_active || item.volunteer_status === 'busy' || item.volunteer_status === 'on_duty') ? styles.disabledButtonText : styles.primaryButtonText
             ]}>
               Assign Task
             </Text>
@@ -291,7 +339,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 20,
+    paddingTop: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
@@ -382,21 +431,31 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginBottom: 8,
   },
-  skillBadge: {
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    marginRight: 4,
+  skillsLabel: {
+    color: '#9ca3af',
+    fontSize: 14,
     marginBottom: 4,
   },
+  skillsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skillBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
   skillText: {
-    color: '#1e40af',
+    color: '#374151',
     fontSize: 12,
+    fontWeight: '500',
   },
   moreSkillsText: {
     color: '#9ca3af',
