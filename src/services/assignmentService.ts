@@ -3,30 +3,75 @@ import { Assignment, AssignmentStatus } from '../types';
 
 export class AssignmentService {
   async createAssignment(requestId: string, volunteerId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('assignments')
-        .insert({
-          request_id: requestId,
-          volunteer_id: volunteerId,
-          status: 'assigned',
-          assigned_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+    console.log('📝 Creating assignment:', { requestId, volunteerId });
+    
+    // Check if volunteer is already assigned to active requests
+    const { data: existingAssignments, error: checkError } = await supabase
+      .from('assignments')
+      .select(`
+        id,
+        status,
+        assistance_requests!inner(status)
+      `)
+      .eq('volunteer_id', volunteerId)
+      .in('status', ['pending', 'accepted', 'in_progress'])
+      .in('assistance_requests.status', ['assigned', 'in_progress']);
 
-      if (error) throw error;
+    if (checkError) {
+      console.error('❌ Error checking existing assignments:', checkError);
+      return { data: null, error: checkError };
+    }
 
-      // Update request status to assigned
-      await supabase
-        .from('assistance_requests')
-        .update({ status: 'assigned' })
-        .eq('id', requestId);
+    if (existingAssignments && existingAssignments.length > 0) {
+      console.error('❌ Volunteer already has active assignments:', existingAssignments);
+      return { 
+        data: null, 
+        error: { message: 'Volunteer is already assigned to another active request' }
+      };
+    }
 
-      return { data, error: null };
-    } catch (error) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .insert({
+        request_id: requestId,
+        volunteer_id: volunteerId,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    console.log('📝 Assignment creation result:', { data, error });
+
+    if (error) {
+      console.error('❌ Assignment creation error:', error);
       return { data: null, error };
     }
+
+    // Update request status to assigned
+    const { error: updateError } = await supabase
+      .from('assistance_requests')
+      .update({ status: 'assigned', updated_at: new Date().toISOString() })
+      .eq('id', requestId);
+
+    if (updateError) {
+      console.error('❌ Request status update error:', updateError);
+      // Rollback assignment if request update fails
+      await supabase.from('assignments').delete().eq('id', data.id);
+      return { data: null, error: updateError };
+    }
+
+    // Update volunteer status to busy
+    const { error: volunteerUpdateError } = await supabase
+      .from('profiles')
+      .update({ volunteer_status: 'busy', updated_at: new Date().toISOString() })
+      .eq('id', volunteerId);
+
+    if (volunteerUpdateError) {
+      console.error('❌ Volunteer status update error:', volunteerUpdateError);
+    }
+
+    console.log('✅ Assignment created successfully');
+    return { data, error: null };
   }
 
   async getAssignments(filters?: {
