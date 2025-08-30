@@ -48,13 +48,14 @@ BEGIN
     
     -- Determine required skills based on request type
     v_required_skills := CASE v_request.type
-        WHEN 'medical' THEN ARRAY['medical', 'first_aid', 'healthcare', 'emergency']
-        WHEN 'transportation' THEN ARRAY['driving', 'navigation', 'vehicle', 'transport']
-        WHEN 'food' THEN ARRAY['cooking', 'food_service', 'kitchen', 'catering']
-        WHEN 'accommodation' THEN ARRAY['hospitality', 'booking', 'lodging', 'guest_service']
-        WHEN 'guidance' THEN ARRAY['local_knowledge', 'tour_guide', 'navigation', 'language']
-        WHEN 'emergency' THEN ARRAY['emergency', 'first_aid', 'crisis_management', 'medical']
-        ELSE ARRAY['general', 'assistance', 'support']
+        WHEN 'medical' THEN ARRAY['medical', 'emergency']
+        WHEN 'guidance' THEN ARRAY['guidance', 'general']
+        WHEN 'emergency' THEN ARRAY['emergency', 'medical']
+        WHEN 'crowd_management' THEN ARRAY['crowd_management', 'general']
+        WHEN 'lost_person' THEN ARRAY['lost_person', 'guidance', 'general']
+        WHEN 'sanitation' THEN ARRAY['sanitation', 'general']
+        WHEN 'general' THEN ARRAY['general']
+        ELSE ARRAY['general']
     END;
     
     -- Find best matching volunteer with scoring
@@ -113,18 +114,18 @@ BEGIN
                     WHEN 'low' THEN 0.4
                     ELSE 0.5
                 END * 0.1
-            ) as match_score
+            ) as calculated_match_score
         FROM profiles p
         WHERE p.role = 'volunteer'
             AND p.is_active = true
             AND p.volunteer_status IN ('available', 'busy')
             AND (p.location IS NULL OR ST_DWithin(p.location, v_request.location, p_max_distance_meters))
-        ORDER BY match_score DESC, 
+        ORDER BY calculated_match_score DESC, 
                  CASE WHEN p.volunteer_status = 'available' THEN 0 ELSE 1 END,
                  ST_Distance(p.location, v_request.location)
         LIMIT 1
     ) scored_volunteers
-    WHERE match_score >= p_min_match_score;
+    WHERE calculated_match_score >= p_min_match_score;
     
     IF NOT FOUND THEN
         RETURN QUERY SELECT FALSE, NULL::UUID, NULL::UUID, 0.0::DECIMAL, 
@@ -184,9 +185,9 @@ BEGIN
         TRUE, 
         v_best_volunteer.volunteer_id, 
         v_assignment_id, 
-        v_best_volunteer.match_score,
+        v_best_volunteer.calculated_match_score,
         'Successfully auto-assigned to ' || v_best_volunteer.name || ' (Match: ' || 
-        ROUND(v_best_volunteer.match_score * 100, 1)::TEXT || '%)';
+        ROUND(v_best_volunteer.calculated_match_score * 100, 1)::TEXT || '%)';
     
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
