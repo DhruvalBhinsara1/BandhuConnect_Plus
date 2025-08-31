@@ -13,7 +13,7 @@ const RequestStatus: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
-  const { requests, getRequests, deleteRequest } = useRequest();
+  const { requests, getRequests, deleteRequest, cancelRequest } = useRequest();
   
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -38,7 +38,7 @@ const RequestStatus: React.FC = () => {
   const handleCancelRequest = async (requestId: string) => {
     Alert.alert(
       'Cancel Request',
-      'Are you sure you want to cancel this request? This action cannot be undone.',
+      'Are you sure you want to cancel this request? This will mark it as cancelled but keep it in your history.',
       [
         {
           text: 'No, Keep Request',
@@ -49,7 +49,7 @@ const RequestStatus: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await deleteRequest(requestId);
+              const { error } = await cancelRequest(requestId);
               if (error) {
                 Alert.alert('Error', 'Failed to cancel request. Please try again.');
               } else {

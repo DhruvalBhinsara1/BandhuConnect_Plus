@@ -22,6 +22,7 @@ interface RequestContextType {
   getRequests: (filters?: any) => Promise<void>;
   getAssignments: (filters?: any) => Promise<void>;
   deleteRequest: (id: string) => Promise<{ error: any }>;
+  cancelRequest: (id: string) => Promise<{ data: any; error: any }>;
   updateAssignmentStatus: (id: string, status: string) => Promise<{ data: any; error: any }>;
   acceptAssignment: (id: string) => Promise<{ data: any; error: any }>;
   startTask: (id: string) => Promise<{ data: any; error: any }>;
@@ -133,6 +134,29 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
     return result;
   };
 
+  const cancelRequest = async (id: string) => {
+    setLoading(true);
+    try {
+      console.log('Cancelling request:', id);
+      const result = await requestService.cancelRequest(id);
+      console.log('Cancel result:', result);
+      
+      if (!result.error && result.data) {
+        setRequests(prev => 
+          prev.map(request => 
+            request.id === id ? { ...request, status: 'cancelled', updated_at: result.data.updated_at } : request
+          )
+        );
+        console.log('Request cancelled successfully in state');
+      } else {
+        console.error('Failed to cancel request:', result.error);
+      }
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteRequest = async (id: string) => {
     setLoading(true);
     try {
@@ -208,6 +232,7 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
     getRequests,
     getAssignments,
     deleteRequest,
+    cancelRequest,
     updateAssignmentStatus,
     acceptAssignment,
     startTask,

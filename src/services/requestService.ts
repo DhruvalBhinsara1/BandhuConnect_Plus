@@ -113,6 +113,30 @@ export class RequestService {
     }
   }
 
+  async cancelRequest(id: string) {
+    try {
+      console.log('Cancelling request (updating status to cancelled):', id);
+      
+      const { data, error } = await supabase
+        .from('assistance_requests')
+        .update({ 
+          status: 'cancelled', 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('Request cancelled successfully:', data);
+      return { data, error: null };
+    } catch (error) {
+      console.error('Cancel request service error:', error);
+      return { data: null, error };
+    }
+  }
+
   async deleteRequest(id: string) {
     try {
       console.log('Attempting to delete request from database:', id);

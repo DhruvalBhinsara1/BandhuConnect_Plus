@@ -25,7 +25,6 @@ import RequestStatus from '../screens/pilgrim/RequestStatus';
 import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 
 // Shared Screens
-import ChatScreen from '../screens/shared/ChatScreen';
 import MapScreen from '../screens/shared/MapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
 
@@ -103,9 +102,6 @@ const MainNavigator: React.FC = () => {
       case 'Map':
         iconName = focused ? 'map' : 'map-outline';
         break;
-      case 'Chat':
-        iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-        break;
       case 'Profile':
         iconName = focused ? 'person' : 'person-outline';
         break;
@@ -130,7 +126,6 @@ const MainNavigator: React.FC = () => {
         <Tab.Screen name="Home" component={VolunteerStack} />
         <Tab.Screen name="Tasks" component={TaskStack} />
         <Tab.Screen name="Map" component={MapScreen} />
-        <Tab.Screen name="Chat" component={ChatScreen} />
         <Tab.Screen name="Profile" component={VolunteerProfile} />
       </Tab.Navigator>
     );
@@ -170,7 +165,6 @@ const MainNavigator: React.FC = () => {
       <Tab.Screen name="Home" component={PilgrimStack} />
       <Tab.Screen name="Requests" component={CreateRequest} />
       <Tab.Screen name="Map" component={MapScreen} />
-      <Tab.Screen name="Chat" component={ChatScreen} />
       <Tab.Screen name="Profile" component={PilgrimProfile} />
     </Tab.Navigator>
   );
