@@ -173,60 +173,126 @@ const PilgrimDashboard: React.FC = () => {
           )}
 
           {/* Quick Actions */}
-          <Card>
+          <Card style={{ marginBottom: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Quick Actions</Text>
             
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('CreateRequest')}
-                className="items-center flex-1"
-              >
-                <View style={{ backgroundColor: '#dcfce7', padding: 12, borderRadius: 50, marginBottom: 8 }}>
-                  <Ionicons name="add-circle" size={24} color={COLORS.secondary} />
-                </View>
-                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>New Request</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('RequestStatus')}
-                className="items-center flex-1"
-              >
-                <View style={{ backgroundColor: '#dbeafe', padding: 12, borderRadius: 50, marginBottom: 8 }}>
-                  <Ionicons name="list" size={24} color={COLORS.primary} />
-                </View>
-                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>My Requests</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Map')}
-                className="items-center flex-1"
-              >
-                <View style={{ backgroundColor: '#ede9fe', padding: 12, borderRadius: 50, marginBottom: 8 }}>
-                  <Ionicons name="map" size={24} color="#8b5cf6" />
-                </View>
-                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>Find Help</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-
-          {/* Emergency Contact */}
-          <Card style={{ marginTop: 16, backgroundColor: '#fef2f2' }}>
-            <View className="flex-row items-center">
-              <Ionicons name="warning" size={24} color={COLORS.error} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ fontWeight: 'bold', color: '#991b1b' }}>Emergency?</Text>
-                <Text style={{ color: '#dc2626', fontSize: 12 }}>
-                  For immediate assistance, call emergency services
-                </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('CreateRequest')}
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 16, 
+                paddingHorizontal: 12,
+                backgroundColor: '#f0fdf4',
+                borderRadius: 12,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: '#bbf7d0'
+              }}
+            >
+              <View style={{ backgroundColor: '#dcfce7', padding: 12, borderRadius: 50, marginRight: 16 }}>
+                <Ionicons name="add-circle" size={24} color={COLORS.secondary} />
               </View>
-              <Button
-                title="Call 911"
-                onPress={() => {/* Handle emergency call */}}
-                variant="danger"
-                size="small"
-              />
-            </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>Create New Request</Text>
+                <Text style={{ fontSize: 12, color: '#6b7280' }}>Get help from nearby volunteers</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('RequestStatus')}
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 16, 
+                paddingHorizontal: 12,
+                backgroundColor: '#eff6ff',
+                borderRadius: 12,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: '#bfdbfe'
+              }}
+            >
+              <View style={{ backgroundColor: '#dbeafe', padding: 12, borderRadius: 50, marginRight: 16 }}>
+                <Ionicons name="list" size={24} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>View My Requests</Text>
+                <Text style={{ fontSize: 12, color: '#6b7280' }}>Track your assistance requests</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Map')}
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 16, 
+                paddingHorizontal: 12,
+                backgroundColor: '#faf5ff',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#e9d5ff'
+              }}
+            >
+              <View style={{ backgroundColor: '#ede9fe', padding: 12, borderRadius: 50, marginRight: 16 }}>
+                <Ionicons name="map" size={24} color="#8b5cf6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>Find Nearby Help</Text>
+                <Text style={{ fontSize: 12, color: '#6b7280' }}>Locate volunteers and services</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+            </TouchableOpacity>
           </Card>
+
+          {/* App Information */}
+          <Card>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>App Information</Text>
+            
+            <TouchableOpacity 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 12, 
+                borderBottomWidth: 1, 
+                borderBottomColor: '#f3f4f6' 
+              }}
+            >
+              <Ionicons name="help-circle-outline" size={24} color="#6b7280" />
+              <Text style={{ color: '#374151', fontSize: 16, marginLeft: 12, flex: 1 }}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 12, 
+                borderBottomWidth: 1, 
+                borderBottomColor: '#f3f4f6' 
+              }}
+            >
+              <Ionicons name="document-text-outline" size={24} color="#6b7280" />
+              <Text style={{ color: '#374151', fontSize: 16, marginLeft: 12, flex: 1 }}>Terms & Conditions</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                paddingVertical: 12 
+              }}
+            >
+              <Ionicons name="shield-checkmark-outline" size={24} color="#6b7280" />
+              <Text style={{ color: '#374151', fontSize: 16, marginLeft: 12, flex: 1 }}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          </Card>
+
         </View>
       </ScrollView>
     </SafeAreaView>
