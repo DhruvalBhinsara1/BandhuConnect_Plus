@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet, Modal, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -20,6 +20,14 @@ const VolunteerManagement: React.FC = () => {
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>('volunteers');
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedVolunteer, setSelectedVolunteer] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    skills: '',
+  });
 
   useEffect(() => {
     loadVolunteers();
@@ -28,31 +36,32 @@ const VolunteerManagement: React.FC = () => {
 
   const loadVolunteers = async () => {
     try {
-      console.log('Loading volunteers...');
+      console.log('🔄 Loading volunteers from database...');
       const { data, error } = await volunteerService.getVolunteers();
-      console.log('Load volunteers result:', { data: data?.length, error });
+      console.log('📥 Load volunteers result:', { 
+        dataCount: data?.length, 
+        error: error?.message || null,
+        timestamp: new Date().toISOString()
+      });
       
       if (data && !error && data.length > 0) {
-        console.log('Setting volunteers from database:');
+        console.log('📋 Setting volunteers from database:');
         data.forEach((volunteer, index) => {
-          console.log(`Volunteer ${index + 1}:`, {
+          console.log(`👤 Volunteer ${index + 1}:`, {
             id: volunteer.id,
             name: volunteer.name,
-            volunteer_status: volunteer.volunteer_status,
-            is_active: volunteer.is_active
+            email: volunteer.email,
+            phone: volunteer.phone,
+            skills: volunteer.skills,
+            is_active: volunteer.is_active,
+            volunteer_status: volunteer.volunteer_status
           });
         });
         setVolunteers(data);
+        console.log('✅ Volunteers state updated successfully');
       } else {
-        console.log('❌ No volunteers found in database!');
-        console.log('Please run final-setup.sql script first to create demo volunteers');
-        console.log('Error details:', error);
+        console.log('⚠️ No volunteers found or error occurred:', error);
         setVolunteers([]);
-        Alert.alert(
-          'No Volunteers Found', 
-          'Please run the final-setup.sql script first to create demo volunteers in the database.',
-          [{ text: 'OK' }]
-        );
       }
     } catch (error) {
       console.error('Error loading volunteers:', error);
@@ -142,11 +151,78 @@ const VolunteerManagement: React.FC = () => {
   };
 
   const handleViewProfile = (volunteer: User) => {
-    Alert.alert(
-      `${volunteer.name} Profile`,
-      `Email: ${volunteer.email}\nPhone: ${volunteer.phone}\nSkills: ${volunteer.skills?.join(', ') || 'None'}\nStatus: ${getStatusText(volunteer)}`,
-      [{ text: 'OK' }]
-    );
+    setSelectedVolunteer(volunteer);
+    setEditForm({
+      name: volunteer.name || '',
+      email: volunteer.email || '',
+      phone: volunteer.phone || '',
+      skills: volunteer.skills?.join(', ') || '',
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!selectedVolunteer) {
+      console.log('❌ Save Profile: No selected volunteer');
+      return;
+    }
+
+    console.log('🔄 Starting profile update for:', {
+      volunteerId: selectedVolunteer.id,
+      volunteerName: selectedVolunteer.name,
+      formData: editForm
+    });
+
+    try {
+      const skillsArray = editForm.skills
+        .split(',')
+        .map(skill => skill.trim())
+        .filter(skill => skill.length > 0);
+
+      console.log('📝 Processed skills array:', skillsArray);
+
+      const profileData = {
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.phone,
+        skills: skillsArray,
+      };
+
+      console.log('📤 Sending update via volunteerService:', {
+        volunteerId: selectedVolunteer.id,
+        profileData
+      });
+
+      const { data, error } = await volunteerService.updateProfile(selectedVolunteer.id, profileData);
+
+      if (error) {
+        console.log('❌ Profile update failed:', error);
+        Alert.alert('Error', `Failed to update volunteer profile: ${error.message}`);
+        return;
+      }
+
+      if (!data) {
+        console.log('⚠️ Update completed but no data returned');
+        Alert.alert('Warning', 'Update may not have been applied. Please check the volunteer profile.');
+        return;
+      }
+
+      console.log('✅ Profile updated successfully:', data);
+      Alert.alert('Success', 'Volunteer profile updated successfully');
+      setEditModalVisible(false);
+      
+      console.log('🔄 Refreshing volunteer list...');
+      await loadVolunteers(); // Refresh the list
+      console.log('✅ Volunteer list refreshed');
+    } catch (error) {
+      console.log('❌ Unexpected error during profile update:', error);
+      Alert.alert('Error', `Failed to update volunteer profile: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditModalVisible(false);
+    setSelectedVolunteer(null);
   };
 
   const handleContactInfo = (volunteer: User) => {
@@ -537,7 +613,7 @@ const VolunteerManagement: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="clipboard-outline" size={64} color="#6b7280" />
-              <Text style={styles.emptyTitle}>No pending requests</Text>
+              <Text style={styles.emptyTitle}>No requests found</Text>
               <Text style={styles.emptySubtitle}>
                 All requests have been assigned or completed
               </Text>
@@ -545,9 +621,80 @@ const VolunteerManagement: React.FC = () => {
           }
         />
       )}
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCancelEdit}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={handleCancelEdit} style={styles.cancelButton}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity onPress={handleSaveProfile} style={styles.saveButton}>
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Name</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editForm.name}
+                onChangeText={(text) => setEditForm({...editForm, name: text})}
+                placeholder="Enter volunteer name"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Email</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editForm.email}
+                onChangeText={(text) => setEditForm({...editForm, email: text})}
+                placeholder="Enter email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Phone</Text>
+              <TextInput
+                style={styles.formInput}
+                value={editForm.phone}
+                onChangeText={(text) => setEditForm({...editForm, phone: text})}
+                placeholder="Enter phone number"
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Skills</Text>
+              <TextInput
+                style={[styles.formInput, styles.multilineInput]}
+                value={editForm.skills}
+                onChangeText={(text) => setEditForm({...editForm, skills: text})}
+                placeholder="Enter skills separated by commas (e.g., guidance, medical, sanitation)"
+                multiline
+                numberOfLines={3}
+              />
+              <Text style={styles.formHint}>Separate multiple skills with commas</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
+
+export default VolunteerManagement;
+
 
 const styles = StyleSheet.create({
   container: {
@@ -852,10 +999,76 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptySubtitle: {
-    color: '#d1d5db',
+    color: '#9ca3af',
+    fontSize: 14,
     textAlign: 'center',
-    marginTop: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  cancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  cancelButtonText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  saveButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  saveButtonText: {
+    color: '#3b82f6',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  multilineInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  formHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
   },
 });
-
-export default VolunteerManagement;

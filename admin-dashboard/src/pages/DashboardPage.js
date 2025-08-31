@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabase';
 import { Colors, Theme } from '../constants/Colors';
 import VolunteerManagement from '../components/VolunteerManagement';
+import PilgrimManagement from '../components/PilgrimManagement';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -18,6 +19,8 @@ export default function DashboardPage() {
     switch (activeTab) {
       case 'volunteers':
         return <VolunteerManagement />;
+      case 'pilgrims':
+        return <PilgrimManagement />;
       case 'requests':
         return <RequestManagement />;
       case 'analytics':
@@ -48,6 +51,12 @@ export default function DashboardPage() {
           style={activeTab === 'volunteers' ? styles.activeNavButton : styles.navButton}
         >
           👥 Volunteers
+        </button>
+        <button
+          onClick={() => setActiveTab('pilgrims')}
+          style={activeTab === 'pilgrims' ? styles.activeNavButton : styles.navButton}
+        >
+          🙏 Pilgrims
         </button>
         <button
           onClick={() => setActiveTab('requests')}

@@ -5,7 +5,7 @@ export class AssignmentService {
   async createAssignment(requestId: string, volunteerId: string) {
     console.log('📝 Creating assignment:', { requestId, volunteerId });
     
-    // Check if volunteer is already assigned to active requests
+    // Check if volunteer has too many active assignments (limit to 3)
     const { data: existingAssignments, error: checkError } = await supabase
       .from('assignments')
       .select(`
@@ -22,12 +22,17 @@ export class AssignmentService {
       return { data: null, error: checkError };
     }
 
-    if (existingAssignments && existingAssignments.length > 0) {
-      console.error('❌ Volunteer already has active assignments:', existingAssignments);
+    if (existingAssignments && existingAssignments.length >= 3) {
+      console.log('📋 Volunteer has reached assignment limit:', existingAssignments.length);
       return { 
         data: null, 
-        error: { message: 'Volunteer is already assigned to another active request' }
+        error: { message: `Volunteer already has ${existingAssignments.length} active assignments. Maximum allowed is 3.` }
       };
+    }
+
+    // Log existing assignments for transparency
+    if (existingAssignments && existingAssignments.length > 0) {
+      console.log(`📋 Volunteer has ${existingAssignments.length} existing assignments, adding one more`);
     }
 
     const { data, error } = await supabase

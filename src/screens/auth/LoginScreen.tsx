@@ -53,8 +53,8 @@ const LoginScreen: React.FC = () => {
       <View style={styles.content}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to your account</Text>
+            <Text style={styles.title}>Admin Sign In</Text>
+            <Text style={styles.subtitle}>Sign in to admin dashboard</Text>
           </View>
 
           <View style={styles.inputContainer}>
@@ -107,12 +107,6 @@ const LoginScreen: React.FC = () => {
             <Text style={styles.outlineButtonText}>Sign in with Phone</Text>
           </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-              <Text style={styles.linkText}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </SafeAreaView>

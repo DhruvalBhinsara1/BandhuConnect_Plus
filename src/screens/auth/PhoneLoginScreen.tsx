@@ -53,9 +53,9 @@ const PhoneLoginScreen: React.FC = () => {
       <View className="flex-1 justify-center px-6">
         <Card style={{ maxWidth: 400, alignSelf: 'center', width: '100%' }}>
           <View className="items-center mb-8">
-            <Text className="text-3xl font-bold text-gray-900 mb-2">Phone Login</Text>
+            <Text className="text-3xl font-bold text-gray-900 mb-2">Pilgrim Sign In</Text>
             <Text className="text-gray-600 text-center">
-              We'll send you a verification code
+              Sign in with your phone number
             </Text>
           </View>
 

@@ -5,6 +5,8 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { AssistanceRequest, User, Assignment } from '../../types';
 import { autoAssignmentService } from '../../services/autoAssignmentService';
+import { assignmentService } from '../../services/assignmentService';
+import { requestService } from '../../services/requestService';
 import { Logger } from '../../utils/logger';
 import AutoAssignModal from './AutoAssignModal';
 
@@ -57,15 +59,48 @@ const TaskAssignment: React.FC = ({ route }: any) => {
       
       if (requestsData) setRequests(requestsData);
 
-      // Load available volunteers
+      // Load available volunteers with assignment count
       const { data: volunteersData } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          assignments!assignments_volunteer_id_fkey(
+            id,
+            status,
+            assistance_requests!inner(status)
+          )
+        `)
         .eq('role', 'volunteer')
         .eq('is_active', true)
         .in('volunteer_status', ['available', 'busy']);
       
-      if (volunteersData) setVolunteers(volunteersData);
+      if (volunteersData) {
+        // Process volunteers to add assignment count and availability info
+        const processedVolunteers = volunteersData.map(volunteer => {
+          const activeAssignments = volunteer.assignments?.filter(assignment => 
+            ['pending', 'accepted', 'in_progress'].includes(assignment.status) &&
+            ['assigned', 'in_progress'].includes(assignment.assistance_requests?.status)
+          ) || [];
+          
+          return {
+            ...volunteer,
+            activeAssignmentCount: activeAssignments.length,
+            canTakeMoreAssignments: activeAssignments.length < 3,
+            workloadStatus: activeAssignments.length === 0 ? 'free' : 
+                           activeAssignments.length < 3 ? 'busy' : 'overloaded'
+          };
+        });
+        
+        // Sort by availability (free volunteers first, then by assignment count)
+        processedVolunteers.sort((a, b) => {
+          if (a.activeAssignmentCount !== b.activeAssignmentCount) {
+            return a.activeAssignmentCount - b.activeAssignmentCount;
+          }
+          return a.name?.localeCompare(b.name) || 0;
+        });
+        
+        setVolunteers(processedVolunteers);
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to load data');
     } finally {
@@ -480,12 +515,29 @@ const TaskAssignment: React.FC = ({ route }: any) => {
                   onPress={() => assignToVolunteer(volunteer)}
                 >
                   <View style={styles.volunteerInfo}>
-                    <Text style={styles.volunteerName}>{volunteer.name}</Text>
+                    <View style={styles.volunteerHeader}>
+                      <Text style={styles.volunteerName}>{volunteer.name}</Text>
+                      <View style={styles.assignmentBadge}>
+                        <Text style={styles.assignmentCount}>
+                          {volunteer.activeAssignmentCount || 0}/3
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={styles.volunteerPhone}>{volunteer.phone}</Text>
                     <View style={styles.volunteerMeta}>
-                      <View style={[styles.statusBadge, { backgroundColor: getVolunteerStatusColor(volunteer.volunteer_status) + '20' }]}>
-                        <Text style={[styles.statusText, { color: getVolunteerStatusColor(volunteer.volunteer_status) }]}>
-                          {volunteer.volunteer_status}
+                      <View style={[styles.statusBadge, { 
+                        backgroundColor: volunteer.workloadStatus === 'free' ? '#10B981' + '20' : 
+                                       volunteer.workloadStatus === 'busy' ? '#F59E0B' + '20' : 
+                                       '#EF4444' + '20' 
+                      }]}>
+                        <Text style={[styles.statusText, { 
+                          color: volunteer.workloadStatus === 'free' ? '#10B981' : 
+                                volunteer.workloadStatus === 'busy' ? '#F59E0B' : 
+                                '#EF4444' 
+                        }]}>
+                          {volunteer.workloadStatus === 'free' ? 'Available' : 
+                           volunteer.workloadStatus === 'busy' ? `Busy (${volunteer.activeAssignmentCount})` : 
+                           'Overloaded'}
                         </Text>
                       </View>
                       {volunteer.skills && (
@@ -833,11 +885,29 @@ const styles = StyleSheet.create({
   volunteerInfo: {
     flex: 1,
   },
+  volunteerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   volunteerName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
+    flex: 1,
+  },
+  assignmentBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  assignmentCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
   },
   volunteerPhone: {
     fontSize: 14,

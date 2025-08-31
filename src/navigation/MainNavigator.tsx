@@ -13,6 +13,7 @@ import VolunteerProfile from '../screens/volunteer/VolunteerProfile';
 // Admin Screens
 import AdminDashboard from '../screens/admin/AdminDashboard';
 import VolunteerManagement from '../screens/admin/VolunteerManagement';
+import PilgrimManagement from '../screens/admin/PilgrimManagement';
 import RequestManagement from '../screens/admin/RequestManagement';
 import TaskAssignment from '../screens/admin/TaskAssignment';
 import AdminProfile from '../screens/admin/AdminProfile';
@@ -43,7 +44,6 @@ const VolunteerStack = () => (
 const AdminStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Dashboard" component={AdminDashboard} />
-    <Stack.Screen name="VolunteerManagement" component={VolunteerManagement} />
     <Stack.Screen name="RequestManagement" component={RequestManagement} />
     <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
     <Stack.Screen name="Profile" component={AdminProfile} />
@@ -90,6 +90,9 @@ const MainNavigator: React.FC = () => {
         break;
       case 'Management':
         iconName = focused ? 'people' : 'people-outline';
+        break;
+      case 'Pilgrims':
+        iconName = focused ? 'walk' : 'walk-outline';
         break;
       case 'Map':
         iconName = focused ? 'map' : 'map-outline';
@@ -140,8 +143,8 @@ const MainNavigator: React.FC = () => {
       >
         <Tab.Screen name="Home" component={AdminStack} />
         <Tab.Screen name="Management" component={ManagementStack} />
+        <Tab.Screen name="Pilgrims" component={PilgrimManagement} />
         <Tab.Screen name="Requests" component={RequestStack} />
-        <Tab.Screen name="Map" component={MapScreen} />
         <Tab.Screen name="Profile" component={AdminProfile} />
       </Tab.Navigator>
     );
