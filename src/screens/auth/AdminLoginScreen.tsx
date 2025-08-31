@@ -36,10 +36,27 @@ const AdminLoginScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await signInWithEmail(email.trim(), password);
+      const result = await signInWithEmail(email.trim(), password);
       
-      if (error) {
-        Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
+      if (result.error) {
+        Alert.alert('Login Failed', result.error.message || 'Please check your credentials and try again.');
+        return;
+      }
+
+      // Verify user has admin role
+      if (!result.user || result.user.role !== 'admin') {
+        console.log('[AdminLogin] Access denied - user role:', result.user?.role);
+        Alert.alert('Access Denied', 'This account is not authorized for admin access. Please use the correct login portal for your account type.', [
+          { 
+            text: 'OK', 
+            onPress: async () => {
+              const { signOut } = useAuth();
+              await signOut();
+              console.log('[AdminLogin] User signed out after access denied');
+            }
+          }
+        ]);
+        return;
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');

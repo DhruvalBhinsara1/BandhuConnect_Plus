@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useRequest } from '../../context/RequestContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -11,15 +12,48 @@ import { COLORS, VOLUNTEER_SKILLS } from '../../constants';
 const VolunteerProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
+  const { assignments } = useRequest();
   
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    completedTasks: 0,
+    totalTasks: 0,
+    hoursWorked: 0,
+  });
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
     skills: user?.skills || [],
-    status: user?.status || 'available',
+    status: user?.volunteer_status || 'available',
   });
+
+  useEffect(() => {
+    if (assignments.length > 0 && user) {
+      calculateStats();
+    }
+  }, [assignments, user]);
+
+  const calculateStats = () => {
+    const userAssignments = assignments.filter(a => a.volunteer_id === user?.id);
+    const completed = userAssignments.filter(a => a.status === 'completed');
+    
+    let totalHours = 0;
+    completed.forEach(assignment => {
+      if (assignment.started_at && assignment.completed_at) {
+        const start = new Date(assignment.started_at);
+        const end = new Date(assignment.completed_at);
+        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        totalHours += hours;
+      }
+    });
+
+    setStats({
+      completedTasks: completed.length,
+      totalTasks: userAssignments.length,
+      hoursWorked: totalHours,
+    });
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -30,11 +64,12 @@ const VolunteerProfile: React.FC = () => {
         name: formData.name,
         phone: formData.phone,
         skills: formData.skills,
-        status: formData.status,
+        volunteer_status: formData.status,
       });
 
       if (error) {
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        console.error('Profile update error:', error);
+        Alert.alert('Error', `Failed to update profile: ${error.message || error}`);
       } else {
         Alert.alert('Success', 'Profile updated successfully!');
         setEditing(false);
@@ -65,11 +100,11 @@ const VolunteerProfile: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row justify-between items-center">
-          <Text className="text-2xl font-bold text-gray-900">Profile</Text>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Profile</Text>
           <TouchableOpacity onPress={() => setEditing(!editing)}>
             <Ionicons 
               name={editing ? "close" : "pencil"} 
@@ -80,27 +115,27 @@ const VolunteerProfile: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-6 py-4">
+      <ScrollView style={styles.scrollView}>
         {/* Profile Info */}
-        <Card style={{ marginBottom: 16 }}>
-          <View className="items-center mb-6">
-            <View className="bg-blue-100 w-20 h-20 rounded-full items-center justify-center mb-3">
+        <Card style={styles.profileCard}>
+          <View style={styles.profileHeader}>
+            <View style={styles.avatarContainer}>
               <Ionicons name="person" size={32} color={COLORS.primary} />
             </View>
-            <Text className="text-xl font-bold text-gray-900">{user?.name}</Text>
-            <Text className="text-gray-600">{user?.email}</Text>
-            <View className="flex-row items-center mt-2">
+            <Text style={styles.userName}>{user?.name}</Text>
+            <Text style={styles.userEmail}>{user?.email}</Text>
+            <View style={styles.statusContainer}>
               <View
-                className="px-3 py-1 rounded-full"
-                style={{ 
-                  backgroundColor: user?.is_active ? COLORS.success + '20' : COLORS.error + '20' 
-                }}
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: user?.is_active ? COLORS.success + '20' : COLORS.error + '20' }
+                ]}
               >
                 <Text
-                  className="text-sm font-medium"
-                  style={{ 
-                    color: user?.is_active ? COLORS.success : COLORS.error 
-                  }}
+                  style={[
+                    styles.statusText,
+                    { color: user?.is_active ? COLORS.success : COLORS.error }
+                  ]}
                 >
                   {user?.is_active ? 'Active' : 'Inactive'}
                 </Text>
@@ -125,22 +160,22 @@ const VolunteerProfile: React.FC = () => {
                 keyboardType="phone-pad"
               />
 
-              <View className="mb-4">
-                <Text className="text-gray-700 text-sm font-medium mb-2">Status</Text>
-                <View className="flex-row">
+              <View style={styles.statusSection}>
+                <Text style={styles.statusLabel}>Status</Text>
+                <View style={styles.statusOptions}>
                   {['available', 'busy', 'off_duty'].map((status) => (
                     <TouchableOpacity
                       key={status}
                       onPress={() => setFormData(prev => ({ ...prev, status }))}
-                      className={`mr-3 px-4 py-2 rounded-full border ${
-                        formData.status === status
-                          ? 'bg-blue-500 border-blue-500'
-                          : 'bg-white border-gray-300'
-                      }`}
+                      style={[
+                        styles.statusOption,
+                        formData.status === status ? styles.statusOptionActive : styles.statusOptionInactive
+                      ]}
                     >
-                      <Text className={`text-sm capitalize ${
-                        formData.status === status ? 'text-white' : 'text-gray-700'
-                      }`}>
+                      <Text style={[
+                        styles.statusOptionText,
+                        formData.status === status ? styles.statusOptionTextActive : styles.statusOptionTextInactive
+                      ]}>
                         {status.replace('_', ' ')}
                       </Text>
                     </TouchableOpacity>
@@ -150,101 +185,101 @@ const VolunteerProfile: React.FC = () => {
             </View>
           ) : (
             <View>
-              <View className="flex-row justify-between mb-3">
-                <Text className="text-gray-600">Phone</Text>
-                <Text className="text-gray-900">{user?.phone}</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Phone</Text>
+                <Text style={styles.infoValue}>{user?.phone}</Text>
               </View>
-              <View className="flex-row justify-between mb-3">
-                <Text className="text-gray-600">Status</Text>
-                <Text className="text-gray-900 capitalize">
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Status</Text>
+                <Text style={styles.infoValue}>
                   {user?.status?.replace('_', ' ')}
                 </Text>
               </View>
-              <View className="flex-row justify-between">
-                <Text className="text-gray-600">Role</Text>
-                <Text className="text-gray-900 capitalize">{user?.role}</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Role</Text>
+                <Text style={styles.infoValue}>{user?.role}</Text>
               </View>
             </View>
           )}
         </Card>
 
         {/* Skills */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Skills</Text>
+        <Card style={styles.skillsCard}>
+          <Text style={styles.sectionTitle}>Skills</Text>
           
           {editing ? (
-            <View className="flex-row flex-wrap">
+            <View style={styles.skillsContainer}>
               {VOLUNTEER_SKILLS.map((skill) => (
                 <TouchableOpacity
                   key={skill}
                   onPress={() => toggleSkill(skill)}
-                  className={`mr-2 mb-2 px-3 py-2 rounded-full border ${
-                    formData.skills.includes(skill)
-                      ? 'bg-blue-500 border-blue-500'
-                      : 'bg-white border-gray-300'
-                  }`}
+                  style={[
+                    styles.skillChip,
+                    formData.skills.includes(skill) ? styles.skillChipActive : styles.skillChipInactive
+                  ]}
                 >
-                  <Text className={`text-sm ${
-                    formData.skills.includes(skill) ? 'text-white' : 'text-gray-700'
-                  }`}>
+                  <Text style={[
+                    styles.skillChipText,
+                    formData.skills.includes(skill) ? styles.skillChipTextActive : styles.skillChipTextInactive
+                  ]}>
                     {skill}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           ) : (
-            <View className="flex-row flex-wrap">
+            <View style={styles.skillsContainer}>
               {user?.skills?.map((skill) => (
                 <View
                   key={skill}
-                  className="bg-blue-100 px-3 py-2 rounded-full mr-2 mb-2"
+                  style={styles.skillBadge}
                 >
-                  <Text className="text-blue-800 text-sm">{skill}</Text>
+                  <Text style={styles.skillBadgeText}>{skill}</Text>
                 </View>
               )) || (
-                <Text className="text-gray-500">No skills added</Text>
+                <Text style={styles.noSkillsText}>No skills added</Text>
               )}
             </View>
           )}
         </Card>
 
         {/* Statistics */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Statistics</Text>
+        <Card style={styles.statsCard}>
+          <Text style={styles.sectionTitle}>Statistics</Text>
           
-          <View className="flex-row justify-between items-center mb-3">
-            <View className="flex-row items-center">
+          <View style={styles.statRow}>
+            <View style={styles.statLabel}>
               <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-              <Text className="text-gray-700 ml-2">Tasks Completed</Text>
+              <Text style={styles.statLabelText}>Tasks Completed</Text>
             </View>
-            <Text className="text-gray-900 font-semibold">12</Text>
+            <Text style={styles.statValue}>{stats.completedTasks}</Text>
           </View>
 
-          <View className="flex-row justify-between items-center mb-3">
-            <View className="flex-row items-center">
+          <View style={styles.statRow}>
+            <View style={styles.statLabel}>
               <Ionicons name="time" size={20} color={COLORS.warning} />
-              <Text className="text-gray-700 ml-2">Hours Worked</Text>
+              <Text style={styles.statLabelText}>Hours Worked</Text>
             </View>
-            <Text className="text-gray-900 font-semibold">48h</Text>
+            <Text style={styles.statValue}>{stats.hoursWorked.toFixed(2)}h</Text>
           </View>
 
-          <View className="flex-row justify-between items-center">
-            <View className="flex-row items-center">
+          <View style={styles.statRow}>
+            <View style={styles.statLabel}>
               <Ionicons name="star" size={20} color={COLORS.warning} />
-              <Text className="text-gray-700 ml-2">Rating</Text>
+              <Text style={styles.statLabelText}>Rating</Text>
             </View>
-            <Text className="text-gray-900 font-semibold">4.8/5</Text>
+            <Text style={styles.statValue}>-</Text>
           </View>
         </Card>
 
         {/* Actions */}
         {editing ? (
-          <View className="flex-row space-x-3 mb-8">
+          <View style={styles.editActions}>
             <Button
               title="Save Changes"
               onPress={handleSave}
               loading={loading}
-              style={{ flex: 1, marginRight: 8 }}
+              style={styles.saveButton}
             />
             <Button
               title="Cancel"
@@ -258,16 +293,16 @@ const VolunteerProfile: React.FC = () => {
                 });
               }}
               variant="outline"
-              style={{ flex: 1 }}
+              style={styles.cancelButton}
             />
           </View>
         ) : (
-          <View className="space-y-3 mb-8">
+          <View style={styles.actions}>
             <Button
               title="View My Tasks"
-              onPress={() => navigation.navigate('TaskList')}
+              onPress={() => navigation.navigate('Tasks')}
               variant="outline"
-              style={{ marginBottom: 12 }}
+              style={styles.actionButton}
             />
             
             <Button
@@ -281,5 +316,213 @@ const VolunteerProfile: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  scrollView: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  profileCard: {
+    marginBottom: 16,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarContainer: {
+    backgroundColor: '#dbeafe',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  userEmail: {
+    color: '#6b7280',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  statusSection: {
+    marginBottom: 16,
+  },
+  statusLabel: {
+    color: '#374151',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  statusOptions: {
+    flexDirection: 'row',
+  },
+  statusOption: {
+    marginRight: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  statusOptionActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  statusOptionInactive: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d1d5db',
+  },
+  statusOptionText: {
+    fontSize: 14,
+    textTransform: 'capitalize',
+  },
+  statusOptionTextActive: {
+    color: '#ffffff',
+  },
+  statusOptionTextInactive: {
+    color: '#374151',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  infoLabel: {
+    color: '#6b7280',
+  },
+  infoValue: {
+    color: '#111827',
+    textTransform: 'capitalize',
+  },
+  skillsCard: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skillChip: {
+    marginRight: 8,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  skillChipActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  skillChipInactive: {
+    backgroundColor: '#ffffff',
+    borderColor: '#d1d5db',
+  },
+  skillChipText: {
+    fontSize: 14,
+  },
+  skillChipTextActive: {
+    color: '#ffffff',
+  },
+  skillChipTextInactive: {
+    color: '#374151',
+  },
+  skillBadge: {
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  skillBadgeText: {
+    color: '#1e40af',
+    fontSize: 14,
+  },
+  noSkillsText: {
+    color: '#6b7280',
+  },
+  statsCard: {
+    marginBottom: 16,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statLabelText: {
+    color: '#374151',
+    marginLeft: 8,
+  },
+  statValue: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  editActions: {
+    flexDirection: 'row',
+    marginBottom: 32,
+  },
+  saveButton: {
+    flex: 1,
+    marginRight: 8,
+  },
+  cancelButton: {
+    flex: 1,
+  },
+  actions: {
+    marginBottom: 32,
+  },
+  actionButton: {
+    marginBottom: 12,
+  },
+});
 
 export default VolunteerProfile;

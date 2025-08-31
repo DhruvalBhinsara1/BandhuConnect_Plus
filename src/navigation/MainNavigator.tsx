@@ -35,9 +35,15 @@ const Stack = createNativeStackNavigator();
 const VolunteerStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Dashboard" component={VolunteerDashboard} />
-    <Stack.Screen name="TaskList" component={TaskList} />
     <Stack.Screen name="TaskDetails" component={TaskDetails} />
     <Stack.Screen name="Profile" component={VolunteerProfile} />
+  </Stack.Navigator>
+);
+
+const TaskStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="TaskList" component={TaskList} />
+    <Stack.Screen name="TaskDetails" component={TaskDetails} />
   </Stack.Navigator>
 );
 
@@ -122,7 +128,7 @@ const MainNavigator: React.FC = () => {
         })}
       >
         <Tab.Screen name="Home" component={VolunteerStack} />
-        <Tab.Screen name="Tasks" component={TaskList} />
+        <Tab.Screen name="Tasks" component={TaskStack} />
         <Tab.Screen name="Map" component={MapScreen} />
         <Tab.Screen name="Chat" component={ChatScreen} />
         <Tab.Screen name="Profile" component={VolunteerProfile} />

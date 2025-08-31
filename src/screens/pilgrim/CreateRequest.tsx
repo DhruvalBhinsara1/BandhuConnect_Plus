@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, Image } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Image } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,14 +41,6 @@ const CreateRequest: React.FC = () => {
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
     
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    
     if (!currentLocation) {
       newErrors.location = 'Location is required. Please enable location services.';
     }
@@ -67,24 +59,26 @@ const CreateRequest: React.FC = () => {
       // Upload photo if selected
       if (formData.photo) {
         setImageLoading(true);
-        const { data, error } = await storageService.uploadImage(
+        const uploadResult = await storageService.uploadImage(
           formData.photo.uri,
-          'request-photos'
+          'request-photos',
+          `request_${Date.now()}.jpg`
         );
         
-        if (error) {
+        if (uploadResult.error) {
           Alert.alert('Error', 'Failed to upload photo. Please try again.');
           return;
         }
         
-        photoUrl = data || '';
+        photoUrl = uploadResult.data || '';
         setImageLoading(false);
       }
 
+      const requestType = REQUEST_TYPES.find(t => t.value === formData.type);
       const { error } = await createRequest({
         type: formData.type,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
+        title: requestType?.label || formData.type,
+        description: formData.description.trim() || `Help needed: ${requestType?.label}`,
         priority: formData.priority,
         location: currentLocation!,
         photo_url: photoUrl,
@@ -119,13 +113,33 @@ const CreateRequest: React.FC = () => {
     }
   };
 
-  const showImagePicker = () => {
+  const showImagePicker = async () => {
+    // Request permissions first
+    const permissions = await storageService.requestPermissions();
+    
+    if (!permissions.camera && !permissions.mediaLibrary) {
+      Alert.alert(
+        'Permissions Required',
+        'Please enable camera and photo library permissions to add photos.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Add Photo',
       'Choose an option',
       [
-        { text: 'Camera', onPress: handleTakePhoto },
-        { text: 'Gallery', onPress: handlePickImage },
+        { 
+          text: 'Camera', 
+          onPress: handleTakePhoto,
+          style: permissions.camera ? 'default' : 'destructive'
+        },
+        { 
+          text: 'Gallery', 
+          onPress: handlePickImage,
+          style: permissions.mediaLibrary ? 'default' : 'destructive'
+        },
         { text: 'Cancel', style: 'cancel' }
       ]
     );
@@ -137,28 +151,70 @@ const CreateRequest: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row items-center">
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
-          </TouchableOpacity>
-          <Text className="text-xl font-bold text-gray-900 ml-4">Create Request</Text>
-        </View>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
 
-      <ScrollView className="flex-1 px-6 py-4">
-        <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Request Details</Text>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 16 }}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+          keyboardDismissMode="none"
+        >
+        <Card style={{ marginBottom: 20, padding: 20 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 20 }}>Request Details</Text>
           
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-medium mb-2">Request Type</Text>
-            <View className="border border-gray-300 rounded-lg">
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', marginBottom: 10 }}>Additional Details (Optional)</Text>
+            <TextInput
+              style={{
+                borderWidth: 1.5,
+                borderColor: '#d1d5db',
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                fontSize: 16,
+                backgroundColor: '#ffffff',
+                minHeight: 100,
+                textAlignVertical: 'top',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+              }}
+              placeholder="Any specific details about your request"
+              placeholderTextColor="#9ca3af"
+              value={formData.description}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+              multiline
+              numberOfLines={4}
+              blurOnSubmit={false}
+              returnKeyType="default"
+              textBreakStrategy="simple"
+            />
+          </View>
+
+          <View style={{ marginBottom: 20 }}>
+            <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', marginBottom: 10 }}>Request Type</Text>
+            <View style={{ 
+              borderWidth: 1.5, 
+              borderColor: '#d1d5db', 
+              borderRadius: 12, 
+              backgroundColor: '#ffffff',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1
+            }}>
               <Picker
                 selectedValue={formData.type}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}
-                style={{ height: 50 }}
+                style={{ height: 56 }}
               >
                 {REQUEST_TYPES.map((type) => (
                   <Picker.Item key={type.value} label={type.label} value={type.value} />
@@ -167,45 +223,35 @@ const CreateRequest: React.FC = () => {
             </View>
           </View>
 
-          <Input
-            label="Title"
-            placeholder="Brief description of your request"
-            value={formData.title}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, title: text }))}
-            error={errors.title}
-          />
 
-          <Input
-            label="Description"
-            placeholder="Provide detailed information about your request"
-            value={formData.description}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-            multiline
-            numberOfLines={4}
-            style={{ height: 100, textAlignVertical: 'top' }}
-            error={errors.description}
-          />
-
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-medium mb-2">Priority Level</Text>
-            <View className="flex-row">
+          <View style={{ marginBottom: 0 }}>
+            <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', marginBottom: 12 }}>Priority Level</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {PRIORITY_LEVELS.map((priority) => (
                 <TouchableOpacity
                   key={priority.value}
                   onPress={() => setFormData(prev => ({ ...prev, priority: priority.value as Priority }))}
-                  className={`mr-3 px-4 py-2 rounded-full border ${
-                    formData.priority === priority.value
-                      ? 'border-2'
-                      : 'border-gray-300'
-                  }`}
                   style={{
-                    borderColor: formData.priority === priority.value ? priority.color : '#d1d5db',
-                    backgroundColor: formData.priority === priority.value ? priority.color + '20' : 'white'
+                    marginRight: 12,
+                    marginBottom: 8,
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    borderRadius: 25,
+                    borderWidth: formData.priority === priority.value ? 2 : 1.5,
+                    borderColor: formData.priority === priority.value ? priority.color : '#e5e7eb',
+                    backgroundColor: formData.priority === priority.value ? priority.color + '15' : '#ffffff',
+                    shadowColor: formData.priority === priority.value ? priority.color : '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: formData.priority === priority.value ? 0.2 : 0.05,
+                    shadowRadius: 3,
+                    elevation: formData.priority === priority.value ? 3 : 1
                   }}
                 >
-                  <Text className={`text-sm font-medium ${
-                    formData.priority === priority.value ? 'font-bold' : ''
-                  }`} style={{ color: priority.color }}>
+                  <Text style={{ 
+                    fontSize: 14, 
+                    fontWeight: formData.priority === priority.value ? '700' : '600',
+                    color: formData.priority === priority.value ? priority.color : '#6b7280'
+                  }}>
                     {priority.label}
                   </Text>
                 </TouchableOpacity>
@@ -215,24 +261,24 @@ const CreateRequest: React.FC = () => {
         </Card>
 
         {/* Photo Upload */}
-        <Card style={{ marginBottom: 16 }}>
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-lg font-bold text-gray-900">Add Photo (Optional)</Text>
+        <Card style={{ marginBottom: 20, padding: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827' }}>Add Photo (Optional)</Text>
             <TouchableOpacity onPress={showImagePicker}>
               <Ionicons name="camera" size={24} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
 
           {formData.photo ? (
-            <View className="relative">
+            <View style={{ position: 'relative' }}>
               <Image
                 source={{ uri: formData.photo.uri }}
-                className="w-full h-48 rounded-lg"
+                style={{ width: '100%', height: 192, borderRadius: 8 }}
                 resizeMode="cover"
               />
               <TouchableOpacity
                 onPress={() => setFormData(prev => ({ ...prev, photo: null }))}
-                className="absolute top-2 right-2 bg-red-500 rounded-full p-1"
+                style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#ef4444', borderRadius: 50, padding: 4 }}
               >
                 <Ionicons name="close" size={16} color="white" />
               </TouchableOpacity>
@@ -240,18 +286,18 @@ const CreateRequest: React.FC = () => {
           ) : (
             <TouchableOpacity
               onPress={showImagePicker}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 items-center"
+              style={{ borderWidth: 2, borderStyle: 'dashed', borderColor: '#d1d5db', borderRadius: 8, padding: 32, alignItems: 'center' }}
             >
               <Ionicons name="camera-outline" size={32} color={COLORS.textSecondary} />
-              <Text className="text-gray-500 mt-2">Tap to add photo</Text>
+              <Text style={{ color: '#6b7280', marginTop: 8 }}>Tap to add photo</Text>
             </TouchableOpacity>
           )}
         </Card>
 
         {/* Location Info */}
-        <Card style={{ marginBottom: 16 }}>
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-lg font-bold text-gray-900">Location</Text>
+        <Card style={{ marginBottom: 20, padding: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827' }}>Location</Text>
             <TouchableOpacity onPress={getCurrentLocation}>
               <Ionicons name="refresh" size={20} color={COLORS.primary} />
             </TouchableOpacity>
@@ -259,25 +305,25 @@ const CreateRequest: React.FC = () => {
 
           {currentLocation ? (
             <View>
-              <View className="flex-row items-center mb-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <Ionicons name="location" size={16} color={COLORS.success} />
-                <Text className="text-gray-600 ml-2">Current location detected</Text>
+                <Text style={{ color: '#4b5563', marginLeft: 8 }}>Current location detected</Text>
               </View>
-              <Text className="text-gray-500 text-sm">
+              <Text style={{ color: '#6b7280', fontSize: 12 }}>
                 Lat: {currentLocation.latitude.toFixed(6)}, Lng: {currentLocation.longitude.toFixed(6)}
               </Text>
             </View>
           ) : (
             <View>
-              <View className="flex-row items-center mb-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                 <Ionicons name="location-outline" size={16} color={COLORS.error} />
-                <Text className="text-red-600 ml-2">Location not available</Text>
+                <Text style={{ color: '#dc2626', marginLeft: 8 }}>Location not available</Text>
               </View>
-              <Text className="text-gray-500 text-sm">
+              <Text style={{ color: '#6b7280', fontSize: 12 }}>
                 Please enable location services to submit your request
               </Text>
               {errors.location && (
-                <Text className="text-red-500 text-sm mt-1">{errors.location}</Text>
+                <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>{errors.location}</Text>
               )}
             </View>
           )}
@@ -289,9 +335,15 @@ const CreateRequest: React.FC = () => {
           onPress={handleSubmit}
           loading={loading || imageLoading}
           disabled={!currentLocation}
-          style={{ marginBottom: 32 }}
+          style={{ 
+            marginBottom: 40,
+            marginTop: 10,
+            paddingVertical: 16,
+            borderRadius: 12
+          }}
         />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

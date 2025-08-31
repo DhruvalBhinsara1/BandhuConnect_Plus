@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, SafeAreaView, Alert, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Card from '../../components/common/Card';
-import { UserRole, VOLUNTEER_SKILLS } from '../../types';
+import { UserRole } from '../../types';
+import { VOLUNTEER_SKILLS } from '../../constants';
+import { COLORS } from '../../constants';
 
 const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -100,12 +103,24 @@ const SignUpScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <ScrollView className="flex-1 px-6 py-4">
-        <Card style={{ maxWidth: 400, alignSelf: 'center', width: '100%' }}>
-          <View className="items-center mb-8">
-            <Text className="text-3xl font-bold text-gray-900 mb-2">Create Account</Text>
-            <Text className="text-gray-600 text-center">Join our community platform</Text>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create Account</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Join our community platform</Text>
+            <Text style={styles.subtitle}>Create your account to get started</Text>
           </View>
 
           <Input
@@ -138,45 +153,44 @@ const SignUpScreen: React.FC = () => {
             error={errors.phone}
           />
 
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-medium mb-2">Role</Text>
-            <View className="border border-gray-300 rounded-lg">
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Role</Text>
+            <View style={styles.pickerContainer}>
               <Picker
                 selectedValue={formData.role}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
-                style={{ height: 50 }}
+                style={styles.picker}
               >
-                <Picker.Item label="Pilgrim/Attendee" value="pilgrim" />
+                <Picker.Item label="Pilgrim" value="pilgrim" />
                 <Picker.Item label="Volunteer" value="volunteer" />
-                <Picker.Item label="Admin" value="admin" />
               </Picker>
             </View>
           </View>
 
           {formData.role === 'volunteer' && (
-            <View className="mb-4">
-              <Text className="text-gray-700 text-sm font-medium mb-2">Skills</Text>
-              <View className="flex-row flex-wrap">
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Skills (Select your areas of expertise)</Text>
+              <View style={styles.skillsContainer}>
                 {VOLUNTEER_SKILLS.map((skill) => (
                   <TouchableOpacity
                     key={skill}
                     onPress={() => toggleSkill(skill)}
-                    className={`mr-2 mb-2 px-3 py-2 rounded-full border ${
-                      formData.skills.includes(skill)
-                        ? 'bg-blue-500 border-blue-500'
-                        : 'bg-white border-gray-300'
-                    }`}
+                    style={[
+                      styles.skillChip,
+                      formData.skills.includes(skill) && styles.skillChipSelected
+                    ]}
                   >
-                    <Text className={`text-sm ${
-                      formData.skills.includes(skill) ? 'text-white' : 'text-gray-700'
-                    }`}>
-                      {skill}
+                    <Text style={[
+                      styles.skillText,
+                      formData.skills.includes(skill) && styles.skillTextSelected
+                    ]}>
+                      {skill.replace('_', ' ').toUpperCase()}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
               {errors.skills && (
-                <Text className="text-red-500 text-sm mt-1">{errors.skills}</Text>
+                <Text style={styles.errorText}>{errors.skills}</Text>
               )}
             </View>
           )}
@@ -214,19 +228,137 @@ const SignUpScreen: React.FC = () => {
             title="Create Account"
             onPress={handleSignUp}
             loading={loading}
-            style={{ marginTop: 8, marginBottom: 16 }}
+            style={styles.createButton}
           />
 
-          <View className="flex-row justify-center items-center">
-            <Text className="text-gray-600">Already have an account? </Text>
+          <View style={styles.signInContainer}>
+            <Text style={styles.signInText}>Already have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text className="text-blue-600 font-semibold">Sign In</Text>
+              <Text style={styles.signInLink}>Sign In</Text>
             </TouchableOpacity>
           </View>
-        </Card>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  placeholder: {
+    width: 32,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+  picker: {
+    height: 50,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  skillChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 20,
+  },
+  skillChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  skillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  skillTextSelected: {
+    color: '#ffffff',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginTop: 4,
+  },
+  createButton: {
+    marginTop: 24,
+    marginBottom: 20,
+  },
+  signInContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  signInText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  signInLink: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+});
 
 export default SignUpScreen;

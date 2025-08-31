@@ -68,6 +68,11 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     };
   }, []);
 
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
+
   const value: LocationContextType = {
     currentLocation,
     isTracking,

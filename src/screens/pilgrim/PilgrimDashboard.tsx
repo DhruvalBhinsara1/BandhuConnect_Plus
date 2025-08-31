@@ -37,17 +37,17 @@ const PilgrimDashboard: React.FC = () => {
   const completedRequests = myRequests.filter(r => r.status === 'completed');
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       <ScrollView
-        className="flex-1"
+        style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* Header */}
-        <View className="bg-green-600 px-6 py-8">
-          <View className="flex-row justify-between items-center mb-4">
+        <View style={{ backgroundColor: '#059669', paddingHorizontal: 24, paddingVertical: 32 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <View>
-              <Text className="text-white text-2xl font-bold">Welcome,</Text>
-              <Text className="text-green-100 text-lg">{user?.name}</Text>
+              <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>Welcome,</Text>
+              <Text style={{ color: '#bbf7d0', fontSize: 18 }}>{user?.name}</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <Ionicons name="person-circle-outline" size={32} color="white" />
@@ -55,53 +55,47 @@ const PilgrimDashboard: React.FC = () => {
           </View>
 
           {/* Quick Stats */}
-          <View className="flex-row justify-between">
-            <View className="bg-white bg-opacity-20 px-4 py-3 rounded-lg flex-1 mr-2">
-              <Text className="text-white text-2xl font-bold">{activeRequests.length}</Text>
-              <Text className="text-green-100 text-sm">Active Requests</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, flex: 1, marginRight: 8 }}>
+              <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>{activeRequests.length}</Text>
+              <Text style={{ color: '#bbf7d0', fontSize: 12 }}>Active Requests</Text>
             </View>
-            <View className="bg-white bg-opacity-20 px-4 py-3 rounded-lg flex-1 ml-2">
-              <Text className="text-white text-2xl font-bold">{completedRequests.length}</Text>
-              <Text className="text-green-100 text-sm">Completed</Text>
+            <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, flex: 1, marginLeft: 8 }}>
+              <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>{completedRequests.length}</Text>
+              <Text style={{ color: '#bbf7d0', fontSize: 12 }}>Completed</Text>
             </View>
           </View>
         </View>
 
-        <View className="px-6 py-4">
+        <View style={{ paddingHorizontal: 24, paddingVertical: 16 }}>
           {/* Quick Request Actions */}
           <Card style={{ marginBottom: 24 }}>
-            <Text className="text-lg font-bold text-gray-900 mb-4">Need Help?</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Need Help?</Text>
             
-            <View className="flex-row flex-wrap justify-between">
-              {REQUEST_TYPES.slice(0, 4).map((type) => (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {REQUEST_TYPES.map((type) => (
                 <TouchableOpacity
                   key={type.value}
                   onPress={() => navigation.navigate('CreateRequest', { type: type.value })}
-                  className="items-center w-1/2 mb-4"
+                  style={{ alignItems: 'center', width: '30%', marginBottom: 16 }}
                 >
-                  <View className="bg-green-100 p-4 rounded-full mb-2">
+                  <View style={{ backgroundColor: '#dcfce7', padding: 16, borderRadius: 50, marginBottom: 8 }}>
                     <Ionicons name={type.icon as any} size={24} color={COLORS.secondary} />
                   </View>
-                  <Text className="text-gray-700 text-sm text-center">{type.label}</Text>
+                  <Text style={{ color: '#374151', fontSize: 10, textAlign: 'center' }}>{type.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Button
-              title="Create Custom Request"
-              onPress={() => navigation.navigate('CreateRequest')}
-              variant="outline"
-              style={{ marginTop: 8 }}
-            />
           </Card>
 
           {/* Active Requests */}
           {activeRequests.length > 0 && (
             <Card style={{ marginBottom: 24 }}>
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-lg font-bold text-gray-900">Active Requests</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827' }}>Active Requests</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('RequestStatus')}>
-                  <Text className="text-green-600 font-semibold">View All</Text>
+                  <Text style={{ color: '#059669', fontWeight: '600' }}>View All</Text>
                 </TouchableOpacity>
               </View>
 
@@ -109,29 +103,38 @@ const PilgrimDashboard: React.FC = () => {
                 <TouchableOpacity
                   key={request.id}
                   onPress={() => navigation.navigate('RequestStatus', { requestId: request.id })}
-                  className="border-b border-gray-200 py-3 last:border-b-0"
+                  style={{ borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingVertical: 12 }}
                 >
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1">
-                      <Text className="font-semibold text-gray-900 mb-1">
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: '600', color: '#111827', marginBottom: 4 }}>
                         {request.title}
                       </Text>
-                      <Text className="text-gray-600 text-sm mb-2">
+                      <Text style={{ color: '#4b5563', fontSize: 12, marginBottom: 8 }}>
                         {request.description}
                       </Text>
-                      <View className="flex-row items-center">
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <View
-                          className="px-2 py-1 rounded-full mr-2"
-                          style={{ backgroundColor: STATUS_COLORS[request.status] + '20' }}
+                          style={{ 
+                            paddingHorizontal: 8, 
+                            paddingVertical: 4, 
+                            borderRadius: 50, 
+                            marginRight: 8,
+                            backgroundColor: STATUS_COLORS[request.status] + '20' 
+                          }}
                         >
                           <Text
-                            className="text-xs font-medium capitalize"
-                            style={{ color: STATUS_COLORS[request.status] }}
+                            style={{ 
+                              fontSize: 10, 
+                              fontWeight: '500', 
+                              textTransform: 'capitalize',
+                              color: STATUS_COLORS[request.status] 
+                            }}
                           >
                             {request.status.replace('_', ' ')}
                           </Text>
                         </View>
-                        <Text className="text-gray-500 text-xs">
+                        <Text style={{ color: '#6b7280', fontSize: 10 }}>
                           {new Date(request.created_at).toLocaleDateString()}
                         </Text>
                       </View>
@@ -146,20 +149,20 @@ const PilgrimDashboard: React.FC = () => {
           {/* Recent Activity */}
           {completedRequests.length > 0 && (
             <Card style={{ marginBottom: 24 }}>
-              <Text className="text-lg font-bold text-gray-900 mb-4">Recent Activity</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Recent Activity</Text>
               
               {completedRequests.slice(0, 2).map((request) => (
                 <View
                   key={request.id}
                   className="border-b border-gray-200 py-3 last:border-b-0"
                 >
-                  <View className="flex-row items-center">
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                    <View className="flex-1 ml-3">
-                      <Text className="font-medium text-gray-900">
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={{ fontWeight: '500', color: '#111827' }}>
                         {request.title}
                       </Text>
-                      <Text className="text-gray-500 text-sm">
+                      <Text style={{ color: '#6b7280', fontSize: 12 }}>
                         Completed on {new Date(request.updated_at).toLocaleDateString()}
                       </Text>
                     </View>
@@ -171,37 +174,37 @@ const PilgrimDashboard: React.FC = () => {
 
           {/* Quick Actions */}
           <Card>
-            <Text className="text-lg font-bold text-gray-900 mb-4">Quick Actions</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Quick Actions</Text>
             
-            <View className="flex-row justify-between">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <TouchableOpacity
                 onPress={() => navigation.navigate('CreateRequest')}
                 className="items-center flex-1"
               >
-                <View className="bg-green-100 p-3 rounded-full mb-2">
+                <View style={{ backgroundColor: '#dcfce7', padding: 12, borderRadius: 50, marginBottom: 8 }}>
                   <Ionicons name="add-circle" size={24} color={COLORS.secondary} />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">New Request</Text>
+                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>New Request</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('RequestStatus')}
                 className="items-center flex-1"
               >
-                <View className="bg-blue-100 p-3 rounded-full mb-2">
+                <View style={{ backgroundColor: '#dbeafe', padding: 12, borderRadius: 50, marginBottom: 8 }}>
                   <Ionicons name="list" size={24} color={COLORS.primary} />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">My Requests</Text>
+                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>My Requests</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('Map')}
                 className="items-center flex-1"
               >
-                <View className="bg-purple-100 p-3 rounded-full mb-2">
+                <View style={{ backgroundColor: '#ede9fe', padding: 12, borderRadius: 50, marginBottom: 8 }}>
                   <Ionicons name="map" size={24} color="#8b5cf6" />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Find Help</Text>
+                <Text style={{ color: '#374151', fontSize: 12, textAlign: 'center' }}>Find Help</Text>
               </TouchableOpacity>
             </View>
           </Card>
@@ -210,9 +213,9 @@ const PilgrimDashboard: React.FC = () => {
           <Card style={{ marginTop: 16, backgroundColor: '#fef2f2' }}>
             <View className="flex-row items-center">
               <Ionicons name="warning" size={24} color={COLORS.error} />
-              <View className="flex-1 ml-3">
-                <Text className="font-bold text-red-800">Emergency?</Text>
-                <Text className="text-red-600 text-sm">
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={{ fontWeight: 'bold', color: '#991b1b' }}>Emergency?</Text>
+                <Text style={{ color: '#dc2626', fontSize: 12 }}>
                   For immediate assistance, call emergency services
                 </Text>
               </View>

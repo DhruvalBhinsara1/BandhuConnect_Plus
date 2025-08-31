@@ -5,7 +5,7 @@
 
 -- 1. Create custom ENUM types for roles, request types, and statuses.
 CREATE TYPE public.user_role AS ENUM ('volunteer', 'admin', 'pilgrim');
-CREATE TYPE public.request_type AS ENUM ('medical', 'safety', 'lost_child', 'directions', 'sanitation', 'general');
+CREATE TYPE public.request_type AS ENUM ('medical', 'emergency', 'lost_person', 'sanitation', 'crowd_management', 'guidance', 'general');
 CREATE TYPE public.request_status AS ENUM ('pending', 'in_progress', 'resolved', 'cancelled');
 
 -- 2. Create the `profiles` table to store public user data.

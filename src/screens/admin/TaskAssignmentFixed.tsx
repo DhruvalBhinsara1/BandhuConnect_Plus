@@ -418,13 +418,13 @@ const TaskAssignment: React.FC = () => {
                 selectedValue={customTask.type}
                 onValueChange={(value) => setCustomTask({...customTask, type: value})}
               >
-                <Picker.Item label="General" value="general" />
-                <Picker.Item label="Medical" value="medical" />
-                <Picker.Item label="Transportation" value="transportation" />
-                <Picker.Item label="Food" value="food" />
-                <Picker.Item label="Accommodation" value="accommodation" />
-                <Picker.Item label="Guidance" value="guidance" />
+                <Picker.Item label="Medical Emergency" value="medical" />
                 <Picker.Item label="Emergency" value="emergency" />
+                <Picker.Item label="Lost Person" value="lost_person" />
+                <Picker.Item label="Sanitation" value="sanitation" />
+                <Picker.Item label="Crowd Management" value="crowd_management" />
+                <Picker.Item label="Guidance" value="guidance" />
+                <Picker.Item label="General Help" value="general" />
               </Picker>
             </View>
 

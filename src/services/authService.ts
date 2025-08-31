@@ -2,88 +2,136 @@ import { supabase } from './supabase';
 import { User, UserRole } from '../types';
 
 export class AuthService {
-  async signUp(email: string, password: string, userData: {
-    name: string;
-    phone: string;
-    role: UserRole;
-    skills?: string[];
-    age?: number;
-  }) {
+  async signUp(email: string, password: string, userData: any) {
     try {
+      console.log('[AuthService] Starting signup for:', email);
+      console.log('[AuthService] UserData:', userData);
+      
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) throw authError;
+      console.log('[AuthService] Auth signup response:', { user: authData.user?.id, error: authError });
 
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            name: userData.name,
-            email,
-            phone: userData.phone,
-            role: userData.role,
-            skills: userData.skills || [],
-            is_active: true,
-            volunteer_status: userData.role === 'volunteer' ? 'available' : 'offline',
-          });
-
-        if (profileError) throw profileError;
+      if (authError) {
+        console.log('[AuthService] Auth error:', authError);
+        throw authError;
       }
 
-      return { data: authData, error: null };
+      if (!authData.user) {
+        throw new Error('No user returned from signup');
+      }
+
+      // If no session (email confirmation required)
+      if (!authData.session) {
+        console.log('[AuthService] No session - email confirmation required');
+        return { 
+          data: { 
+            user: authData.user, 
+            profile: null,
+            emailConfirmationRequired: true,
+            pendingUserData: userData
+          }, 
+          error: null 
+        };
+      }
+
+      // Set the session to authenticate the user for RLS
+      await supabase.auth.setSession(authData.session);
+      console.log('[AuthService] Session set for user:', authData.user.id);
+
+      // Wait a moment for session to be fully established
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Create profile with authenticated session
+      console.log('[AuthService] Creating profile for user:', authData.user.id);
+      const profileData = {
+        id: authData.user.id,
+        email: authData.user.email,
+        name: userData.name,
+        phone: userData.phone,
+        role: userData.role,
+        ...(userData.role === 'volunteer' && {
+          skills: userData.skills || [],
+          volunteer_status: 'available',
+          is_active: true,
+        }),
+      };
+
+      console.log('[AuthService] Profile data to insert:', profileData);
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .insert([profileData])
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('[AuthService] Profile creation error:', profileError);
+        console.error('[AuthService] Profile data that failed:', profileData);
+        
+        // If duplicate phone number, try updating existing profile instead
+        if (profileError.code === '23505' && profileError.message?.includes('profiles_phone_key')) {
+          console.log('[AuthService] Duplicate phone detected, trying to update existing profile');
+          
+          const { data: updateResult, error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              name: profileData.name,
+              role: profileData.role,
+              ...(profileData.role === 'volunteer' && {
+                skills: profileData.skills,
+                volunteer_status: profileData.volunteer_status,
+                is_active: profileData.is_active,
+              }),
+            })
+            .eq('phone', profileData.phone)
+            .select()
+            .single();
+            
+          if (updateError) {
+            console.error('[AuthService] Profile update also failed:', updateError);
+            throw profileError;
+          }
+          
+          console.log('[AuthService] Profile updated successfully after phone conflict:', updateResult);
+          return { data: { user: authData.user, profile: updateResult }, error: null };
+        }
+        
+        throw profileError;
+      }
+
+      console.log('[AuthService] Profile created successfully:', profile);
+      return { data: { user: authData.user, profile }, error: null };
     } catch (error) {
+      console.log('[AuthService] SignUp catch error:', error);
       return { data: null, error };
     }
   }
 
   async signInWithEmail(email: string, password: string) {
     try {
+      console.log('[AuthService] SignIn attempt for email:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      console.log('[AuthService] Supabase auth response:', { data: data.user?.id, error });
+
+      if (error) {
+        console.log('[AuthService] Auth error details:', error);
+        throw error;
+      }
 
       return { data, error: null };
     } catch (error) {
+      console.log('[AuthService] SignIn catch error:', error);
       return { data: null, error };
     }
   }
 
-  async signInWithPhone(phone: string) {
-    try {
-      const { data, error } = await supabase.auth.signInWithOtp({
-        phone,
-      });
-
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  }
-
-  async verifyOtp(phone: string, token: string) {
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token,
-        type: 'sms',
-      });
-
-      if (error) throw error;
-
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  }
 
   async signOut() {
     try {
@@ -105,9 +153,25 @@ export class AuthService {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting current user profile:', error);
+        return null;
+      }
+
+      // If no profile exists, return user with basic info
+      if (!profile) {
+        console.error('[AuthService] No profile found for user:', user.id, 'Email:', user.email);
+        console.error('[AuthService] This indicates signup did not create profile properly');
+        return {
+          id: user.id,
+          email: user.email,
+          name: null,
+          phone: null,
+          role: null,
+        } as User;
+      }
 
       return profile;
     } catch (error) {
@@ -129,6 +193,81 @@ export class AuthService {
 
       return { data, error: null };
     } catch (error) {
+      return { data: null, error };
+    }
+  }
+
+  async createProfileAfterConfirmation(userData: any) {
+    try {
+      console.log('[AuthService] Creating profile after email confirmation');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('No authenticated user found');
+      }
+
+      // Create profile with authenticated session
+      const profileData = {
+        id: user.id,
+        email: user.email,
+        name: userData.name,
+        phone: userData.phone,
+        role: userData.role,
+        ...(userData.role === 'volunteer' && {
+          skills: userData.skills || [],
+          volunteer_status: 'available',
+          is_active: true,
+        }),
+      };
+
+      console.log('[AuthService] Profile data to insert after confirmation:', profileData);
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .insert([profileData])
+        .select()
+        .single();
+
+      if (profileError) {
+        console.error('[AuthService] Profile creation error after confirmation:', profileError);
+        console.error('[AuthService] Profile data that failed after confirmation:', profileData);
+        
+        // If duplicate phone number, try updating existing profile instead
+        if (profileError.code === '23505' && profileError.message?.includes('profiles_phone_key')) {
+          console.log('[AuthService] Duplicate phone detected, trying to update existing profile');
+          
+          const { data: updateResult, error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              name: profileData.name,
+              role: profileData.role,
+              ...(profileData.role === 'volunteer' && {
+                skills: profileData.skills,
+                volunteer_status: profileData.volunteer_status,
+                is_active: profileData.is_active,
+              }),
+            })
+            .eq('phone', profileData.phone)
+            .select()
+            .single();
+            
+          if (updateError) {
+            console.error('[AuthService] Profile update also failed:', updateError);
+            throw profileError;
+          }
+          
+          console.log('[AuthService] Profile updated successfully after phone conflict:', updateResult);
+          return { data: { user, profile: updateResult }, error: null };
+        }
+        
+        throw profileError;
+      }
+
+      console.log('[AuthService] Profile created successfully after confirmation:', profile);
+      return { data: { user, profile }, error: null };
+    } catch (error) {
+      console.log('[AuthService] CreateProfileAfterConfirmation error:', error);
       return { data: null, error };
     }
   }

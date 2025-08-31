@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -44,54 +44,53 @@ const TaskList: React.FC = () => {
   const renderTaskItem = ({ item }: { item: Assignment }) => (
     <TouchableOpacity
       onPress={() => navigation.navigate('TaskDetails', { assignmentId: item.id })}
+      style={styles.taskItemContainer}
     >
-      <Card style={{ marginBottom: 12 }}>
-        <View className="flex-row justify-between items-start mb-3">
-          <View className="flex-1">
-            <Text className="font-bold text-gray-900 text-lg mb-1">
+      <Card style={styles.taskCard}>
+        <View style={styles.taskHeader}>
+          <View style={styles.taskContent}>
+            <Text style={styles.taskTitle}>
               {item.request?.title}
             </Text>
-            <Text className="text-gray-600 mb-2">
+            <Text style={styles.taskDescription}>
               {item.request?.description}
             </Text>
           </View>
           <View
-            className="px-3 py-1 rounded-full"
-            style={{ backgroundColor: STATUS_COLORS[item.status] + '20' }}
+            style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] + '20' }]}
           >
             <Text
-              className="text-xs font-medium capitalize"
-              style={{ color: STATUS_COLORS[item.status] }}
+              style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}
             >
               {item.status.replace('_', ' ')}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row justify-between items-center">
-          <View className="flex-row items-center">
+        <View style={styles.taskMeta}>
+          <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={16} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-sm ml-1">
+            <Text style={styles.metaText}>
               {new Date(item.assigned_at).toLocaleDateString()}
             </Text>
           </View>
           
-          <View className="flex-row items-center">
+          <View style={styles.metaItem}>
             <Ionicons name="location-outline" size={16} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-sm ml-1">
+            <Text style={styles.metaText}>
               {item.request?.location ? '0.5 km away' : 'Location pending'}
             </Text>
           </View>
         </View>
 
         {item.request?.priority && (
-          <View className="flex-row items-center mt-2">
+          <View style={styles.priorityContainer}>
             <Ionicons 
               name="flag" 
               size={16} 
               color={item.request.priority === 'high' ? COLORS.error : COLORS.warning} 
             />
-            <Text className="text-sm ml-1 capitalize font-medium">
+            <Text style={styles.priorityText}>
               {item.request.priority} Priority
             </Text>
           </View>
@@ -103,18 +102,18 @@ const TaskList: React.FC = () => {
   const filteredTasks = getFilteredTasks();
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row justify-between items-center">
-          <Text className="text-2xl font-bold text-gray-900">My Tasks</Text>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>My Tasks</Text>
           <TouchableOpacity onPress={handleRefresh}>
             <Ionicons name="refresh" size={24} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
 
         {/* Filter Tabs */}
-        <View className="flex-row mt-4">
+        <View style={styles.filterTabs}>
           {[
             { key: 'all', label: 'All' },
             { key: 'active', label: 'Active' },
@@ -123,11 +122,9 @@ const TaskList: React.FC = () => {
             <TouchableOpacity
               key={tab.key}
               onPress={() => setFilter(tab.key as any)}
-              className={`mr-4 pb-2 ${filter === tab.key ? 'border-b-2 border-blue-500' : ''}`}
+              style={[styles.filterTab, filter === tab.key && styles.activeFilterTab]}
             >
-              <Text className={`font-medium ${
-                filter === tab.key ? 'text-blue-600' : 'text-gray-600'
-              }`}>
+              <Text style={[styles.filterTabText, filter === tab.key && styles.activeFilterTabText]}>
                 {tab.label} ({
                   tab.key === 'all' ? assignments.length :
                   tab.key === 'active' ? assignments.filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status)).length :
@@ -144,15 +141,15 @@ const TaskList: React.FC = () => {
         data={filteredTasks}
         renderItem={renderTaskItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
         ListEmptyComponent={
-          <View className="items-center justify-center py-12">
+          <View style={styles.emptyContainer}>
             <Ionicons name="list-outline" size={64} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-lg mt-4">No tasks found</Text>
-            <Text className="text-gray-400 text-center mt-2">
+            <Text style={styles.emptyTitle}>No tasks found</Text>
+            <Text style={styles.emptySubtitle}>
               {filter === 'active' 
                 ? 'You have no active tasks at the moment'
                 : filter === 'completed'
@@ -166,5 +163,128 @@ const TaskList: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    marginTop: 16,
+  },
+  filterTab: {
+    marginRight: 16,
+    paddingBottom: 8,
+  },
+  activeFilterTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#3b82f6',
+  },
+  filterTabText: {
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeFilterTabText: {
+    color: '#2563eb',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  taskItemContainer: {
+    marginBottom: 12,
+  },
+  taskCard: {
+    padding: 16,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  taskContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  taskTitle: {
+    fontWeight: 'bold',
+    color: '#111827',
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  taskDescription: {
+    color: '#6b7280',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  taskMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  priorityText: {
+    fontSize: 14,
+    marginLeft: 4,
+    textTransform: 'capitalize',
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    color: '#6b7280',
+    fontSize: 18,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+});
 
 export default TaskList;

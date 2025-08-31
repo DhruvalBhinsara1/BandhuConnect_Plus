@@ -1,10 +1,10 @@
 export type UserRole = 'volunteer' | 'admin' | 'pilgrim';
 
-export type RequestType = 'medical' | 'tech' | 'crowd_management' | 'sanitation' | 'general' | 'lost_person';
+export type RequestType = 'medical' | 'emergency' | 'lost_person' | 'sanitation' | 'crowd_management' | 'guidance' | 'general';
 
 export type RequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 
-export type AssignmentStatus = 'assigned' | 'accepted' | 'on_duty' | 'completed';
+export type AssignmentStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
 
 export type Priority = 'low' | 'medium' | 'high' | 'emergency';
 
@@ -13,10 +13,10 @@ export type MessageType = 'text' | 'image' | 'location';
 export interface User {
   id: string;
   user_id: string;
-  name: string;
+  name: string | null;
   email: string;
-  phone: string;
-  role: UserRole;
+  phone: string | null;
+  role: UserRole | null;
   skills: string[];
   age?: number;
   location?: {
@@ -28,6 +28,7 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  needsProfileCompletion?: boolean; // Flag for incomplete profiles
 }
 
 export interface AssistanceRequest {

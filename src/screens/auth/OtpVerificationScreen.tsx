@@ -42,10 +42,28 @@ const OtpVerificationScreen: React.FC = () => {
     setError('');
     
     try {
-      const { error } = await verifyOtp(phone, otp.trim());
+      const pendingUserData = route.params?.pendingUserData;
+      const fromSignup = route.params?.fromSignup;
+      
+      const { data, error } = await verifyOtp(phone, otp.trim(), pendingUserData);
       
       if (error) {
         setError(error.message || 'Invalid verification code. Please try again.');
+      } else if (data) {
+        if (fromSignup) {
+          Alert.alert('Success', 'Account created and verified successfully!', [
+            { text: 'OK', onPress: () => navigation.reset({
+              index: 0,
+              routes: [{ name: 'Main' }],
+            }) }
+          ]);
+        } else {
+          // Regular OTP login flow
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Main' }],
+          });
+        }
       }
     } catch (error) {
       setError('An unexpected error occurred. Please try again.');
