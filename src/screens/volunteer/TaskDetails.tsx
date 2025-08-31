@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Alert, Image, StyleSheet } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,225 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { COLORS, STATUS_COLORS } from '../../constants';
 import { Assignment } from '../../types';
+import { NotificationService } from '../../services/notificationService';
+
+// Styles definition moved before component
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  notFoundContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFoundText: {
+    color: '#6b7280',
+    fontSize: 16,
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  cardMargin: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  detailSection: {
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailColumn: {
+    flex: 1,
+    marginRight: 16,
+  },
+  detailLabel: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  detailTitle: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  detailValue: {
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  detailValueCapitalized: {
+    color: '#374151',
+    fontSize: 14,
+    textTransform: 'capitalize',
+  },
+  priorityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priorityText: {
+    marginLeft: 4,
+    color: '#374151',
+    fontSize: 14,
+    textTransform: 'capitalize',
+  },
+  attachedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+  },
+  timelineContainer: {
+    paddingLeft: 6,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineTitle: {
+    color: '#111827',
+    fontWeight: '500',
+  },
+  timelineDate: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationInfo: {
+    marginBottom: 12,
+  },
+  locationText: {
+    color: '#374151',
+    fontSize: 14,
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  distanceText: {
+    color: '#6b7280',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  actionContainer: {
+    marginBottom: 32,
+  },
+  pendingContainer: {
+    backgroundColor: '#fef3c7',
+    padding: 16,
+    borderRadius: 8,
+  },
+  pendingText: {
+    color: '#92400e',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  completionLocationContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#f0f9ff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0ea5e9',
+  },
+  completionLocationTitle: {
+    color: '#0c4a6e',
+    fontWeight: '600',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  completionLocationText: {
+    color: '#0369a1',
+    fontSize: 13,
+    fontFamily: 'monospace',
+  },
+  completionAddressText: {
+    color: '#0369a1',
+    fontSize: 13,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  completedContainer: {
+    backgroundColor: '#dcfce7',
+    padding: 16,
+    borderRadius: 8,
+  },
+  completedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  completedText: {
+    color: '#166534',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+});
 
 const TaskDetails: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -76,6 +295,10 @@ const TaskDetails: React.FC = () => {
               if (error) {
                 Alert.alert('Error', 'Failed to complete task. Please try again.');
               } else {
+                // Send completion notification
+                await NotificationService.sendTaskCompletionNotification(
+                  assignment.request?.title || 'Task'
+                );
                 Alert.alert('Success', 'Task completed successfully!');
                 navigation.goBack();
               }
@@ -88,15 +311,34 @@ const TaskDetails: React.FC = () => {
     );
   };
 
+  const handleStartTaskDirectly = async () => {
+    if (!assignment) return;
+
+    setLoading(true);
+    try {
+      const { error } = await startTask(assignment.id);
+      if (error) {
+        Alert.alert('Error', 'Failed to start task. Please try again.');
+      } else {
+        Alert.alert('Success', 'Task started! You are now on duty.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getActionButton = () => {
     if (!assignment) return null;
 
-    switch (assignment.status) {
-      case 'assigned':
+    const status = assignment.status;
+    
+    switch (status) {
+      case 'pending':
+        // Tasks are already assigned, mark as done directly
         return (
           <Button
-            title="Accept Task"
-            onPress={handleAcceptTask}
+            title="Mark Task Done"
+            onPress={handleCompleteTask}
             loading={loading}
           />
         );
@@ -108,21 +350,20 @@ const TaskDetails: React.FC = () => {
             loading={loading}
           />
         );
-      case 'on_duty':
+      case 'in_progress':
         return (
           <Button
-            title="Complete Task"
+            title="Mark Task Complete"
             onPress={handleCompleteTask}
             loading={loading}
-            variant="secondary"
           />
         );
       case 'completed':
         return (
-          <View className="bg-green-100 p-4 rounded-lg">
-            <View className="flex-row items-center">
+          <View style={styles.completedContainer}>
+            <View style={styles.completedContent}>
               <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
-              <Text className="text-green-800 font-semibold ml-2">Task Completed</Text>
+              <Text style={styles.completedText}>Task Completed</Text>
             </View>
           </View>
         );
@@ -133,43 +374,47 @@ const TaskDetails: React.FC = () => {
 
   if (!assignment) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50 justify-center items-center">
-        <Text className="text-gray-500 text-lg">Task not found</Text>
+      <SafeAreaView style={styles.notFoundContainer}>
+        <Text style={styles.notFoundText}>Task not found</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row items-center">
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
           <Button
             title="←"
             onPress={() => navigation.goBack()}
             variant="outline"
             size="small"
-            style={{ marginRight: 16, minWidth: 40 }}
+            style={styles.backButton}
           />
-          <Text className="text-xl font-bold text-gray-900">Task Details</Text>
+          <Text style={styles.headerTitle}>Task Details</Text>
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-6 py-4">
+      <ScrollView style={styles.scrollView}>
         {/* Status Card */}
-        <Card style={{ marginBottom: 16 }}>
-          <View className="flex-row justify-between items-center">
+        <Card style={styles.cardMargin}>
+          <View style={styles.statusContainer}>
             <View>
-              <Text className="text-lg font-bold text-gray-900 mb-1">
+              <Text style={styles.statusTitle}>
                 Current Status
               </Text>
               <View
-                className="px-3 py-2 rounded-full self-start"
-                style={{ backgroundColor: STATUS_COLORS[assignment.status] + '20' }}
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: STATUS_COLORS[assignment.status] + '20' }
+                ]}
               >
                 <Text
-                  className="font-medium capitalize"
-                  style={{ color: STATUS_COLORS[assignment.status] }}
+                  style={[
+                    styles.statusText,
+                    { color: STATUS_COLORS[assignment.status] }
+                  ]}
                 >
                   {assignment.status.replace('_', ' ')}
                 </Text>
@@ -184,39 +429,39 @@ const TaskDetails: React.FC = () => {
         </Card>
 
         {/* Request Details */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Request Details</Text>
+        <Card style={styles.cardMargin}>
+          <Text style={styles.sectionTitle}>Request Details</Text>
           
-          <View className="mb-4">
-            <Text className="text-gray-600 text-sm mb-1">Title</Text>
-            <Text className="text-gray-900 font-semibold text-lg">
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Title</Text>
+            <Text style={styles.detailTitle}>
               {assignment.request?.title}
             </Text>
           </View>
 
-          <View className="mb-4">
-            <Text className="text-gray-600 text-sm mb-1">Description</Text>
-            <Text className="text-gray-900">
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Description</Text>
+            <Text style={styles.detailValue}>
               {assignment.request?.description}
             </Text>
           </View>
 
-          <View className="flex-row justify-between mb-4">
-            <View className="flex-1 mr-4">
-              <Text className="text-gray-600 text-sm mb-1">Type</Text>
-              <Text className="text-gray-900 capitalize">
+          <View style={styles.detailRow}>
+            <View style={styles.detailColumn}>
+              <Text style={styles.detailLabel}>Type</Text>
+              <Text style={styles.detailValueCapitalized}>
                 {assignment.request?.type?.replace('_', ' ')}
               </Text>
             </View>
-            <View className="flex-1">
-              <Text className="text-gray-600 text-sm mb-1">Priority</Text>
-              <View className="flex-row items-center">
+            <View style={styles.detailColumn}>
+              <Text style={styles.detailLabel}>Priority</Text>
+              <View style={styles.priorityContainer}>
                 <Ionicons 
                   name="flag" 
                   size={16} 
                   color={assignment.request?.priority === 'high' ? COLORS.error : COLORS.warning} 
                 />
-                <Text className="text-gray-900 capitalize ml-1">
+                <Text style={styles.priorityText}>
                   {assignment.request?.priority}
                 </Text>
               </View>
@@ -224,11 +469,11 @@ const TaskDetails: React.FC = () => {
           </View>
 
           {assignment.request?.photo_url && (
-            <View className="mb-4">
-              <Text className="text-gray-600 text-sm mb-2">Attached Photo</Text>
+            <View style={styles.detailSection}>
+              <Text style={styles.detailLabel}>Attached Photo</Text>
               <Image
                 source={{ uri: assignment.request.photo_url }}
-                className="w-full h-48 rounded-lg"
+                style={styles.attachedImage}
                 resizeMode="cover"
               />
             </View>
@@ -236,26 +481,26 @@ const TaskDetails: React.FC = () => {
         </Card>
 
         {/* Timeline */}
-        <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Timeline</Text>
+        <Card style={styles.cardMargin}>
+          <Text style={styles.sectionTitle}>Timeline</Text>
           
-          <View className="space-y-3">
-            <View className="flex-row items-center">
-              <View className="w-3 h-3 bg-blue-500 rounded-full mr-3" />
-              <View className="flex-1">
-                <Text className="text-gray-900 font-medium">Task Assigned</Text>
-                <Text className="text-gray-500 text-sm">
+          <View style={styles.timelineContainer}>
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineDot, { backgroundColor: COLORS.primary }]} />
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineTitle}>Task Assigned</Text>
+                <Text style={styles.timelineDate}>
                   {new Date(assignment.assigned_at).toLocaleString()}
                 </Text>
               </View>
             </View>
 
             {assignment.accepted_at && (
-              <View className="flex-row items-center">
-                <View className="w-3 h-3 bg-green-500 rounded-full mr-3" />
-                <View className="flex-1">
-                  <Text className="text-gray-900 font-medium">Task Accepted</Text>
-                  <Text className="text-gray-500 text-sm">
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDot, { backgroundColor: COLORS.success }]} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>Task Accepted</Text>
+                  <Text style={styles.timelineDate}>
                     {new Date(assignment.accepted_at).toLocaleString()}
                   </Text>
                 </View>
@@ -263,11 +508,11 @@ const TaskDetails: React.FC = () => {
             )}
 
             {assignment.started_at && (
-              <View className="flex-row items-center">
-                <View className="w-3 h-3 bg-purple-500 rounded-full mr-3" />
-                <View className="flex-1">
-                  <Text className="text-gray-900 font-medium">Task Started</Text>
-                  <Text className="text-gray-500 text-sm">
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDot, { backgroundColor: '#8b5cf6' }]} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>Task Started</Text>
+                  <Text style={styles.timelineDate}>
                     {new Date(assignment.started_at).toLocaleString()}
                   </Text>
                 </View>
@@ -275,11 +520,11 @@ const TaskDetails: React.FC = () => {
             )}
 
             {assignment.completed_at && (
-              <View className="flex-row items-center">
-                <View className="w-3 h-3 bg-green-600 rounded-full mr-3" />
-                <View className="flex-1">
-                  <Text className="text-gray-900 font-medium">Task Completed</Text>
-                  <Text className="text-gray-500 text-sm">
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineDot, { backgroundColor: '#16a34a' }]} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>Task Completed</Text>
+                  <Text style={styles.timelineDate}>
                     {new Date(assignment.completed_at).toLocaleString()}
                   </Text>
                 </View>
@@ -288,41 +533,154 @@ const TaskDetails: React.FC = () => {
           </View>
         </Card>
 
-        {/* Location */}
-        {assignment.request?.location && (
-          <Card style={{ marginBottom: 16 }}>
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-lg font-bold text-gray-900">Location</Text>
-              <Button
-                title="View on Map"
-                onPress={() => navigation.navigate('Map', { 
-                  location: assignment.request?.location 
-                })}
-                variant="outline"
-                size="small"
-              />
+        {/* Request Details */}
+        <Card style={styles.cardMargin}>
+          <Text style={styles.sectionTitle}>Request Details</Text>
+          
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Title</Text>
+            <Text style={styles.detailTitle}>{assignment.request?.title}</Text>
+          </View>
+
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Description</Text>
+            <Text style={styles.detailValue}>{assignment.request?.description}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailColumn}>
+              <Text style={styles.detailLabel}>Type</Text>
+              <Text style={styles.detailValueCapitalized}>{assignment.request?.type}</Text>
             </View>
-            
-            <View className="flex-row items-center">
-              <Ionicons name="location" size={20} color={COLORS.primary} />
-              <Text className="text-gray-600 ml-2">
-                Lat: {assignment.request.location.latitude}, 
-                Lng: {assignment.request.location.longitude}
+            <View style={styles.detailColumn}>
+              <Text style={styles.detailLabel}>Priority</Text>
+              <View style={styles.priorityContainer}>
+                <Ionicons 
+                  name="flag" 
+                  size={16} 
+                  color={assignment.request?.priority === 'high' ? COLORS.error : COLORS.warning} 
+                />
+                <Text style={styles.priorityText}>
+                  {assignment.request?.priority}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+        {assignment.request?.photo_url && (
+          <View style={styles.detailSection}>
+            <Text style={styles.detailLabel}>Attached Photo</Text>
+            <Image
+              source={{ uri: assignment.request.photo_url }}
+              style={styles.attachedImage}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+      </Card>
+
+      {/* Timeline */}
+      <Card style={styles.cardMargin}>
+        <Text style={styles.sectionTitle}>Timeline</Text>
+        
+        <View style={styles.timelineContainer}>
+          <View style={styles.timelineItem}>
+            <View style={[styles.timelineDot, { backgroundColor: COLORS.primary }]} />
+            <View style={styles.timelineContent}>
+              <Text style={styles.timelineTitle}>Task Assigned</Text>
+              <Text style={styles.timelineDate}>
+                {new Date(assignment.assigned_at).toLocaleString()}
               </Text>
             </View>
-            <Text className="text-gray-500 text-sm mt-1">
-              Estimated distance: 0.5 km
-            </Text>
-          </Card>
-        )}
+          </View>
 
-        {/* Action Button */}
-        <View className="mb-8">
-          {getActionButton()}
+          {assignment.accepted_at && (
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineDot, { backgroundColor: COLORS.success }]} />
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineTitle}>Task Accepted</Text>
+                <Text style={styles.timelineDate}>
+                  {new Date(assignment.accepted_at).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {assignment.started_at && (
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineDot, { backgroundColor: '#8b5cf6' }]} />
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineTitle}>Task Started</Text>
+                <Text style={styles.timelineDate}>
+                  {new Date(assignment.started_at).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {assignment.completed_at && (
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineDot, { backgroundColor: '#16a34a' }]} />
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineTitle}>Task Completed</Text>
+                <Text style={styles.timelineDate}>
+                  {new Date(assignment.completed_at).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+      </Card>
+
+      {/* Location */}
+      {assignment.request?.location && (
+        <Card style={styles.cardMargin}>
+          <View style={styles.locationHeader}>
+            <Ionicons name="location-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Location</Text>
+            <Button
+              title="View on Map"
+              onPress={() => {/* TODO: Open map */}}
+              variant="outline"
+              size="small"
+            />
+          </View>
+          <View style={styles.locationInfo}>
+            {assignment.request?.location && assignment.request.location.latitude && assignment.request.location.longitude ? (
+              <Text style={styles.locationText}>
+                Lat: {assignment.request.location.latitude.toFixed(6)}, Lng: {assignment.request.location.longitude.toFixed(6)}
+              </Text>
+            ) : (
+              <Text style={styles.locationText}>Location not available</Text>
+            )}
+            <Text style={styles.distanceText}>
+              Estimated distance: {assignment.request?.location ? '0.5 km' : 'Unknown'}
+            </Text>
+          </View>
+          
+          {assignment.status === 'completed' && (assignment as any).completion_latitude && (
+            <View style={styles.completionLocationContainer}>
+              <Text style={styles.completionLocationTitle}>Task Completed At:</Text>
+              <Text style={styles.completionLocationText}>
+                Lat: {(assignment as any).completion_latitude?.toFixed(6) || 'N/A'}, Lng: {(assignment as any).completion_longitude?.toFixed(6) || 'N/A'}
+              </Text>
+              {(assignment as any).completion_address && (
+                <Text style={styles.completionAddressText}>
+                  {(assignment as any).completion_address}
+                </Text>
+              )}
+            </View>
+          )}
+        </Card>
+      )}
+
+      {/* Action Button */}
+      <View style={styles.actionContainer}>
+        {getActionButton()}
+      </View>
+    </ScrollView>
+  </SafeAreaView>
+);
+}
 
 export default TaskDetails;

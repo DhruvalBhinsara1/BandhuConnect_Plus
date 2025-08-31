@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Image, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -13,7 +13,7 @@ const RequestStatus: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user } = useAuth();
-  const { requests, getRequests } = useRequest();
+  const { requests, getRequests, deleteRequest } = useRequest();
   
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -33,6 +33,36 @@ const RequestStatus: React.FC = () => {
     setRefreshing(true);
     await loadRequests();
     setRefreshing(false);
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    Alert.alert(
+      'Cancel Request',
+      'Are you sure you want to cancel this request? This action cannot be undone.',
+      [
+        {
+          text: 'No, Keep Request',
+          style: 'cancel'
+        },
+        {
+          text: 'Yes, Cancel Request',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await deleteRequest(requestId);
+              if (error) {
+                Alert.alert('Error', 'Failed to cancel request. Please try again.');
+              } else {
+                Alert.alert('Success', 'Request cancelled successfully.');
+                await loadRequests(); // Refresh the list
+              }
+            } catch (error) {
+              Alert.alert('Error', 'An unexpected error occurred.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const getFilteredRequests = () => {
@@ -88,77 +118,86 @@ const RequestStatus: React.FC = () => {
 
   const renderRequestItem = ({ item }: { item: AssistanceRequest }) => (
     <Card style={{ marginBottom: 12 }}>
-      <View className="mb-4">
-        <View className="flex-row justify-between items-start mb-2">
-          <Text className="font-bold text-gray-900 text-lg flex-1">
+      <View style={{ marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <Text style={{ fontWeight: 'bold', color: '#111827', fontSize: 18, flex: 1 }}>
             {item.title}
           </Text>
           <View
-            className="px-3 py-1 rounded-full ml-2"
-            style={{ backgroundColor: STATUS_COLORS[item.status] + '20' }}
+            style={{ 
+              paddingHorizontal: 12, 
+              paddingVertical: 4, 
+              borderRadius: 50, 
+              marginLeft: 8,
+              backgroundColor: STATUS_COLORS[item.status] + '20' 
+            }}
           >
             <Text
-              className="text-xs font-medium capitalize"
-              style={{ color: STATUS_COLORS[item.status] }}
+              style={{ 
+                fontSize: 12, 
+                fontWeight: '500', 
+                textTransform: 'capitalize',
+                color: STATUS_COLORS[item.status] 
+              }}
             >
               {item.status.replace('_', ' ')}
             </Text>
           </View>
         </View>
         
-        <Text className="text-gray-600 mb-3">{item.description}</Text>
+        <Text style={{ color: '#6b7280', marginBottom: 12 }}>{item.description}</Text>
 
         {/* Status Timeline */}
-        <View className="bg-gray-50 p-3 rounded-lg mb-3">
-          <View className="flex-row items-center mb-2">
+        <View style={{ backgroundColor: '#f9fafb', padding: 12, borderRadius: 8, marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <Ionicons 
               name={getStatusIcon(item.status) as any} 
               size={20} 
               color={STATUS_COLORS[item.status]} 
             />
-            <Text className="text-gray-700 font-medium ml-2">
+            <Text style={{ color: '#374151', fontWeight: '500', marginLeft: 8 }}>
               {getStatusMessage(item.status)}
             </Text>
           </View>
-          <Text className="text-gray-500 text-sm">
-            Last updated: {new Date(item.updated_at).toLocaleString()}
+          <Text style={{ color: '#6b7280', fontSize: 14 }}>
+            {item.created_at ? `Created: ${new Date(item.created_at).toLocaleDateString()}` : 'Date not available'}
           </Text>
         </View>
 
         {/* Request Details */}
-        <View className="flex-row justify-between items-center mb-3">
-          <View className="flex-row items-center">
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Ionicons name="flag" size={14} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-sm ml-1 capitalize">
+            <Text style={{ color: '#6b7280', fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
               {item.priority} Priority
             </Text>
           </View>
           
-          <View className="flex-row items-center">
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Ionicons name="pricetag" size={14} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-sm ml-1 capitalize">
+            <Text style={{ color: '#6b7280', fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
               {item.type.replace('_', ' ')}
             </Text>
           </View>
         </View>
 
         {item.photo_url && (
-          <View className="mb-3">
-            <Text className="text-gray-700 text-sm font-medium mb-2">Attached Photo</Text>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={{ color: '#374151', fontSize: 14, fontWeight: '500', marginBottom: 8 }}>Attached Photo</Text>
             <Image
               source={{ uri: item.photo_url }}
-              className="w-full h-32 rounded-lg"
+              style={{ width: '100%', height: 128, borderRadius: 8 }}
               resizeMode="cover"
             />
           </View>
         )}
 
-        <Text className="text-gray-500 text-sm">
+        <Text style={{ color: '#6b7280', fontSize: 14 }}>
           Created: {new Date(item.created_at).toLocaleString()}
         </Text>
       </View>
 
-      <View className="flex-row justify-between">
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Button
           title="View on Map"
           onPress={() => navigation.navigate('Map', { location: item.location })}
@@ -170,7 +209,7 @@ const RequestStatus: React.FC = () => {
         {item.status === 'pending' && (
           <Button
             title="Cancel Request"
-            onPress={() => {/* Handle cancel request */}}
+            onPress={() => handleCancelRequest(item.id)}
             variant="danger"
             size="small"
             style={{ flex: 1 }}
@@ -192,17 +231,17 @@ const RequestStatus: React.FC = () => {
   const filteredRequests = getFilteredRequests();
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       {/* Header */}
-      <View className="bg-white px-6 py-4 border-b border-gray-200">
-        <View className="flex-row justify-between items-center">
-          <View className="flex-row items-center">
+      <View style={{ backgroundColor: 'white', paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {specificRequestId && (
               <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
               </TouchableOpacity>
             )}
-            <Text className="text-2xl font-bold text-gray-900 ml-2">
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginLeft: 8 }}>
               {specificRequestId ? 'Request Details' : 'My Requests'}
             </Text>
           </View>
@@ -213,7 +252,7 @@ const RequestStatus: React.FC = () => {
 
         {/* Filter Tabs - Only show if not viewing specific request */}
         {!specificRequestId && (
-          <View className="flex-row mt-4">
+          <View style={{ flexDirection: 'row', marginTop: 16 }}>
             {[
               { key: 'all', label: 'All' },
               { key: 'active', label: 'Active' },
@@ -222,11 +261,17 @@ const RequestStatus: React.FC = () => {
               <TouchableOpacity
                 key={tab.key}
                 onPress={() => setFilter(tab.key as any)}
-                className={`mr-4 pb-2 ${filter === tab.key ? 'border-b-2 border-green-500' : ''}`}
+                style={{
+                  marginRight: 16,
+                  paddingBottom: 8,
+                  borderBottomWidth: filter === tab.key ? 2 : 0,
+                  borderBottomColor: filter === tab.key ? '#10b981' : 'transparent'
+                }}
               >
-                <Text className={`font-medium ${
-                  filter === tab.key ? 'text-green-600' : 'text-gray-600'
-                }`}>
+                <Text style={{
+                  fontWeight: '500',
+                  color: filter === tab.key ? '#059669' : '#6b7280'
+                }}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -245,10 +290,10 @@ const RequestStatus: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
         ListEmptyComponent={
-          <View className="items-center justify-center py-12">
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
             <Ionicons name="document-text-outline" size={64} color={COLORS.textSecondary} />
-            <Text className="text-gray-500 text-lg mt-4">No requests found</Text>
-            <Text className="text-gray-400 text-center mt-2">
+            <Text style={{ color: '#6b7280', fontSize: 18, marginTop: 16 }}>No requests found</Text>
+            <Text style={{ color: '#9ca3af', textAlign: 'center', marginTop: 8 }}>
               {filter === 'active' 
                 ? 'You have no active requests'
                 : filter === 'completed'

@@ -11,7 +11,7 @@ import { COLORS } from '../../constants';
 
 const PilgrimProfile: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { user, updateProfile, signOut } = useAuth();
+  const { user, updateProfile, signOut, selectedRole } = useAuth();
   const { requests } = useRequest();
   
   const [editing, setEditing] = useState(false);
@@ -57,13 +57,13 @@ const PilgrimProfile: React.FC = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
       {/* Header */}
-      <View className="bg-green-600 px-6 py-8">
-        <View className="flex-row justify-between items-center">
+      <View style={{ backgroundColor: '#059669', paddingHorizontal: 24, paddingVertical: 32 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
-            <Text className="text-white text-2xl font-bold">Profile</Text>
-            <Text className="text-green-100">{user?.name}</Text>
+            <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>Profile</Text>
+            <Text style={{ color: '#bbf7d0' }}>{user?.name}</Text>
           </View>
           <TouchableOpacity onPress={() => setEditing(!editing)}>
             <Ionicons 
@@ -75,10 +75,10 @@ const PilgrimProfile: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-6 py-4">
+      <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingVertical: 16 }}>
         {/* Profile Information */}
         <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Personal Information</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Personal Information</Text>
           
           {editing ? (
             <>
@@ -106,7 +106,7 @@ const PilgrimProfile: React.FC = () => {
                 keyboardType="phone-pad"
               />
               
-              <View className="flex-row mt-4">
+              <View style={{ flexDirection: 'row', marginTop: 16 }}>
                 <Button
                   title="Save Changes"
                   onPress={handleSave}
@@ -131,27 +131,27 @@ const PilgrimProfile: React.FC = () => {
           ) : (
             <>
               <View className="mb-4">
-                <Text className="text-gray-600 text-sm">Full Name</Text>
-                <Text className="text-gray-900 text-lg font-medium">{user?.name}</Text>
+                <Text style={{ color: '#4b5563', fontSize: 12 }}>Full Name</Text>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '500' }}>{user?.name}</Text>
               </View>
               
               <View className="mb-4">
-                <Text className="text-gray-600 text-sm">Email</Text>
-                <Text className="text-gray-900 text-lg font-medium">{user?.email}</Text>
+                <Text style={{ color: '#4b5563', fontSize: 12 }}>Email</Text>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '500' }}>{user?.email}</Text>
               </View>
               
               <View className="mb-4">
-                <Text className="text-gray-600 text-sm">Phone Number</Text>
-                <Text className="text-gray-900 text-lg font-medium">{user?.phone}</Text>
+                <Text style={{ color: '#4b5563', fontSize: 12 }}>Phone Number</Text>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '500' }}>{user?.phone}</Text>
               </View>
               
               <View className="mb-4">
-                <Text className="text-gray-600 text-sm">Account Type</Text>
-                <Text className="text-gray-900 text-lg font-medium capitalize">{user?.role}</Text>
+                <Text style={{ color: '#4b5563', fontSize: 12 }}>Account Type</Text>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '500', textTransform: 'capitalize' }}>{user?.role || selectedRole || 'Pilgrim'}</Text>
               </View>
               
               <View>
-                <Text className="text-gray-600 text-sm">Member Since</Text>
+                <Text style={{ color: '#4b5563', fontSize: 12 }}>Member Since</Text>
                 <Text className="text-gray-900 text-lg font-medium">
                   {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                 </Text>
@@ -162,41 +162,41 @@ const PilgrimProfile: React.FC = () => {
 
         {/* Request Statistics */}
         <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Request Statistics</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Request Statistics</Text>
           
-          <View className="flex-row flex-wrap justify-between">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <View className="w-1/2 mb-4">
-              <Text className="text-2xl font-bold text-green-600">{stats.totalRequests}</Text>
-              <Text className="text-gray-600">Total Requests</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#059669' }}>{stats.totalRequests}</Text>
+              <Text style={{ color: '#4b5563' }}>Total Requests</Text>
             </View>
             
             <View className="w-1/2 mb-4">
-              <Text className="text-2xl font-bold text-blue-600">{stats.activeRequests}</Text>
-              <Text className="text-gray-600">Active Requests</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#2563eb' }}>{stats.activeRequests}</Text>
+              <Text style={{ color: '#4b5563' }}>Active Requests</Text>
             </View>
             
             <View className="w-1/2 mb-4">
-              <Text className="text-2xl font-bold text-green-600">{stats.completedRequests}</Text>
-              <Text className="text-gray-600">Completed</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#059669' }}>{stats.completedRequests}</Text>
+              <Text style={{ color: '#4b5563' }}>Completed</Text>
             </View>
             
             <View className="w-1/2 mb-4">
-              <Text className="text-2xl font-bold text-red-600">{stats.cancelledRequests}</Text>
-              <Text className="text-gray-600">Cancelled</Text>
+              <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#dc2626' }}>{stats.cancelledRequests}</Text>
+              <Text style={{ color: '#4b5563' }}>Cancelled</Text>
             </View>
           </View>
         </Card>
 
         {/* Quick Actions */}
         <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">Quick Actions</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>Quick Actions</Text>
           
           <TouchableOpacity
             onPress={() => navigation.navigate('CreateRequest')}
             className="flex-row items-center py-3 border-b border-gray-200"
           >
             <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
-            <Text className="text-gray-700 text-lg ml-3">Create New Request</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>Create New Request</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
           
@@ -205,39 +205,39 @@ const PilgrimProfile: React.FC = () => {
             className="flex-row items-center py-3 border-b border-gray-200"
           >
             <Ionicons name="list-outline" size={24} color={COLORS.primary} />
-            <Text className="text-gray-700 text-lg ml-3">View My Requests</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>View My Requests</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
           
           <TouchableOpacity
             onPress={() => navigation.navigate('Map')}
-            className="flex-row items-center py-3"
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}
           >
             <Ionicons name="map-outline" size={24} color={COLORS.primary} />
-            <Text className="text-gray-700 text-lg ml-3">Find Nearby Help</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>Find Nearby Help</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
         </Card>
 
         {/* App Information */}
         <Card style={{ marginBottom: 16 }}>
-          <Text className="text-lg font-bold text-gray-900 mb-4">App Information</Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 16 }}>App Information</Text>
           
           <TouchableOpacity className="flex-row items-center py-3 border-b border-gray-200">
             <Ionicons name="help-circle-outline" size={24} color={COLORS.textSecondary} />
-            <Text className="text-gray-700 text-lg ml-3">Help & Support</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
           
           <TouchableOpacity className="flex-row items-center py-3 border-b border-gray-200">
             <Ionicons name="document-text-outline" size={24} color={COLORS.textSecondary} />
-            <Text className="text-gray-700 text-lg ml-3">Terms & Conditions</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>Terms & Conditions</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
           
-          <TouchableOpacity className="flex-row items-center py-3">
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="shield-checkmark-outline" size={24} color={COLORS.textSecondary} />
-            <Text className="text-gray-700 text-lg ml-3">Privacy Policy</Text>
+            <Text style={{ color: '#374151', fontSize: 18, marginLeft: 12 }}>Privacy Policy</Text>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} className="ml-auto" />
           </TouchableOpacity>
         </Card>

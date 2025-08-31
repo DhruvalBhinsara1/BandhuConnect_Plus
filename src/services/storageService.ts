@@ -62,31 +62,86 @@ export class StorageService {
     }
   }
 
-  async uploadImage(uri: string, bucket: string, fileName?: string): Promise<{ data: string | null; error: any }> {
+  async uploadImage(uri: string, bucket: string = 'request-photos', fileName?: string): Promise<{ data: string | null; error: any }> {
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      console.log('Starting image upload:', { uri, bucket, fileName });
+
+      // Check authentication first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Authentication error:', authError);
+        return { data: null, error: 'User not authenticated' };
+      }
+      console.log('User authenticated:', user.id);
+
+      // Get file extension from URI
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const finalFileName = fileName || `request_${user.id}_${Date.now()}.${fileExt}`;
       
-      const fileExt = uri.split('.').pop();
-      const finalFileName = fileName || `${Date.now()}.${fileExt}`;
+      console.log('Preparing upload:', { bucket, finalFileName, uri });
+
+      // For React Native/Expo, we need to read the file as ArrayBuffer
+      let uploadData: ArrayBuffer;
       
+      try {
+        console.log('Fetching image data...');
+        const response = await fetch(uri);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        }
+        
+        uploadData = await response.arrayBuffer();
+        console.log('Image data loaded:', { size: uploadData.byteLength });
+        
+        if (uploadData.byteLength === 0) {
+          throw new Error('Image file is empty');
+        }
+      } catch (fetchError) {
+        console.error('Error reading image file:', fetchError);
+        return { data: null, error: `Failed to read image file: ${fetchError}` };
+      }
+
+      console.log('Uploading to Supabase storage...');
+      
+      // Upload to Supabase storage using ArrayBuffer
       const { data, error } = await supabase.storage
         .from(bucket)
-        .upload(finalFileName, blob, {
+        .upload(finalFileName, uploadData, {
           contentType: `image/${fileExt}`,
           upsert: false,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Upload error details:', {
+          message: error.message,
+          error: error,
+          bucket: bucket,
+          fileName: finalFileName
+        });
+        
+        // Provide more specific error messages
+        if (error.message?.includes('row-level security')) {
+          return { data: null, error: 'Storage permissions error. Please check database configuration.' };
+        }
+        if (error.message?.includes('bucket')) {
+          return { data: null, error: 'Storage bucket not found. Please check configuration.' };
+        }
+        
+        return { data: null, error: `Upload failed: ${error.message}` };
+      }
+
+      console.log('Upload successful:', data);
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from(bucket)
         .getPublicUrl(data.path);
 
+      console.log('Public URL generated:', publicUrl);
       return { data: publicUrl, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Image upload failed:', error);
+      return { data: null, error: error instanceof Error ? error.message : 'Upload failed' };
     }
   }
 

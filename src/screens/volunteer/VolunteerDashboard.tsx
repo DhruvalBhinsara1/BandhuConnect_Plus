@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import { useLocation } from '../../context/LocationContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import { assignmentService } from '../../services/assignmentService';
+import { volunteerService } from '../../services/volunteerService';
 import { COLORS, STATUS_COLORS } from '../../constants';
 import { VolunteerStats } from '../../types';
 
@@ -25,6 +26,7 @@ const VolunteerDashboard: React.FC = () => {
     hoursWorked: 0,
   });
   const [isOnDuty, setIsOnDuty] = useState(false);
+  const [realtimeHours, setRealtimeHours] = useState(0);
 
   useEffect(() => {
     loadDashboardData();
@@ -34,24 +36,81 @@ const VolunteerDashboard: React.FC = () => {
     if (assignments.length > 0) {
       calculateStats();
     }
+  }, [assignments, user]);
+
+  // Real-time hours tracking for active on_duty tasks
+  useEffect(() => {
+    const activeOnDutyTasks = assignments.filter(a => a.status === 'on_duty' && a.started_at);
+    
+    if (activeOnDutyTasks.length === 0) {
+      setRealtimeHours(0);
+      return;
+    }
+
+    const updateRealtimeHours = () => {
+      const currentTime = new Date().getTime();
+      const totalActiveHours = activeOnDutyTasks.reduce((total, task) => {
+        if (task.started_at) {
+          const startTime = new Date(task.started_at).getTime();
+          const hoursOnDuty = (currentTime - startTime) / (1000 * 60 * 60);
+          return total + Math.max(0, hoursOnDuty);
+        }
+        return total;
+      }, 0);
+      setRealtimeHours(Math.round(totalActiveHours * 100) / 100);
+    };
+
+    // Update immediately
+    updateRealtimeHours();
+
+    // Update every 30 seconds for real-time tracking
+    const interval = setInterval(updateRealtimeHours, 30000);
+
+    return () => clearInterval(interval);
   }, [assignments]);
 
   const loadDashboardData = async () => {
     if (!user) return;
     
+    // Load assignments and volunteer stats from database
     await getAssignments({ volunteerId: user.id });
+    
+    // Load real volunteer statistics
+    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
+    if (volunteerStats && !error) {
+      setStats({
+        totalTasks: volunteerStats.totalTasks,
+        completedTasks: volunteerStats.completedTasks,
+        activeAssignments: volunteerStats.activeAssignments,
+        hoursWorked: volunteerStats.hoursWorked,
+      });
+    }
   };
 
-  const calculateStats = () => {
-    const completed = assignments.filter(a => a.status === 'completed').length;
-    const active = assignments.filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status)).length;
+  const calculateStats = async () => {
+    if (!user) return;
     
-    setStats({
-      totalTasks: assignments.length,
-      completedTasks: completed,
-      activeAssignments: active,
-      hoursWorked: Math.floor(Math.random() * 40), // Mock data for demo
-    });
+    // Get real statistics from database instead of calculating from local assignments
+    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
+    if (volunteerStats && !error) {
+      setStats({
+        totalTasks: volunteerStats.totalTasks,
+        completedTasks: volunteerStats.completedTasks,
+        activeAssignments: volunteerStats.activeAssignments,
+        hoursWorked: volunteerStats.hoursWorked,
+      });
+    } else {
+      // Fallback to local calculation if database query fails
+      const completed = assignments.filter(a => a.status === 'completed').length;
+      const active = assignments.filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status)).length;
+      
+      setStats({
+        totalTasks: assignments.length,
+        completedTasks: completed,
+        activeAssignments: active,
+        hoursWorked: completed * 2, // 2 hours per completed task
+      });
+    }
   };
 
   const handleRefresh = async () => {
@@ -77,17 +136,17 @@ const VolunteerDashboard: React.FC = () => {
   const recentAssignments = assignments.slice(0, 3);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <ScrollView
-        className="flex-1"
+        style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* Header */}
-        <View className="bg-blue-600 px-6 py-8">
-          <View className="flex-row justify-between items-center mb-4">
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
             <View>
-              <Text className="text-white text-2xl font-bold">Welcome back,</Text>
-              <Text className="text-blue-100 text-lg">{user?.name}</Text>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text style={styles.nameText}>{user?.name}</Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <Ionicons name="person-circle-outline" size={32} color="white" />
@@ -96,12 +155,12 @@ const VolunteerDashboard: React.FC = () => {
 
           {/* Duty Status Toggle */}
           <Card style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-            <View className="flex-row justify-between items-center">
+            <View style={styles.dutyStatusRow}>
               <View>
-                <Text className="text-white text-lg font-semibold">
+                <Text style={styles.dutyStatusTitle}>
                   {isOnDuty ? 'On Duty' : 'Off Duty'}
                 </Text>
-                <Text className="text-blue-100">
+                <Text style={styles.dutyStatusSubtitle}>
                   {isOnDuty ? 'Location tracking active' : 'Tap to start duty'}
                 </Text>
               </View>
@@ -115,88 +174,86 @@ const VolunteerDashboard: React.FC = () => {
           </Card>
         </View>
 
-        <View className="px-6 py-4">
+        <View style={styles.content}>
           {/* Stats Cards */}
-          <View className="flex-row flex-wrap justify-between mb-6">
-            <Card style={{ width: '48%', marginBottom: 16 }}>
-              <View className="items-center">
+          <View style={styles.statsContainer}>
+            <Card style={styles.statCard}>
+              <View style={styles.statCardContent}>
                 <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
+                <Text style={styles.statNumber}>
                   {stats.completedTasks}
                 </Text>
-                <Text className="text-gray-600">Completed</Text>
+                <Text style={styles.statLabel}>Completed</Text>
               </View>
             </Card>
 
-            <Card style={{ width: '48%', marginBottom: 16 }}>
-              <View className="items-center">
+            <Card style={styles.statCard}>
+              <View style={styles.statCardContent}>
                 <Ionicons name="time" size={32} color={COLORS.warning} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
+                <Text style={styles.statNumber}>
                   {stats.activeAssignments}
                 </Text>
-                <Text className="text-gray-600">Active Tasks</Text>
+                <Text style={styles.statLabel}>Active Tasks</Text>
               </View>
             </Card>
 
-            <Card style={{ width: '48%' }}>
-              <View className="items-center">
+            <Card style={styles.statCard}>
+              <View style={styles.statCardContent}>
                 <Ionicons name="list" size={32} color={COLORS.primary} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
+                <Text style={styles.statNumber}>
                   {stats.totalTasks}
                 </Text>
-                <Text className="text-gray-600">Total Tasks</Text>
+                <Text style={styles.statLabel}>Total Tasks</Text>
               </View>
             </Card>
 
-            <Card style={{ width: '48%' }}>
-              <View className="items-center">
+            <Card style={styles.statCard}>
+              <View style={styles.statCardContent}>
                 <Ionicons name="timer" size={32} color={COLORS.secondary} />
-                <Text className="text-2xl font-bold text-gray-900 mt-2">
-                  {stats.hoursWorked}h
+                <Text style={styles.statNumber}>
+                  {(stats.hoursWorked + realtimeHours).toFixed(2)}h
                 </Text>
-                <Text className="text-gray-600">Hours Worked</Text>
+                <Text style={styles.statLabel}>Hours Worked</Text>
               </View>
             </Card>
           </View>
 
           {/* Active Assignments */}
           {activeAssignments.length > 0 && (
-            <Card style={{ marginBottom: 24 }}>
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-lg font-bold text-gray-900">Active Tasks</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('TaskList')}>
-                  <Text className="text-blue-600 font-semibold">View All</Text>
+            <Card style={styles.activeTasksCard}>
+              <View style={styles.activeTasksHeader}>
+                <Text style={styles.activeTasksTitle}>Active Tasks</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Tasks')}>
+                  <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
 
-              {activeAssignments.slice(0, 2).map((assignment) => (
+              {activeAssignments.slice(0, 2).map((assignment, index) => (
                 <TouchableOpacity
                   key={assignment.id}
                   onPress={() => navigation.navigate('TaskDetails', { assignmentId: assignment.id })}
-                  className="border-b border-gray-200 py-3 last:border-b-0"
+                  style={[styles.assignmentItem, index < activeAssignments.slice(0, 2).length - 1 && styles.assignmentItemBorder]}
                 >
-                  <View className="flex-row justify-between items-start">
-                    <View className="flex-1">
-                      <Text className="font-semibold text-gray-900 mb-1">
+                  <View style={styles.assignmentRow}>
+                    <View style={styles.assignmentContent}>
+                      <Text style={styles.assignmentTitle}>
                         {assignment.request?.title}
                       </Text>
-                      <Text className="text-gray-600 text-sm mb-2">
+                      <Text style={styles.assignmentDescription}>
                         {assignment.request?.description}
                       </Text>
-                      <View className="flex-row items-center">
+                      <View style={styles.assignmentMeta}>
                         <View
-                          className="px-2 py-1 rounded-full mr-2"
-                          style={{ backgroundColor: STATUS_COLORS[assignment.status] + '20' }}
+                          style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[assignment.status] + '20' }]}
                         >
                           <Text
-                            className="text-xs font-medium capitalize"
-                            style={{ color: STATUS_COLORS[assignment.status] }}
+                            style={[styles.statusText, { color: STATUS_COLORS[assignment.status] }]}
                           >
                             {assignment.status.replace('_', ' ')}
                           </Text>
                         </View>
                         <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-                        <Text className="text-gray-500 text-xs ml-1">
+                        <Text style={styles.locationText}>
                           {assignment.request?.location ? '0.5 km away' : 'Location pending'}
                         </Text>
                       </View>
@@ -210,51 +267,51 @@ const VolunteerDashboard: React.FC = () => {
 
           {/* Quick Actions */}
           <Card>
-            <Text className="text-lg font-bold text-gray-900 mb-4">Quick Actions</Text>
+            <Text style={styles.quickActionsTitle}>Quick Actions</Text>
             
-            <View className="flex-row justify-between">
+            <View style={styles.quickActionsRow}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('TaskList')}
-                className="items-center flex-1"
+                onPress={() => navigation.navigate('Tasks')}
+                style={styles.quickActionItem}
               >
-                <View className="bg-blue-100 p-3 rounded-full mb-2">
+                <View style={[styles.quickActionIcon, { backgroundColor: '#dbeafe' }]}>
                   <Ionicons name="list" size={24} color={COLORS.primary} />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">View Tasks</Text>
+                <Text style={styles.quickActionText}>View Tasks</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('Map')}
-                className="items-center flex-1"
+                style={styles.quickActionItem}
               >
-                <View className="bg-green-100 p-3 rounded-full mb-2">
+                <View style={[styles.quickActionIcon, { backgroundColor: '#dcfce7' }]}>
                   <Ionicons name="map" size={24} color={COLORS.secondary} />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Map View</Text>
+                <Text style={styles.quickActionText}>Map View</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => navigation.navigate('Chat')}
-                className="items-center flex-1"
+                style={styles.quickActionItem}
               >
-                <View className="bg-purple-100 p-3 rounded-full mb-2">
+                <View style={[styles.quickActionIcon, { backgroundColor: '#f3e8ff' }]}>
                   <Ionicons name="chatbubbles" size={24} color="#8b5cf6" />
                 </View>
-                <Text className="text-gray-700 text-sm text-center">Chat</Text>
+                <Text style={styles.quickActionText}>Chat</Text>
               </TouchableOpacity>
             </View>
           </Card>
 
           {/* Location Status */}
           {currentLocation && (
-            <Card style={{ marginTop: 16 }}>
-              <View className="flex-row items-center">
+            <Card style={styles.locationCard}>
+              <View style={styles.locationRow}>
                 <Ionicons name="location" size={20} color={COLORS.success} />
-                <Text className="text-gray-700 ml-2">
+                <Text style={styles.locationText}>
                   Location: {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
                 </Text>
               </View>
-              <Text className="text-gray-500 text-sm mt-1">
+              <Text style={styles.locationTimestamp}>
                 Last updated: {new Date().toLocaleTimeString()}
               </Text>
             </Card>
@@ -264,5 +321,173 @@ const VolunteerDashboard: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  header: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  welcomeText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  nameText: {
+    color: '#dbeafe',
+    fontSize: 18,
+  },
+  dutyStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dutyStatusTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  dutyStatusSubtitle: {
+    color: '#dbeafe',
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  statCard: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  statCardContent: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 8,
+  },
+  statLabel: {
+    color: '#6b7280',
+  },
+  activeTasksCard: {
+    marginBottom: 24,
+  },
+  activeTasksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  activeTasksTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  viewAllText: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  assignmentItem: {
+    paddingVertical: 12,
+  },
+  assignmentItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  assignmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  assignmentContent: {
+    flex: 1,
+  },
+  assignmentTitle: {
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  assignmentDescription: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  assignmentMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  locationText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  quickActionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  quickActionIcon: {
+    padding: 12,
+    borderRadius: 24,
+    marginBottom: 8,
+  },
+  quickActionText: {
+    color: '#374151',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  locationCard: {
+    marginTop: 16,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationTimestamp: {
+    color: '#6b7280',
+    fontSize: 14,
+    marginTop: 4,
+  },
+});
 
 export default VolunteerDashboard;

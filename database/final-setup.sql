@@ -48,11 +48,12 @@ ALTER TYPE request_type RENAME TO request_type_old;
 
 CREATE TYPE request_type AS ENUM (
     'medical',
-    'tech', 
-    'crowd_management',
+    'emergency',
+    'lost_person',
     'sanitation',
-    'general',
-    'lost_person'
+    'crowd_management',
+    'guidance',
+    'general'
 );
 
 -- Update the table to use new enum
@@ -60,11 +61,18 @@ ALTER TABLE assistance_requests
 ALTER COLUMN type TYPE request_type USING 
 CASE type::text
     WHEN 'medical' THEN 'medical'::request_type
-    WHEN 'emergency' THEN 'medical'::request_type
+    WHEN 'emergency' THEN 'emergency'::request_type
+    WHEN 'lost_person' THEN 'lost_person'::request_type
+    WHEN 'lost_child' THEN 'lost_person'::request_type
+    WHEN 'sanitation' THEN 'sanitation'::request_type
+    WHEN 'crowd_management' THEN 'crowd_management'::request_type
+    WHEN 'guidance' THEN 'guidance'::request_type
+    WHEN 'directions' THEN 'guidance'::request_type
     WHEN 'transportation' THEN 'general'::request_type
     WHEN 'food' THEN 'general'::request_type
     WHEN 'accommodation' THEN 'general'::request_type
-    WHEN 'guidance' THEN 'general'::request_type
+    WHEN 'tech' THEN 'general'::request_type
+    WHEN 'safety' THEN 'general'::request_type
     ELSE 'general'::request_type
 END;
 

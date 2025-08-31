@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { requestService } from '../services/requestService';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Assignment, AssistanceRequest, RequestType, Priority, LocationData } from '../types';
+import { volunteerService } from '../services/volunteerService';
+import { NotificationService } from '../services/notificationService';
 import { assignmentService } from '../services/assignmentService';
-import { AssistanceRequest, Assignment, RequestType, Priority, LocationData } from '../types';
+import { requestService } from '../services/requestService';
+import { AssignmentStatus } from '../types';
 import { useAuth } from './AuthContext';
 
 interface RequestContextType {
@@ -81,8 +84,8 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
     }
   };
 
-  const updateAssignmentStatus = async (id: string, status: string) => {
-    const result = await assignmentService.updateAssignmentStatus(id, status as any);
+  const updateAssignmentStatus = async (id: string, status: AssignmentStatus, completionLocation?: any) => {
+    const result = await assignmentService.updateAssignmentStatus(id, status as any, completionLocation);
     if (result.data && !result.error) {
       setAssignments(prev => 
         prev.map(assignment => 
@@ -98,11 +101,36 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
   };
 
   const startTask = async (id: string) => {
-    return await updateAssignmentStatus(id, 'on_duty');
+    // Get current assignment to check status
+    const currentAssignment = assignments.find(a => a.id === id);
+    
+    if (currentAssignment?.status === 'pending') {
+      // Skip acceptance step and go directly to in_progress
+      return await updateAssignmentStatus(id, 'in_progress');
+    } else {
+      // Normal flow for already accepted tasks
+      return await updateAssignmentStatus(id, 'in_progress');
+    }
   };
 
   const completeTask = async (id: string) => {
-    return await updateAssignmentStatus(id, 'completed');
+    console.log('🎯 Completing task:', id);
+    
+    // Get current location before completing task
+    let completionLocation = null;
+    
+    try {
+      // Try to get current location
+      const locationService = await import('../services/locationService');
+      completionLocation = await locationService.locationService.getCurrentLocation();
+      console.log('📍 Task completion location:', completionLocation);
+    } catch (error) {
+      console.log('⚠️ Could not get completion location:', error);
+    }
+    
+    const result = await updateAssignmentStatus(id, 'completed', completionLocation);
+    console.log('🎯 Complete task result:', result);
+    return result;
   };
 
   const deleteRequest = async (id: string) => {
@@ -140,9 +168,16 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
       if (user.role === 'volunteer') {
         const assignmentSubscription = assignmentService.subscribeToAssignments(
           user.id,
-          (payload) => {
+          async (payload) => {
             if (payload.eventType === 'INSERT') {
               setAssignments(prev => [payload.new, ...prev]);
+              // Send notification for new task assignment
+              if (payload.new.request) {
+                await NotificationService.sendTaskAssignmentNotification(
+                  payload.new.request.title,
+                  payload.new.request.type
+                );
+              }
             } else if (payload.eventType === 'UPDATE') {
               setAssignments(prev => 
                 prev.map(assignment => 

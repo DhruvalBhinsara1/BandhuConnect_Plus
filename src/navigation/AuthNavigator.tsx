@@ -7,8 +7,11 @@ import AdminLoginScreen from '../screens/auth/AdminLoginScreen';
 import VolunteerLoginScreen from '../screens/auth/VolunteerLoginScreen';
 import PilgrimLoginScreen from '../screens/auth/PilgrimLoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
+import PilgrimSignUpScreen from '../screens/auth/PilgrimSignUpScreen';
+import VolunteerSignUpScreen from '../screens/auth/VolunteerSignUpScreen';
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen';
 import OtpVerificationScreen from '../screens/auth/OtpVerificationScreen';
+import ProfileCompletionScreen from '../screens/auth/ProfileCompletionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,8 +31,11 @@ const AuthNavigator: React.FC = () => {
       <Stack.Screen name="VolunteerLogin" component={VolunteerLoginScreen} />
       <Stack.Screen name="PilgrimLogin" component={PilgrimLoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="PilgrimSignUp" component={PilgrimSignUpScreen} />
+      <Stack.Screen name="VolunteerSignUp" component={VolunteerSignUpScreen} />
       <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
       <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
+      <Stack.Screen name="ProfileCompletion" component={ProfileCompletionScreen} />
     </Stack.Navigator>
   );
 };

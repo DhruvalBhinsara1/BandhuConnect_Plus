@@ -225,8 +225,10 @@ ORDER BY type::text;
 -- Show total counts
 SELECT 
   'Final Summary:' as info,
-  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'general') as general_requests,
-  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'guidance') as guidance_requests,
-  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'lost_person') as lost_person_requests,
   (SELECT COUNT(*) FROM assistance_requests WHERE type = 'medical') as medical_requests,
-  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'sanitation') as sanitation_requests;
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'emergency') as emergency_requests,
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'lost_person') as lost_person_requests,
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'sanitation') as sanitation_requests,
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'crowd_management') as crowd_management_requests,
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'guidance') as guidance_requests,
+  (SELECT COUNT(*) FROM assistance_requests WHERE type = 'general') as general_requests;

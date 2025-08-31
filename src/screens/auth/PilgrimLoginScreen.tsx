@@ -36,10 +36,27 @@ const PilgrimLoginScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await signInWithEmail(email.trim(), password);
+      const result = await signInWithEmail(email.trim(), password);
       
-      if (error) {
-        Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
+      if (result.error) {
+        Alert.alert('Login Failed', result.error.message || 'Please check your credentials and try again.');
+        return;
+      }
+
+      // Verify user has pilgrim role
+      if (!result.user || result.user.role !== 'pilgrim') {
+        console.log('[PilgrimLogin] Access denied - user role:', result.user?.role);
+        Alert.alert('Access Denied', 'This account is not authorized for pilgrim access. Please use the correct login portal for your account type.', [
+          { 
+            text: 'OK', 
+            onPress: async () => {
+              const { signOut } = useAuth();
+              await signOut();
+              console.log('[PilgrimLogin] User signed out after access denied');
+            }
+          }
+        ]);
+        return;
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
@@ -108,7 +125,7 @@ const PilgrimLoginScreen: React.FC = () => {
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('PilgrimSignUp')}>
-              <Text style={styles.linkText}>Sign Up</Text>
+              <Text style={styles.signUpLink}>Sign Up</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -220,6 +237,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   linkText: {
+    color: '#f59e0b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  signUpLink: {
     color: '#f59e0b',
     fontSize: 14,
     fontWeight: '600',

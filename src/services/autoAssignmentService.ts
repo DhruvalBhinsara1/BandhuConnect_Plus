@@ -307,10 +307,12 @@ class AutoAssignmentService {
    */
   private getRequiredSkills(requestType: string): string[] {
     const skillMap: Record<string, string[]> = {
-      lost_person: ['search_rescue', 'crowd_management', 'communication', 'local_knowledge'],
       medical: ['medical', 'first_aid', 'healthcare', 'emergency'],
-      guidance: ['local_knowledge', 'tour_guide', 'navigation', 'language'],
+      emergency: ['emergency', 'medical', 'first_aid', 'crisis_management'],
+      lost_person: ['search_rescue', 'crowd_management', 'communication', 'local_knowledge'],
       sanitation: ['cleaning', 'sanitation', 'maintenance', 'hygiene'],
+      crowd_management: ['crowd_management', 'security', 'communication', 'organization'],
+      guidance: ['local_knowledge', 'tour_guide', 'navigation', 'language'],
       general: ['general', 'assistance', 'support']
     };
 

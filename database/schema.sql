@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- Create custom types
 CREATE TYPE user_role AS ENUM ('volunteer', 'admin', 'pilgrim');
-CREATE TYPE request_type AS ENUM ('transportation', 'food', 'medical', 'accommodation', 'guidance', 'emergency', 'general');
+CREATE TYPE request_type AS ENUM ('medical', 'emergency', 'lost_person', 'sanitation', 'crowd_management', 'guidance', 'general');
 CREATE TYPE request_status AS ENUM ('pending', 'assigned', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE assignment_status AS ENUM ('pending', 'accepted', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE priority_level AS ENUM ('low', 'medium', 'high');

@@ -130,7 +130,20 @@ export class VolunteerService {
       
       let query = supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          id,
+          name,
+          email,
+          phone,
+          role,
+          skills,
+          volunteer_status,
+          is_active,
+          rating,
+          total_ratings,
+          created_at,
+          updated_at
+        `)
         .eq('role', 'volunteer')
         .order('created_at', { ascending: false });
 
@@ -151,6 +164,139 @@ export class VolunteerService {
       return { data, error: null };
     } catch (error) {
       console.error('Error fetching volunteers:', error);
+      return { data: null, error };
+    }
+  }
+
+  async getVolunteerById(volunteerId: string) {
+    try {
+      console.log('Fetching volunteer by ID:', volunteerId);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          name,
+          email,
+          phone,
+          role,
+          skills,
+          volunteer_status,
+          is_active,
+          rating,
+          total_ratings,
+          created_at,
+          updated_at
+        `)
+        .eq('id', volunteerId)
+        .eq('role', 'volunteer')
+        .single();
+      
+      console.log('Volunteer by ID result:', { data, error });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching volunteer by ID:', error);
+      return { data: null, error };
+    }
+  }
+
+  async getVolunteerStats(volunteerId: string) {
+    try {
+      console.log('Fetching volunteer statistics:', volunteerId);
+      
+      // Get assignment statistics
+      const { data: assignments, error: assignmentError } = await supabase
+        .from('assignments')
+        .select(`
+          id,
+          status,
+          assigned_at,
+          accepted_at,
+          started_at,
+          completed_at,
+          request:assistance_requests(
+            id,
+            title,
+            description,
+            priority,
+            type
+          )
+        `)
+        .eq('volunteer_id', volunteerId);
+
+      if (assignmentError) throw assignmentError;
+
+      // Calculate statistics
+      const totalTasks = assignments?.length || 0;
+      const completedTasks = assignments?.filter(a => a.status === 'completed').length || 0;
+      const activeAssignments = assignments?.filter(a => 
+        ['assigned', 'accepted', 'on_duty'].includes(a.status)
+      ).length || 0;
+      
+      // Calculate actual hours worked based on duty time (started_at to completed_at)
+      let hoursWorked = 0;
+      if (assignments) {
+        hoursWorked = assignments.reduce((total, assignment) => {
+          // Only count hours for completed tasks that have both started_at and completed_at
+          if (assignment.status === 'completed' && assignment.started_at && assignment.completed_at) {
+            const startTime = new Date(assignment.started_at).getTime();
+            const endTime = new Date(assignment.completed_at).getTime();
+            const hoursOnDuty = (endTime - startTime) / (1000 * 60 * 60); // Convert ms to hours
+            return total + Math.max(0, hoursOnDuty); // Ensure non-negative hours
+          }
+          return total;
+        }, 0);
+      }
+      
+      // Round to 2 decimal places for better testing visibility
+      hoursWorked = Math.round(hoursWorked * 100) / 100;
+
+      const stats = {
+        totalTasks,
+        completedTasks,
+        activeAssignments,
+        hoursWorked,
+        assignments: assignments || []
+      };
+      
+      console.log('Volunteer stats result:', stats);
+      return { data: stats, error: null };
+    } catch (error) {
+      console.error('Error fetching volunteer stats:', error);
+      return { data: null, error };
+    }
+  }
+
+  async getAvailableVolunteers() {
+    try {
+      console.log('Fetching available volunteers...');
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          name,
+          email,
+          skills,
+          volunteer_status,
+          rating,
+          is_active
+        `)
+        .eq('role', 'volunteer')
+        .eq('volunteer_status', 'available')
+        .eq('is_active', true)
+        .order('rating', { ascending: false });
+      
+      console.log('Available volunteers result:', { data: data?.length, error });
+
+      if (error) throw error;
+
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching available volunteers:', error);
       return { data: null, error };
     }
   }

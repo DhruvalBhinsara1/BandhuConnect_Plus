@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ViewStyle } from 'react-native';
+import { View, ViewStyle, StyleSheet } from 'react-native';
 
 interface CardProps {
   children: React.ReactNode;
@@ -14,29 +14,49 @@ const Card: React.FC<CardProps> = ({
   padding = 'medium',
   shadow = true,
 }) => {
-  const getPaddingClass = () => {
+  const getPaddingValue = () => {
     switch (padding) {
       case 'none':
-        return '';
+        return 0;
       case 'small':
-        return 'p-2';
+        return 8;
       case 'large':
-        return 'p-6';
+        return 24;
       default:
-        return 'p-4';
+        return 16;
     }
   };
 
+  const cardStyle = [
+    styles.card,
+    { padding: getPaddingValue() },
+    shadow && styles.shadow,
+    style,
+  ];
+
   return (
-    <View
-      className={`bg-white rounded-lg ${getPaddingClass()} ${
-        shadow ? 'shadow-sm' : ''
-      }`}
-      style={style}
-    >
+    <View style={cardStyle}>
       {children}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  shadow: {
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+});
 
 export default Card;

@@ -34,31 +34,31 @@ export const FONTS = {
 };
 
 export const REQUEST_TYPES = [
-  { value: 'medical', label: 'Medical Emergency', icon: 'medical-bag' },
-  { value: 'safety', label: 'Safety Issue', icon: 'shield-alert' },
-  { value: 'lost_child', label: 'Lost Child', icon: 'account-child' },
+  { value: 'medical', label: 'Medical Emergency', icon: 'medical' },
+  { value: 'emergency', label: 'Emergency', icon: 'warning' },
+  { value: 'lost_person', label: 'Lost Person', icon: 'person' },
   { value: 'sanitation', label: 'Sanitation', icon: 'water' },
+  { value: 'crowd_management', label: 'Crowd Management', icon: 'people' },
+  { value: 'guidance', label: 'Guidance', icon: 'compass' },
   { value: 'general', label: 'General Help', icon: 'help-circle' },
 ];
 
 export const VOLUNTEER_SKILLS = [
-  'First Aid',
-  'Medical',
-  'Security',
-  'Translation',
-  'Crowd Control',
-  'Technical Support',
-  'Food Service',
-  'Transportation',
-  'Child Care',
-  'Emergency Response',
+  'medical',
+  'emergency',
+  'lost_person',
+  'sanitation',
+  'crowd_management',
+  'guidance',
+  'general',
+  'communication',
+  'local_knowledge'
 ];
 
 export const PRIORITY_LEVELS = [
   { value: 'low', label: 'Low', color: '#10b981' },
   { value: 'medium', label: 'Medium', color: '#f59e0b' },
   { value: 'high', label: 'High', color: '#ef4444' },
-  { value: 'emergency', label: 'Emergency', color: '#dc2626' },
 ];
 
 export const STATUS_COLORS = {

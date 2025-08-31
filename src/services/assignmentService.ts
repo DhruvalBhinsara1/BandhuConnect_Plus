@@ -116,8 +116,10 @@ export class AssignmentService {
     }
   }
 
-  async updateAssignmentStatus(id: string, status: AssignmentStatus) {
+  async updateAssignmentStatus(id: string, status: AssignmentStatus, completionLocation?: any) {
     try {
+      console.log('📝 Updating assignment status:', { id, status });
+      
       const updateData: any = {
         status,
       };
@@ -127,11 +129,19 @@ export class AssignmentService {
         case 'accepted':
           updateData.accepted_at = new Date().toISOString();
           break;
-        case 'on_duty':
+        case 'in_progress':
+          // For pending tasks going directly to in_progress, set both accepted_at and started_at
+          updateData.accepted_at = updateData.accepted_at || new Date().toISOString();
           updateData.started_at = new Date().toISOString();
           break;
         case 'completed':
           updateData.completed_at = new Date().toISOString();
+          // Add completion location if available
+          if (completionLocation) {
+            updateData.completion_latitude = completionLocation.latitude;
+            updateData.completion_longitude = completionLocation.longitude;
+            updateData.completion_address = completionLocation.address;
+          }
           break;
       }
 
@@ -145,6 +155,8 @@ export class AssignmentService {
         `)
         .single();
 
+      console.log('📝 Assignment update result:', { data, error });
+
       if (error) throw error;
 
       // Update request status based on assignment status
@@ -154,7 +166,7 @@ export class AssignmentService {
           case 'accepted':
             requestStatus = 'assigned';
             break;
-          case 'on_duty':
+          case 'in_progress':
             requestStatus = 'in_progress';
             break;
           case 'completed':
@@ -183,7 +195,7 @@ export class AssignmentService {
           request:assistance_requests(*)
         `)
         .eq('volunteer_id', volunteerId)
-        .in('status', ['assigned', 'accepted', 'on_duty'])
+        .in('status', ['assigned', 'accepted', 'in_progress'])
         .order('assigned_at', { ascending: false });
 
       if (error) throw error;
