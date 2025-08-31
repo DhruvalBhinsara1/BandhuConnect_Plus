@@ -22,7 +22,7 @@ export default function LoginPage() {
         <div style={styles.logoContainer}>
           <div style={styles.logo}>🔧</div>
         </div>
-        <h2 style={styles.title}>BandhuConnect+ Admin</h2>
+        <h2 style={styles.title}>Admin Sign In</h2>
         <p style={styles.subtitle}>Manage volunteers and coordinate assistance</p>
         <form onSubmit={handleLogin}>
           <input

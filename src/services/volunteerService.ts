@@ -69,6 +69,61 @@ export class VolunteerService {
     }
   }
 
+  async updateProfile(volunteerId: string, profileData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    skills?: string[];
+  }) {
+    try {
+      console.log('🔄 Updating volunteer profile:', { volunteerId, profileData });
+      
+      // First verify the volunteer exists
+      const { data: existingVolunteer, error: checkError } = await supabase
+        .from('profiles')
+        .select('id, name, email, phone, skills')
+        .eq('id', volunteerId)
+        .eq('role', 'volunteer')
+        .single();
+        
+      console.log('📋 Existing volunteer check:', { existingVolunteer, checkError });
+      
+      if (checkError || !existingVolunteer) {
+        console.error('❌ Volunteer not found:', volunteerId);
+        return { data: null, error: { message: `Volunteer ${volunteerId} not found` } };
+      }
+      
+      // Update the profile with proper authentication context
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          ...profileData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', volunteerId)
+        .eq('role', 'volunteer')
+        .select();
+
+      console.log('📥 Profile update result:', { data, error });
+
+      if (error) {
+        console.error('❌ Profile update failed:', error);
+        return { data: null, error };
+      }
+
+      if (!data || data.length === 0) {
+        console.log('⚠️ No rows updated - this may indicate RLS policy restrictions');
+        return { data: null, error: { message: 'Profile update failed - no rows affected' } };
+      }
+
+      console.log('✅ Profile updated successfully:', data[0]);
+      return { data: data[0], error: null };
+    } catch (error) {
+      console.error('❌ Service error during profile update:', error);
+      return { data: null, error };
+    }
+  }
+
   async getVolunteers(filters?: { is_active?: boolean; status?: string }) {
     try {
       console.log('Fetching volunteers from database...');

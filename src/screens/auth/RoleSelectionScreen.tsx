@@ -8,9 +8,22 @@ const RoleSelectionScreen: React.FC = () => {
   const { setUserRole } = useAuth();
 
   const handleRoleSelection = (role: 'admin' | 'volunteer' | 'pilgrim') => {
-    // Set the user role and navigate to login
+    // Set the user role and navigate to appropriate login screen
     setUserRole(role);
-    navigation.navigate('Login', { role });
+    
+    switch (role) {
+      case 'admin':
+        navigation.navigate('AdminLogin');
+        break;
+      case 'volunteer':
+        navigation.navigate('VolunteerLogin');
+        break;
+      case 'pilgrim':
+        navigation.navigate('PilgrimLogin');
+        break;
+      default:
+        navigation.navigate('Login', { role });
+    }
   };
 
   return (

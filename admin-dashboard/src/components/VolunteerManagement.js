@@ -9,6 +9,8 @@ export default function VolunteerManagement() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [volunteerAssignments, setVolunteerAssignments] = useState([]);
 
   // Fetch volunteers from database
   useEffect(() => {
@@ -19,7 +21,21 @@ export default function VolunteerManagement() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          assignments(
+            id,
+            status,
+            assistance_requests!inner(
+              id,
+              title,
+              type,
+              status,
+              priority,
+              created_at
+            )
+          )
+        `)
         .eq('role', 'volunteer')
         .order('name');
       
@@ -58,11 +74,67 @@ export default function VolunteerManagement() {
       await fetchVolunteers();
       
       // Show subtle notification
-      setNotification('Status updated successfully');
-      setTimeout(() => setNotification(null), 3000);
+      const showNotification = (message, type = 'success') => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 3000);
+      };
+
+      showNotification('Status updated successfully');
     } catch (error) {
       console.error('Error updating volunteer status:', error);
       alert('Error updating volunteer status. Please try again.');
+    }
+  };
+
+  const viewVolunteerProfile = async (volunteer) => {
+    setSelectedVolunteer(volunteer);
+    setShowProfile(true);
+    
+    // Fetch detailed assignments for this volunteer
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select(`
+          *,
+          assistance_requests(
+            id,
+            title,
+            type,
+            status,
+            priority,
+            created_at,
+            user:profiles!assistance_requests_user_id_fkey(name, email)
+          )
+        `)
+        .eq('volunteer_id', volunteer.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setVolunteerAssignments(data || []);
+    } catch (error) {
+      console.error('Error fetching volunteer assignments:', error);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending': return '#f59e0b';
+      case 'assigned': return '#3b82f6';
+      case 'accepted': return '#8b5cf6';
+      case 'in_progress': return '#06b6d4';
+      case 'completed': return '#10b981';
+      case 'cancelled': return '#ef4444';
+      default: return '#6b7280';
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'emergency': return '#dc2626';
+      case 'high': return '#ea580c';
+      case 'medium': return '#d97706';
+      case 'low': return '#65a30d';
+      default: return '#6b7280';
     }
   };
 
@@ -250,9 +322,9 @@ export default function VolunteerManagement() {
                 <div style={styles.tableCell}>
                   <div style={styles.compactActions}>
                     <button
-                      onClick={() => setSelectedVolunteer(volunteer)}
+                      onClick={() => viewVolunteerProfile(volunteer)}
                       style={styles.compactViewButton}
-                      title="View Details"
+                      title="View Profile"
                     >
                       👁️
                     </button>
@@ -277,22 +349,119 @@ export default function VolunteerManagement() {
           onClose={() => setShowAddForm(false)}
           onSuccess={() => {
             setShowAddForm(false);
+            fetchVolunteers();
           }}
         />
       )}
 
-      {/* Volunteer Details Modal */}
-      {selectedVolunteer && (
-        <VolunteerDetailsModal
-          volunteer={selectedVolunteer}
-          onClose={() => setSelectedVolunteer(null)}
-        />
+      {/* Volunteer Profile Modal */}
+      {showProfile && selectedVolunteer && (
+        <div style={styles.modal}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <button 
+                onClick={() => setShowProfile(false)}
+                style={styles.backButton}
+              >
+                ← Back to Volunteers
+              </button>
+              <h2 style={styles.modalTitle}>Volunteer Profile</h2>
+            </div>
+
+            <div style={styles.profileCard}>
+              <div style={styles.profileHeader}>
+                <h3 style={styles.profileName}>{selectedVolunteer.name}</h3>
+                <div style={styles.statusBadges}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    backgroundColor: selectedVolunteer.volunteer_status === 'active' ? '#10b981' : '#ef4444'
+                  }}>
+                    {selectedVolunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
+                  </span>
+                  <span style={{
+                    ...styles.statusBadge,
+                    backgroundColor: selectedVolunteer.duty_status === 'on_duty' ? '#3b82f6' : '#6b7280'
+                  }}>
+                    {selectedVolunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
+                  </span>
+                </div>
+              </div>
+              
+              <div style={styles.profileDetails}>
+                <div style={styles.detailRow}>
+                  <strong>Email:</strong> {selectedVolunteer.email || 'Not provided'}
+                </div>
+                <div style={styles.detailRow}>
+                  <strong>Phone:</strong> {selectedVolunteer.phone || 'Not provided'}
+                </div>
+                <div style={styles.detailRow}>
+                  <strong>Age:</strong> {selectedVolunteer.age || 'Not provided'}
+                </div>
+                <div style={styles.detailRow}>
+                  <strong>Skills:</strong> {selectedVolunteer.skills?.join(', ') || 'No skills listed'}
+                </div>
+                <div style={styles.detailRow}>
+                  <strong>Joined:</strong> {new Date(selectedVolunteer.created_at).toLocaleDateString()}
+                </div>
+                <div style={styles.detailRow}>
+                  <strong>Total Assignments:</strong> {volunteerAssignments.length}
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.assignmentsSection}>
+              <h3 style={styles.sectionTitle}>Assignment History</h3>
+              {volunteerAssignments.length === 0 ? (
+                <div style={styles.noAssignments}>No assignments found</div>
+              ) : (
+                <div style={styles.assignmentsList}>
+                  {volunteerAssignments.map((assignment) => (
+                    <div key={assignment.id} style={styles.assignmentCard}>
+                      <div style={styles.assignmentHeader}>
+                        <h4 style={styles.assignmentTitle}>
+                          {assignment.assistance_requests?.title || 'Untitled Request'}
+                        </h4>
+                        <div style={styles.assignmentBadges}>
+                          <span style={{
+                            ...styles.badge,
+                            backgroundColor: getStatusColor(assignment.status)
+                          }}>
+                            {assignment.status}
+                          </span>
+                          {assignment.assistance_requests?.priority && (
+                            <span style={{
+                              ...styles.badge,
+                              backgroundColor: getPriorityColor(assignment.assistance_requests.priority)
+                            }}>
+                              {assignment.assistance_requests.priority}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div style={styles.assignmentDetails}>
+                        <div><strong>Type:</strong> {assignment.assistance_requests?.type || 'Unknown'}</div>
+                        <div><strong>Assigned:</strong> {new Date(assignment.created_at).toLocaleString()}</div>
+                        {assignment.assistance_requests?.user && (
+                          <div>
+                            <strong>Requested by:</strong> {assignment.assistance_requests.user.name} 
+                            ({assignment.assistance_requests.user.email})
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Subtle notification */}
       {notification && (
         <div style={styles.notification}>
-          {notification}
+          {notification.message}
         </div>
       )}
     </div>

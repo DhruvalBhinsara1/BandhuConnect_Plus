@@ -1,28 +1,39 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, RefreshControl, Modal, StyleSheet, TextInput, SafeAreaView, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../context/AuthContext';
-import { useRequest } from '../../context/RequestContext';
-import { assignmentService } from '../../services/assignmentService';
-import { AssistanceRequest } from '../../types';
+import { supabase } from '../../services/supabase';
 
 const RequestManagement: React.FC = () => {
-  const navigation = useNavigation<any>();
-  const { user } = useAuth();
-  const { requests, getRequests, deleteRequest } = useRequest();
-  
+  const [requests, setRequests] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'assigned' | 'completed'>('all');
-  const [selectedRequest, setSelectedRequest] = useState<AssistanceRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showPriorityModal, setShowPriorityModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   useEffect(() => {
     loadRequests();
   }, []);
 
   const loadRequests = async () => {
-    await getRequests();
+    try {
+      const { data, error } = await supabase
+        .from('assistance_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error loading requests:', error);
+      } else {
+        setRequests(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading requests:', error);
+    }
   };
 
   const handleRefresh = async () => {
@@ -45,23 +56,10 @@ const RequestManagement: React.FC = () => {
   };
 
   const handleAssignVolunteer = async (requestId: string) => {
-    // Mock volunteer assignment - in real app, show volunteer selection modal
-    const mockVolunteerId = '1'; // This would come from volunteer selection
-    
-    try {
-      const { error } = await assignmentService.createAssignment(requestId, mockVolunteerId);
-      if (error) {
-        Alert.alert('Error', 'Failed to assign volunteer. Please try again.');
-      } else {
-        Alert.alert('Success', 'Volunteer assigned successfully!');
-        await loadRequests();
-      }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred.');
-    }
+    Alert.alert('Assign Volunteer', 'Volunteer assignment functionality would be implemented here');
   };
 
-  const handleMenuPress = (request: AssistanceRequest) => {
+  const handleMenuPress = (request: any) => {
     setSelectedRequest(request);
     setShowMenu(true);
   };
@@ -73,7 +71,9 @@ const RequestManagement: React.FC = () => {
 
     switch (action) {
       case 'edit':
-        Alert.alert('Edit Request', 'Edit functionality would be implemented here');
+        setEditTitle(selectedRequest.title);
+        setEditDescription(selectedRequest.description);
+        setShowEditModal(true);
         break;
       case 'delete':
         Alert.alert(
@@ -86,11 +86,16 @@ const RequestManagement: React.FC = () => {
               style: 'destructive',
               onPress: async () => {
                 try {
-                  const result = await deleteRequest(selectedRequest.id);
-                  if (result.error) {
+                  const { error } = await supabase
+                    .from('assistance_requests')
+                    .delete()
+                    .eq('id', selectedRequest.id);
+                  
+                  if (error) {
                     Alert.alert('Error', 'Failed to delete request. Please try again.');
                   } else {
                     Alert.alert('Success', 'Request deleted successfully');
+                    await loadRequests();
                   }
                 } catch (error) {
                   Alert.alert('Error', 'An unexpected error occurred.');
@@ -101,14 +106,89 @@ const RequestManagement: React.FC = () => {
         );
         break;
       case 'status':
-        Alert.alert('Change Status', 'Status change functionality would be implemented here');
+        setShowStatusModal(true);
         break;
       case 'priority':
-        Alert.alert('Change Priority', 'Priority change functionality would be implemented here');
+        setShowPriorityModal(true);
         break;
     }
-    
-    setSelectedRequest(null);
+  };
+
+  const handleEditRequest = async () => {
+    try {
+      const { error } = await supabase
+        .from('assistance_requests')
+        .update({
+          title: editTitle,
+          description: editDescription
+        })
+        .eq('id', selectedRequest.id);
+
+      if (error) {
+        Alert.alert('Error', 'Failed to update request. Please try again.');
+      } else {
+        Alert.alert('Success', 'Request updated successfully');
+        setShowEditModal(false);
+        await loadRequests();
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!selectedRequest) {
+      Alert.alert('Error', 'No request selected');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('assistance_requests')
+        .update({ status: newStatus })
+        .eq('id', selectedRequest.id);
+
+      if (error) {
+        console.error('Status update error:', error);
+        Alert.alert('Error', `Failed to update status: ${error.message}`);
+      } else {
+        Alert.alert('Success', 'Status updated successfully');
+        setShowStatusModal(false);
+        setSelectedRequest(null);
+        await loadRequests();
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      Alert.alert('Error', `An unexpected error occurred: ${error.message || error}`);
+    }
+  };
+
+  const handlePriorityChange = async (newPriority: string) => {
+    if (!selectedRequest) {
+      Alert.alert('Error', 'No request selected');
+      return;
+    }
+
+    try {
+      console.log('Updating priority for request:', selectedRequest.id, 'to:', newPriority);
+      const { error } = await supabase
+        .from('assistance_requests')
+        .update({ priority: newPriority })
+        .eq('id', selectedRequest.id);
+
+      if (error) {
+        console.error('Priority update error:', error);
+        Alert.alert('Error', `Failed to update priority: ${error.message}`);
+      } else {
+        Alert.alert('Success', 'Priority updated successfully');
+        setShowPriorityModal(false);
+        setSelectedRequest(null);
+        await loadRequests();
+      }
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      Alert.alert('Error', `An unexpected error occurred: ${error.message || error}`);
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -133,7 +213,7 @@ const RequestManagement: React.FC = () => {
     return statusColors[status as keyof typeof statusColors] || '#6b7280';
   };
 
-  const renderRequestItem = ({ item }: { item: AssistanceRequest }) => (
+  const renderRequestItem = ({ item }: { item: any }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.cardContent}>
@@ -321,6 +401,117 @@ const RequestManagement: React.FC = () => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Edit Request Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModalContainer}>
+            <Text style={styles.modalTitle}>Edit Request</Text>
+            
+            <Text style={styles.inputLabel}>Title</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Enter request title"
+            />
+            
+            <Text style={styles.inputLabel}>Description</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Enter request description"
+              multiline
+              numberOfLines={4}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleEditRequest}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Status Modal */}
+      <Modal
+        visible={showStatusModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowStatusModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.optionModalContainer}>
+            <Text style={styles.modalTitle}>Change Status</Text>
+            
+            {['pending', 'assigned', 'accepted', 'in_progress', 'completed', 'cancelled'].map((status) => (
+              <TouchableOpacity
+                key={status}
+                style={styles.optionItem}
+                onPress={() => handleStatusChange(status)}
+              >
+                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]} />
+                <Text style={styles.optionText}>{status.replace('_', ' ').toUpperCase()}</Text>
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity 
+              style={styles.cancelOnlyButton}
+              onPress={() => setShowStatusModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Change Priority Modal */}
+      <Modal
+        visible={showPriorityModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPriorityModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.optionModalContainer}>
+            <Text style={styles.modalTitle}>Change Priority</Text>
+            
+            {['low', 'medium', 'high'].map((priority) => (
+              <TouchableOpacity
+                key={priority}
+                style={styles.optionItem}
+                onPress={() => handlePriorityChange(priority)}
+              >
+                <View style={[styles.priorityIndicator, { backgroundColor: getPriorityColor(priority) }]} />
+                <Text style={styles.optionText}>{priority.toUpperCase()}</Text>
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity 
+              style={styles.cancelOnlyButton}
+              onPress={() => setShowPriorityModal(false)}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -503,6 +694,114 @@ const styles = StyleSheet.create({
   },
   deleteMenuText: {
     color: '#ef4444',
+  },
+  // New modal styles
+  editModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    margin: 20,
+    maxHeight: '80%',
+  },
+  optionModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    margin: 20,
+    minWidth: 250,
+    maxWidth: 300,
+    alignSelf: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: '#f9fafb',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+  },
+  saveButton: {
+    backgroundColor: '#3b82f6',
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontWeight: '600',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  priorityIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  cancelOnlyButton: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+    alignSelf: 'center',
   },
 });
 

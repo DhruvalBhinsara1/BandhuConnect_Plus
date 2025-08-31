@@ -3,6 +3,7 @@ import { View, Text, Modal, TouchableOpacity, ScrollView, Alert, StyleSheet } fr
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import { Logger } from '../../utils/logger';
+import { assignmentService } from '../../services/assignmentService';
 
 interface AutoAssignModalProps {
   visible: boolean;
@@ -109,35 +110,50 @@ const AutoAssignModal: React.FC<AutoAssignModalProps> = ({
       setLoading(true);
       Logger.autoAssignment.requestProcessing(request, 0, 1);
 
-      const { data, error } = await supabase.rpc('auto_assign_request_enhanced', {
-        p_request_id: request.id,
-        p_volunteer_id: selectedVolunteer.id,
-        p_min_match_score: 0.4 // Lower threshold for manual selection
-      });
+      // Use assignment service for manual assignment instead of auto-assignment function
+      const assignmentResult = await assignmentService.createAssignment(request.id, selectedVolunteer.id);
+      
+      const data = assignmentResult.data ? { success: true, assignment: assignmentResult.data } : null;
+      const error = assignmentResult.error;
 
       if (error) {
         Logger.autoAssignment.error(error, 'manual volunteer assignment');
-        Alert.alert('Assignment Failed', `Could not assign task: ${error.message}`);
+        Alert.alert('Assignment Failed', `Could not assign task: ${error.message}`, [
+          { text: 'OK', onPress: () => {
+            onAssignmentComplete();
+            onClose();
+          }}
+        ]);
         return;
       }
 
       if (data && data.success) {
-        Logger.autoAssignment.matchResult(true, selectedVolunteer.name, data.match_score);
+        Logger.autoAssignment.matchResult(true, selectedVolunteer.name, 1.0);
         Alert.alert(
           'Assignment Successful',
-          `Task "${request.title}" has been assigned to ${selectedVolunteer.name}`,
+          `Task assigned to ${selectedVolunteer.name}`,
           [{ text: 'OK', onPress: () => {
             onAssignmentComplete();
             onClose();
           }}]
         );
       } else {
-        Logger.autoAssignment.matchResult(false, undefined, undefined, data?.message || 'Unknown error');
-        Alert.alert('Assignment Failed', data?.message || 'Could not assign task to this volunteer');
+        Logger.autoAssignment.matchResult(false, selectedVolunteer.name, 0);
+        Alert.alert('Assignment Failed', 'Could not assign task to volunteer', [
+          { text: 'OK', onPress: () => {
+            onAssignmentComplete();
+            onClose();
+          }}
+        ]);
       }
     } catch (error) {
       Logger.autoAssignment.error(error, 'manual volunteer assignment');
-      Alert.alert('Error', 'Failed to assign task');
+      Alert.alert('Error', 'Failed to assign task', [
+        { text: 'OK', onPress: () => {
+          onAssignmentComplete();
+          onClose();
+        }}
+      ]);
     } finally {
       setLoading(false);
     }
