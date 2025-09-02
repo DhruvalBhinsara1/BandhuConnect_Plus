@@ -1,5 +1,32 @@
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import { LocationData } from '../types';
+import { mapService } from './mapService';
+
+const LOCATION_TASK_NAME = 'background-location-task';
+
+// Define the background task
+TaskManager.defineTask(LOCATION_TASK_NAME, ({ data, error }) => {
+  if (error) {
+    console.error('Background location task error:', error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as any;
+    const location = locations[0];
+    if (location) {
+      // Update location in database
+      mapService.updateUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        accuracy: location.coords.accuracy,
+        timestamp: location.timestamp,
+      }).catch(error => {
+        console.error('Failed to update location in background:', error);
+      });
+    }
+  }
+});
 
 export class LocationService {
   async requestPermissions() {
@@ -42,21 +69,79 @@ export class LocationService {
       return await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 10000, // 10 seconds
-          distanceInterval: 10, // 10 meters
+          timeInterval: 30000, // 30 seconds for battery optimization
+          distanceInterval: 50, // 50 meters to reduce unnecessary updates
         },
         (location) => {
-          callback({
+          const locationData = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
             accuracy: location.coords.accuracy || undefined,
             timestamp: location.timestamp,
+          };
+          callback(locationData);
+          
+          // Also update database immediately
+          mapService.updateUserLocation(locationData).catch(error => {
+            console.error('Failed to update location:', error);
           });
         }
       );
     } catch (error) {
       console.error('Error watching position:', error);
       return null;
+    }
+  }
+
+  async startBackgroundLocationUpdates() {
+    try {
+      const { granted } = await Location.getBackgroundPermissionsAsync();
+      if (!granted) {
+        console.log('Background location permission not granted');
+        return false;
+      }
+
+      const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      if (isRegistered) {
+        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      }
+
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 60000, // 1 minute for background
+        distanceInterval: 100, // 100 meters for background
+        foregroundService: {
+          notificationTitle: 'BandhuConnect+ Location Tracking',
+          notificationBody: 'Tracking your location for volunteer coordination',
+        },
+      });
+
+      console.log('Background location tracking started');
+      return true;
+    } catch (error) {
+      console.error('Error starting background location updates:', error);
+      return false;
+    }
+  }
+
+  async stopBackgroundLocationUpdates() {
+    try {
+      const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      if (isRegistered) {
+        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        console.log('Background location tracking stopped');
+      }
+    } catch (error) {
+      console.error('Error stopping background location updates:', error);
+    }
+  }
+
+  async isBackgroundLocationActive() {
+    try {
+      return await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+    } catch (error) {
+      console.error('Error checking background location status:', error);
+      return false;
     }
   }
 
@@ -106,3 +191,4 @@ export class LocationService {
 }
 
 export const locationService = new LocationService();
+export { LOCATION_TASK_NAME };

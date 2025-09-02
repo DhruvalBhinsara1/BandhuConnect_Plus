@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { locationService } from '../services/locationService';
 import { LocationData } from '../types';
+import { useAuth } from './AuthContext';
 
 interface LocationContextType {
   currentLocation: LocationData | null;
   isTracking: boolean;
+  isBackgroundTracking: boolean;
   permissions: { foreground: boolean; background: boolean } | null;
   startTracking: () => Promise<void>;
   stopTracking: () => void;
@@ -21,8 +23,10 @@ interface LocationProviderProps {
 export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) => {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [isBackgroundTracking, setIsBackgroundTracking] = useState(false);
   const [permissions, setPermissions] = useState<{ foreground: boolean; background: boolean } | null>(null);
   const [watchSubscription, setWatchSubscription] = useState<any>(null);
+  const { user } = useAuth();
 
   const requestPermissions = async () => {
     const perms = await locationService.requestPermissions();
@@ -48,15 +52,25 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
         setCurrentLocation(location);
       });
       setWatchSubscription(subscription);
+      
+      // Also start background tracking if permission granted
+      if (permissions?.background) {
+        const backgroundStarted = await locationService.startBackgroundLocationUpdates();
+        setIsBackgroundTracking(backgroundStarted);
+      }
     }
   };
 
-  const stopTracking = () => {
+  const stopTracking = async () => {
     if (watchSubscription) {
       watchSubscription.remove();
       setWatchSubscription(null);
     }
     setIsTracking(false);
+    
+    // Stop background tracking
+    await locationService.stopBackgroundLocationUpdates();
+    setIsBackgroundTracking(false);
   };
 
   useEffect(() => {
@@ -72,10 +86,23 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     getCurrentLocation();
   }, []);
 
+  // Auto-start tracking when user is logged in and permissions are granted
+  useEffect(() => {
+    const autoStartTracking = async () => {
+      if (user && permissions?.foreground && !isTracking) {
+        console.log('[LocationContext] Auto-starting location tracking for logged-in user');
+        await startTracking();
+      }
+    };
+
+    autoStartTracking();
+  }, [user, permissions, isTracking]);
+
 
   const value: LocationContextType = {
     currentLocation,
     isTracking,
+    isBackgroundTracking,
     permissions,
     startTracking,
     stopTracking,
