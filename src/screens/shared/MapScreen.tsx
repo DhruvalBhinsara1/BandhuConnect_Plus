@@ -1,14 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAuth } from '../../context/AuthContext';
 import { useMap } from '../../context/MapContext';
 import { useLocation } from '../../context/LocationContext';
 
+const { width, height } = Dimensions.get('window');
+
 const MapScreen: React.FC = () => {
   const { user } = useAuth();
   const { userLocations, loading, refreshLocations } = useMap();
-  const { currentLocation, isTracking, isBackgroundTracking, permissions } = useLocation();
+  const { currentLocation, isTracking, isBackgroundTracking, permissions, getCurrentLocation } = useLocation();
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 23.1667, // Ujjain Mahakumbh coordinates (23°10'N)
+    longitude: 75.7667, // 75°46'E
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
 
   const getTrackingStatusText = () => {
     if (!permissions?.foreground) {
@@ -66,23 +75,50 @@ const MapScreen: React.FC = () => {
     return `${distance.toFixed(1)}km`;
   };
 
-  const openInMaps = (latitude: number, longitude: number, name: string) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  useEffect(() => {
+    refreshLocations();
+    // Get current location and center map
+    getCurrentLocationAndCenter();
+  }, []);
+
+  const getCurrentLocationAndCenter = async () => {
+    try {
+      const location = await getCurrentLocation();
+      if (location) {
+        setMapRegion({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      }
+    } catch (error) {
+      console.log('Could not get current location for map centering:', error);
+    }
+  };
+
+  // Update map region when current location changes (only first time)
+  useEffect(() => {
+    if (currentLocation && mapRegion.latitude === 23.1667) {
+      setMapRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+    }
+  }, [currentLocation]);
+
+  const onMarkerPress = (location: any) => {
     Alert.alert(
-      'Open in Maps',
-      `Open ${name}'s location in Google Maps?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open', onPress: () => {
-          // This would open in browser in Expo Go
-          console.log('Opening maps URL:', url);
-        }}
-      ]
+      location.user_name || 'User Location',
+      `Role: ${location.user_role}\nStatus: ${location.assignment_info?.status || 'available'}\nLast updated: ${new Date(location.updated_at).toLocaleTimeString()}`,
+      [{ text: 'OK' }]
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Location Tracking</Text>
@@ -95,124 +131,87 @@ const MapScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Current Location */}
-      {currentLocation && (
-        <View style={styles.currentLocationCard}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="location" size={20} color="#4285F4" />
-            <Text style={styles.cardTitle}>Your Location</Text>
-          </View>
-          <Text style={styles.coordinates}>
-            {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
-          </Text>
-          <Text style={styles.timestamp}>
-            Last updated: {new Date().toLocaleTimeString()}
-          </Text>
-        </View>
-      )}
+      {/* OpenStreetMap - Full Screen */}
+      <View style={styles.mapContainer}>
+        <MapView
+          style={styles.map}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={mapRegion}
+          region={mapRegion}
+          onRegionChangeComplete={setMapRegion}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          showsCompass={true}
+          showsScale={true}
+          mapType="standard"
+          loadingEnabled={false}
+          pitchEnabled={true}
+          rotateEnabled={true}
+          scrollEnabled={true}
+          zoomEnabled={true}
+        >
+          {/* Current User Location Marker */}
+          {currentLocation && (
+            <Marker
+              coordinate={{
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+              }}
+              title="Your Location"
+              description={`Last updated: ${new Date().toLocaleTimeString()}`}
+              pinColor="blue"
+            />
+          )}
 
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity style={styles.refreshButton} onPress={refreshLocations}>
-          <Ionicons name="refresh" size={20} color="#fff" />
-          <Text style={styles.buttonText}>Refresh Locations</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Auto-tracking Info */}
-      <View style={styles.infoCard}>
-        <View style={styles.infoHeader}>
-          <Ionicons name="information-circle" size={20} color="#3B82F6" />
-          <Text style={styles.infoTitle}>Automatic Location Tracking</Text>
-        </View>
-        <Text style={styles.infoText}>
-          Location tracking starts automatically when you log in. Your location is shared with other volunteers for coordination purposes.
-        </Text>
-        {!permissions?.background && (
-          <Text style={styles.warningText}>
-            ⚠️ Background location permission not granted. Location will only be tracked when app is open.
-          </Text>
-        )}
-      </View>
-
-      {/* User Locations List */}
-      <ScrollView 
-        style={styles.locationsList}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refreshLocations} />
-        }
-      >
-        {userLocations.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="location-outline" size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No active locations found</Text>
-            <Text style={styles.emptySubtext}>Users will appear here when they start location tracking</Text>
-          </View>
-        ) : (
-          userLocations.map((location) => (
-            <TouchableOpacity
+          {/* Other Users Markers */}
+          {userLocations.map((location) => (
+            <Marker
               key={location.location_id}
-              style={styles.locationCard}
-              onPress={() => openInMaps(location.latitude, location.longitude, location.user_name || 'User')}
+              coordinate={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+              }}
+              title={location.user_name || 'Unknown User'}
+              description={`${location.user_role} - ${location.assignment_info?.status || 'available'}`}
+              pinColor={getRoleColor(location.user_role)}
+              onPress={() => onMarkerPress(location)}
+            />
+          ))}
+        </MapView>
+
+        {/* Map Controls Overlay */}
+        <View style={styles.mapControls}>
+          <TouchableOpacity style={styles.refreshMapButton} onPress={refreshLocations}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+          </TouchableOpacity>
+          
+          {currentLocation && (
+            <TouchableOpacity 
+              style={styles.centerMapButton} 
+              onPress={() => setMapRegion({
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              })}
             >
-              <View style={styles.locationHeader}>
-                <View style={styles.userInfo}>
-                  <View style={[styles.roleIndicator, { backgroundColor: getRoleColor(location.user_role) }]} />
-                  <View>
-                    <Text style={styles.userName}>{location.user_name || 'Unknown User'}</Text>
-                    <Text style={styles.userRole}>{location.user_role}</Text>
-                  </View>
-                </View>
-                <View style={styles.statusInfo}>
-                  <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(location.assignment_info) }]} />
-                  <Text style={styles.statusText}>
-                    {location.assignment_info?.status || 'available'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.locationDetails}>
-                <View style={styles.coordinatesRow}>
-                  <Ionicons name="location-outline" size={16} color="#6B7280" />
-                  <Text style={styles.coordinatesText}>
-                    {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-                  </Text>
-                </View>
-
-                {currentLocation && (
-                  <View style={styles.distanceRow}>
-                    <Ionicons name="navigate-outline" size={16} color="#6B7280" />
-                    <Text style={styles.distanceText}>
-                      {formatDistance(
-                        currentLocation.latitude,
-                        currentLocation.longitude,
-                        location.latitude,
-                        location.longitude
-                      )} away
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.timeRow}>
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text style={styles.timeText}>
-                    {new Date(location.updated_at).toLocaleTimeString()}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.cardFooter}>
-                <Ionicons name="map-outline" size={16} color="#3B82F6" />
-                <Text style={styles.mapText}>Tap to view in maps</Text>
-              </View>
+              <Ionicons name="locate" size={20} color="#fff" />
             </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+          )}
+        </View>
 
-      {/* Legend */}
-      <View style={styles.legend}>
-        <Text style={styles.legendTitle}>Legend</Text>
+        {/* Info Overlay */}
+        {!permissions?.background && (
+          <View style={styles.warningOverlay}>
+            <Text style={styles.warningOverlayText}>
+              ⚠️ Background location permission not granted
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Bottom Legend */}
+      <View style={styles.bottomLegend}>
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, { backgroundColor: '#DC2626' }]} />
@@ -222,8 +221,6 @@ const MapScreen: React.FC = () => {
             <View style={[styles.legendColor, { backgroundColor: '#16A34A' }]} />
             <Text style={styles.legendText}>Volunteer</Text>
           </View>
-        </View>
-        <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, { backgroundColor: '#2563EB' }]} />
             <Text style={styles.legendText}>Pilgrim</Text>
@@ -234,7 +231,7 @@ const MapScreen: React.FC = () => {
           </View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -356,126 +353,67 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  locationsList: {
+  mapContainer: {
     flex: 1,
-    paddingHorizontal: 16,
   },
-  emptyState: {
+  map: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  mapControls: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'column',
+    gap: 8,
+  },
+  refreshMapButton: {
+    backgroundColor: '#6B7280',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
+  centerMapButton: {
+    backgroundColor: '#3B82F6',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  locationCard: {
+  bottomLegend: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  roleIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  userRole: {
-    fontSize: 12,
-    color: '#6B7280',
-    textTransform: 'capitalize',
-  },
-  statusInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#374151',
-    textTransform: 'capitalize',
-  },
-  locationDetails: {
-    marginBottom: 12,
-  },
-  coordinatesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  coordinatesText: {
-    fontSize: 12,
-    color: '#374151',
-    fontFamily: 'monospace',
-    marginLeft: 8,
-  },
-  distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  distanceText: {
-    fontSize: 12,
-    color: '#374151',
-    marginLeft: 8,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-  },
-  mapText: {
-    fontSize: 12,
-    color: '#3B82F6',
-    marginLeft: 6,
-  },
-  legend: {
-    backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+  },
+  warningOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(220, 38, 38, 0.9)',
+    padding: 8,
+    borderRadius: 8,
+  },
+  warningOverlayText: {
+    color: '#fff',
+    fontSize: 12,
+    textAlign: 'center',
   },
   legendTitle: {
     fontSize: 14,
@@ -485,12 +423,11 @@ const styles = StyleSheet.create({
   },
   legendRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    justifyContent: 'space-around',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   legendColor: {
     width: 12,

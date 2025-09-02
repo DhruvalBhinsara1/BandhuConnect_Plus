@@ -5,6 +5,7 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
+    main: "./index.ts",
     splash: {
       backgroundColor: "#121212",
       resizeMode: "contain"
@@ -21,7 +22,11 @@ export default {
         backgroundColor: "#121212"
       },
       jsEngine: "jsc",
-      package: "com.anonymous.bandhuconnectplus"
+      package: "com.anonymous.bandhuconnectplus",
+      config: {
+        ndkVersion: "29.0.13846066"
+      },
+      minSdkVersion: 24
     },
     plugins: [
       [
