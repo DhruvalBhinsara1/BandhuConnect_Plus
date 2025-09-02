@@ -10,14 +10,6 @@ interface AssignmentInfo {
   volunteer_name?: string;
 }
 
-interface LocationDetails {
-  name: string;
-  address: string;
-  locality: string;
-  landmark?: string;
-  placeId?: string;
-}
-
 export interface UserLocationData {
   location_id: string;
   user_id: string;
@@ -27,7 +19,6 @@ export interface UserLocationData {
   longitude: number;
   accuracy?: number;
   last_updated: string;
-  locationDetails?: LocationDetails;
   assignment_info: AssignmentInfo[];
 }
 
@@ -149,51 +140,6 @@ class MapService {
   // Convert degrees to radians
   private toRadians(degrees: number): number {
     return degrees * (Math.PI / 180);
-  }
-
-  // Get location details using reverse geocoding
-  async getLocationDetails(latitude: number, longitude: number): Promise<LocationDetails | null> {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
-      );
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.results.length > 0) {
-        const result = data.results[0];
-        const addressComponents = result.address_components;
-        
-        const locationDetails: LocationDetails = {
-          name: result.formatted_address,
-          address: result.formatted_address,
-          locality: this.extractLocality(addressComponents),
-          landmark: this.extractLandmark(addressComponents),
-          placeId: result.place_id
-        };
-
-        return locationDetails;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting location details:', error);
-      return null;
-    }
-  }
-
-  private extractLocality(addressComponents: any[]): string {
-    const locality = addressComponents.find(
-      (component: any) => component.types.includes('sublocality_level_1') || 
-                         component.types.includes('locality')
-    );
-    return locality ? locality.long_name : '';
-  }
-
-  private extractLandmark(addressComponents: any[]): string | undefined {
-    const landmark = addressComponents.find(
-      (component: any) => component.types.includes('point_of_interest') || 
-                         component.types.includes('establishment')
-    );
-    return landmark ? landmark.long_name : undefined;
   }
 
   // Get center for map view

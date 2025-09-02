@@ -2,6 +2,14 @@ export type UserRole = 'volunteer' | 'admin' | 'pilgrim';
 
 export type RequestType = 'medical' | 'emergency' | 'lost_person' | 'sanitation' | 'crowd_management' | 'guidance' | 'general';
 
+export interface LocationDetails {
+  name: string;
+  address: string;
+  locality: string;
+  landmark?: string;
+  placeId?: string;
+}
+
 export type RequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 
 export type AssignmentStatus = 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';

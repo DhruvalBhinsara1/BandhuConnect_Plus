@@ -12,6 +12,7 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { COLORS, REQUEST_TYPES, PRIORITY_LEVELS } from '../../constants';
 import { RequestType, Priority } from '../../types';
+import { LocationPreview } from '../../components/LocationPreview';
 
 const CreateRequest: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -304,15 +305,10 @@ const CreateRequest: React.FC = () => {
           </View>
 
           {currentLocation ? (
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <Ionicons name="location" size={16} color={COLORS.success} />
-                <Text style={{ color: '#4b5563', marginLeft: 8 }}>Current location detected</Text>
-              </View>
-              <Text style={{ color: '#6b7280', fontSize: 12 }}>
-                Lat: {currentLocation.latitude.toFixed(6)}, Lng: {currentLocation.longitude.toFixed(6)}
-              </Text>
-            </View>
+            <LocationPreview
+              latitude={currentLocation.latitude}
+              longitude={currentLocation.longitude}
+            />
           ) : (
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>

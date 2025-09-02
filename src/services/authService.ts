@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { User, UserRole } from '../types';
+import { deviceService } from './deviceService';
 
 export class AuthService {
   async signUp(email: string, password: string, userData: any) {
@@ -125,6 +126,10 @@ export class AuthService {
         throw error;
       }
 
+      // Register device after successful login
+      const deviceId = await deviceService.registerDevice();
+      console.log('[AuthService] Device registered:', deviceId);
+
       return { data, error: null };
     } catch (error) {
       console.log('[AuthService] SignIn catch error:', error);
@@ -135,17 +140,37 @@ export class AuthService {
 
   async signOut() {
     try {
+      // Deactivate current device before signing out
+      const devices = await deviceService.getActiveDevices();
+      const currentToken = deviceService.getDeviceToken();
+      const currentDevice = devices.find(d => d.device_token === currentToken);
+      
+      if (currentDevice) {
+        console.log('[AuthService] Deactivating device:', currentDevice.device_id);
+        await deviceService.deactivateDevice(currentDevice.device_id);
+      }
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       return { error: null };
     } catch (error) {
+      console.error('[AuthService] Error during sign out:', error);
       return { error };
     }
+  }
+
+  async getActiveDevices() {
+    return deviceService.getActiveDevices();
   }
 
   async getCurrentUser(): Promise<User | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // Register device if we have an active user
+      if (user) {
+        await deviceService.registerDevice();
+      }
       
       if (!user) return null;
 
