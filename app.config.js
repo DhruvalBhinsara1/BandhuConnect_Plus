@@ -13,17 +13,26 @@ export default {
       "**/*"
     ],
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      jsEngine: "jsc"
     },
     android: {
       adaptiveIcon: {
         backgroundColor: "#121212"
-      }
+      },
+      jsEngine: "jsc",
+      package: "com.anonymous.bandhuconnectplus"
     },
-    web: {
-      bundler: "metro"
-    },
-    plugins: [],
+    plugins: [
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "This app needs access to location when open and in the background to track volunteer locations for emergency assistance coordination.",
+          isIosBackgroundLocationEnabled: true,
+          isAndroidBackgroundLocationEnabled: true
+        }
+      ]
+    ],
     scheme: "bandhuconnect",
     extra: {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,

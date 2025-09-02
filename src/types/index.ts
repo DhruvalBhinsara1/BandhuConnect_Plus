@@ -78,6 +78,9 @@ export interface LocationData {
   longitude: number;
   accuracy?: number;
   timestamp?: number;
+  heading?: number;
+  speed?: number;
+  altitude?: number;
 }
 
 export interface AuthState {

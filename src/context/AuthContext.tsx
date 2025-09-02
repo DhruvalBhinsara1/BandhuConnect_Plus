@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { authService } from '../services/authService';
 import { User, AuthState, UserRole } from '../types';
 
@@ -7,7 +7,7 @@ interface AuthContextType extends AuthState {
   signUp: (email: string, password: string, userData: any) => Promise<{ data: any; error: any }>;
   signInWithEmail: (email: string, password: string) => Promise<{ data: any; error: any; user?: User }>;
   signOut: () => Promise<void>;
-  updateProfile: (userId: string, updates: Partial<User>) => Promise<{ data: any; error: any }>;
+  updateProfile: (updates: Partial<User>) => Promise<{ data: any; error: any }>;
   setUserRole: (role: UserRole) => void;
   selectedRole: UserRole | null;
   getCurrentUser: () => Promise<User | null>;
@@ -52,13 +52,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const currentUser = await getCurrentUser();
         
         if (currentUser) {
-          const savedRole = await AsyncStorage.getItem('selectedRole');
+          const savedRole = await SecureStore.getItemAsync('selectedRole');
           if (savedRole) {
             setSelectedRole(savedRole as 'admin' | 'volunteer' | 'pilgrim');
           } else if (currentUser.role) {
             // Use user's role from profile if no saved role
             setSelectedRole(currentUser.role);
-            await AsyncStorage.setItem('selectedRole', currentUser.role);
+            await SecureStore.setItemAsync('selectedRole', currentUser.role);
           }
         }
       } catch (error) {
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('[AuthContext] Auth event:', event, 'Session user ID:', session?.user?.id);
             
             // Check if we have pending user data from signup
-            const pendingData = await AsyncStorage.getItem('pendingUserData');
+            const pendingData = await SecureStore.getItemAsync('pendingUserData');
             if (pendingData) {
               console.log('[AuthContext] Creating profile after email confirmation');
               const userData = JSON.parse(pendingData);
@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
               
               // Clear pending data
-              await AsyncStorage.removeItem('pendingUserData');
+              await SecureStore.deleteItemAsync('pendingUserData');
             }
           }
           
@@ -113,12 +113,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Always use the user's actual role from database, not saved role
           if (currentUser && currentUser.role) {
             setSelectedRole(currentUser.role);
-            await AsyncStorage.setItem('selectedRole', currentUser.role);
+            await SecureStore.setItemAsync('selectedRole', currentUser.role);
           }
         } else {
           setUser(null);
           setSelectedRole(null);
-          await AsyncStorage.removeItem('selectedRole');
+          await SecureStore.deleteItemAsync('selectedRole');
         }
         
         setLoading(false);
@@ -143,7 +143,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // If email confirmation is required, store pending user data
         if (result.data.emailConfirmationRequired && result.data.pendingUserData) {
           console.log('[AuthContext] Storing pending user data for email confirmation');
-          await AsyncStorage.setItem('pendingUserData', JSON.stringify(result.data.pendingUserData));
+          await SecureStore.setItemAsync('pendingUserData', JSON.stringify(result.data.pendingUserData));
         }
         
         const currentUser = await authService.getCurrentUser();
@@ -182,7 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setSession(null);
       setSelectedRole(null);
-      await AsyncStorage.removeItem('selectedRole');
+      await SecureStore.deleteItemAsync('selectedRole');
       console.log('[AuthContext] SignOut completed successfully');
     } catch (error) {
       console.error('[AuthContext] SignOut error:', error);
@@ -203,7 +203,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const setUserRole = async (role: 'admin' | 'volunteer' | 'pilgrim') => {
     setSelectedRole(role);
-    await AsyncStorage.setItem('selectedRole', role);
+    await SecureStore.setItemAsync('selectedRole', role);
   };
 
   const getCurrentUser = async () => {

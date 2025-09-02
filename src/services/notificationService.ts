@@ -1,5 +1,5 @@
 import { Platform, Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 // Conditionally import notifications only if available
 let Notifications: any = null;
@@ -60,7 +60,7 @@ export class NotificationService {
           console.log('Push notification token:', token);
           
           // Store token locally
-          await AsyncStorage.setItem('pushToken', token);
+          await SecureStore.setItemAsync('pushToken', token);
         } catch (error) {
           console.log('Push notifications not supported in Expo Go. Using local notifications only.');
           console.log('For full push notification support, create a development build.');
