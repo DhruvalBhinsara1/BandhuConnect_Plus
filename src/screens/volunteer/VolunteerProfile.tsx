@@ -13,6 +13,12 @@ const VolunteerProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
   const { assignments } = useRequest();
+
+  // Type for the navigation
+  type RootStackParamList = {
+    Devices: undefined;
+  };
+  const typedNavigation = navigation as any;
   
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -199,6 +205,14 @@ const VolunteerProfile: React.FC = () => {
                 <Text style={styles.infoLabel}>Role</Text>
                 <Text style={styles.infoValue}>{user?.role}</Text>
               </View>
+              <TouchableOpacity 
+                style={styles.devicesButton}
+                onPress={() => typedNavigation.navigate('Devices')}
+              >
+                <Ionicons name="phone-portrait-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.devicesButtonText}>Manage Active Devices</Text>
+                <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
+              </TouchableOpacity>
             </View>
           )}
         </Card>
@@ -318,6 +332,22 @@ const VolunteerProfile: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  devicesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f3f4f6',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  devicesButtonText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 12,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',

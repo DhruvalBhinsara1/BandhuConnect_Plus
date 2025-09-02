@@ -27,15 +27,23 @@ import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 // Shared Screens
 import MapScreen from '../screens/shared/MapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
+import { DevicesScreen } from '../screens/DevicesScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+const VolunteerProfileStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="ProfileMain" component={VolunteerProfile} options={{ headerShown: false }} />
+    <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Active Devices' }} />
+  </Stack.Navigator>
+);
 
 const VolunteerStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Dashboard" component={VolunteerDashboard} />
     <Stack.Screen name="TaskDetails" component={TaskDetails} />
-    <Stack.Screen name="Profile" component={VolunteerProfile} />
+    <Stack.Screen name="Profile" component={VolunteerProfileStack} />
   </Stack.Navigator>
 );
 
