@@ -29,6 +29,7 @@ export interface UserLocationData {
   last_updated: string;
   locationDetails?: LocationDetails;
   assignment_info: AssignmentInfo[];
+  isPlaceholder?: boolean; // Flag for users without location data
 }
 
 export interface MapBounds {
@@ -83,35 +84,226 @@ class MapService implements MapServiceInterface {
       if (sessionError) throw sessionError;
 
       if (!session?.session?.user) {
+        console.log('MapService: No user session found');
         return { data: [], error: null };
       }
 
       const user = session.session.user;
-      const role = user.user_metadata.role;
+      
+      // Get user role from profiles table since it's not in metadata
+      console.log('MapService: Attempting to fetch profile for user ID:', user.id);
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+        
+      let role = profile?.role;
+      
+      if (profileError) {
+        console.error('MapService: Error fetching user profile:', profileError);
+        console.error('MapService: Profile error details:', {
+          code: profileError.code,
+          message: profileError.message,
+          details: profileError.details,
+          hint: profileError.hint
+        });
+        
+        // Try to get role from user metadata as fallback
+        const metadataRole = user.user_metadata?.role || user.app_metadata?.role;
+        if (metadataRole) {
+          console.log('MapService: Using role from metadata:', metadataRole);
+          role = metadataRole;
+        } else {
+          console.error('MapService: No role found in metadata either');
+          return { data: [], error: `Could not fetch user profile: ${profileError.message}` };
+        }
+      }
+      console.log('MapService: Fetching locations for user:', user.id, 'role:', role);
+      console.log('MapService: Profile data:', profile);
 
       let data;
       let error;
+      let fallbackData = [];
 
       if (role === 'volunteer') {
         // Volunteers see pilgrim locations (people they can help)
+        console.log('MapService: Calling get_pilgrim_locations_for_volunteer');
         ({ data, error } = await supabase.rpc('get_pilgrim_locations_for_volunteer', {
           p_volunteer_id: user.id
         }));
+        console.log('MapService: Volunteer locations result:', { data, error });
+        
+        // If function doesn't exist, fall back to basic query
+        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
+          console.log('MapService: Function not found, using fallback query for volunteer');
+          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, role));
+        }
+        
       } else if (role === 'pilgrim') {
         // Pilgrims see volunteer locations (people who can help them)
+        console.log('MapService: Calling get_volunteer_locations_for_pilgrim');
         ({ data, error } = await supabase.rpc('get_volunteer_locations_for_pilgrim', {
           p_pilgrim_id: user.id
         }));
+        console.log('MapService: Pilgrim locations result:', { data, error });
+        
+        // If function doesn't exist, fall back to basic query
+        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
+          console.log('MapService: Function not found, using fallback query for pilgrim');
+          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, role));
+        }
+        
       } else if (role === 'admin') {
         // Admins see all locations
         ({ data, error } = await supabase.rpc('get_all_active_locations'));
+        
+        // If function doesn't exist, fall back to basic query
+        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
+          console.log('MapService: Function not found, using fallback query for admin');
+          ({ data, error } = await this.getFallbackAllLocations());
+        }
+      } else {
+        console.log('MapService: No valid role found, cannot fetch assignment locations');
+        return { data: [], error: 'No valid user role found' };
       }
 
-      if (error) throw error;
-      return { data: data || [], error: null };
+      if (error) {
+        console.error('MapService: Error fetching locations:', error);
+        return { data: [], error };
+      }
+      
+      // Process location data and mark placeholders
+      const locationData = data || [];
+      const processedData = locationData.map(location => ({
+        ...location,
+        isPlaceholder: location.assignment_info?.is_placeholder || (location.latitude === 0 && location.longitude === 0)
+      }));
+      
+      console.log('MapService: Returning', processedData.length, 'locations');
+      return { data: processedData, error: null };
     } catch (error) {
       console.error('Error getting assignment locations:', error);
-      return { data: null, error };
+      return { data: [], error };
+    }
+  }
+
+  // Fallback method when database functions don't exist
+  private async getFallbackAssignmentLocations(userId: string, role: string): Promise<{ data: UserLocationData[] | null; error: any }> {
+    try {
+      console.log('MapService: Using fallback assignment locations query');
+      
+      if (role === 'volunteer') {
+        // Get assigned pilgrims' locations
+        const { data, error } = await supabase
+          .from('user_locations')
+          .select(`
+            id,
+            user_id,
+            latitude,
+            longitude,
+            accuracy,
+            last_updated,
+            profiles!inner(name, role)
+          `)
+          .eq('is_active', true)
+          .eq('profiles.role', 'pilgrim');
+          
+        if (error) throw error;
+        
+        return {
+          data: data?.map(loc => ({
+            location_id: loc.id,
+            user_id: loc.user_id,
+            user_name: (loc.profiles as any)?.name || 'Unknown',
+            user_role: 'pilgrim' as const,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            accuracy: loc.accuracy,
+            last_updated: loc.last_updated,
+            assignment_info: []
+          })) || [],
+          error: null
+        };
+        
+      } else if (role === 'pilgrim') {
+        // Get assigned volunteers' locations
+        const { data, error } = await supabase
+          .from('user_locations')
+          .select(`
+            id,
+            user_id,
+            latitude,
+            longitude,
+            accuracy,
+            last_updated,
+            profiles!inner(name, role)
+          `)
+          .eq('is_active', true)
+          .eq('profiles.role', 'volunteer');
+          
+        if (error) throw error;
+        
+        return {
+          data: data?.map(loc => ({
+            location_id: loc.id,
+            user_id: loc.user_id,
+            user_name: (loc.profiles as any)?.name || 'Unknown',
+            user_role: 'volunteer' as const,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            accuracy: loc.accuracy,
+            last_updated: loc.last_updated,
+            assignment_info: []
+          })) || [],
+          error: null
+        };
+      }
+      
+      return { data: [], error: null };
+    } catch (error) {
+      console.error('MapService: Fallback query error:', error);
+      return { data: [], error };
+    }
+  }
+
+  // Fallback method for admin to get all locations
+  private async getFallbackAllLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
+    try {
+      console.log('MapService: Using fallback all locations query');
+      
+      const { data, error } = await supabase
+        .from('user_locations')
+        .select(`
+          id,
+          user_id,
+          latitude,
+          longitude,
+          accuracy,
+          last_updated,
+          profiles!inner(name, role)
+        `)
+        .eq('is_active', true);
+        
+      if (error) throw error;
+      
+      return {
+        data: data?.map(loc => ({
+          location_id: loc.id,
+          user_id: loc.user_id,
+          user_name: (loc.profiles as any)?.name || 'Unknown',
+          user_role: (loc.profiles as any)?.role as 'admin' | 'volunteer' | 'pilgrim',
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: loc.accuracy,
+          last_updated: loc.last_updated,
+          assignment_info: []
+        })) || [],
+        error: null
+      };
+    } catch (error) {
+      console.error('MapService: Fallback all locations query error:', error);
+      return { data: [], error };
     }
   }
 
@@ -211,15 +403,18 @@ class MapService implements MapServiceInterface {
       const { data, error } = await this.getAssignmentLocations();
       if (error) throw error;
       
-      if (!data || data.length === 0) {
-        // Default to India's center if no locations available
+      // Filter out placeholder users for center calculation
+      const realLocations = data?.filter(loc => !loc.isPlaceholder && loc.latitude !== 0 && loc.longitude !== 0) || [];
+      
+      if (realLocations.length === 0) {
+        // Default to India's center if no real locations available
         return { latitude: 20.5937, longitude: 78.9629, error: null };
       }
 
-      // Calculate the center point of all locations
-      const totalLat = data.reduce((sum, loc) => sum + loc.latitude, 0);
-      const totalLong = data.reduce((sum, loc) => sum + loc.longitude, 0);
-      const count = data.length;
+      // Calculate the center point of real locations only
+      const totalLat = realLocations.reduce((sum, loc) => sum + loc.latitude, 0);
+      const totalLong = realLocations.reduce((sum, loc) => sum + loc.longitude, 0);
+      const count = realLocations.length;
 
       return {
         latitude: totalLat / count,
@@ -278,7 +473,10 @@ class MapService implements MapServiceInterface {
       const { data, error } = await this.getAssignmentLocations();
       if (error) throw error;
 
-      if (!data || data.length === 0) {
+      // Filter out placeholder users for bounds calculation
+      const realLocations = data?.filter(loc => !loc.isPlaceholder && loc.latitude !== 0 && loc.longitude !== 0) || [];
+
+      if (realLocations.length === 0) {
         // Default bounds covering most of India
         return {
           bounds: {
@@ -289,9 +487,9 @@ class MapService implements MapServiceInterface {
         };
       }
 
-      // Find min and max coordinates
-      const lats = data.map(loc => loc.latitude);
-      const longs = data.map(loc => loc.longitude);
+      // Find min and max coordinates from real locations only
+      const lats = realLocations.map(loc => loc.latitude);
+      const longs = realLocations.map(loc => loc.longitude);
 
       const maxLat = Math.max(...lats);
       const minLat = Math.min(...lats);
