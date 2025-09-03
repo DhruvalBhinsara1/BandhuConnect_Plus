@@ -65,16 +65,26 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
   const getCurrentLocation = async () => {
     try {
+      console.log('LocationContext: Getting current location...');
       const location = await locationService.getCurrentLocation();
       if (location) {
+        console.log('LocationContext: Setting current location:', location);
         setCurrentLocation(location);
         setLastKnownLocation(location); // Update last known location
+        
+        // Also update in database immediately
+        try {
+          await locationService.updateLocation(location);
+          console.log('LocationContext: Updated location in database');
+        } catch (updateError) {
+          console.log('LocationContext: Failed to update location in database:', updateError);
+        }
       } else {
-        console.log('Location unavailable - GPS may be disabled or no signal');
+        console.log('LocationContext: Location unavailable - GPS may be disabled or no signal');
         // Don't show error to user for common GPS issues
       }
     } catch (error) {
-      console.log('Location unavailable:', error);
+      console.log('LocationContext: Location unavailable:', error);
       const locationError = LocationErrorHandler.parseError(error);
       LocationErrorHandler.logError(locationError, 'getCurrentLocation');
       
@@ -173,12 +183,20 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     silentPermissionRequest();
   }, []);
 
-  // Get initial location when permissions granted
+  // Initialize permissions and location on mount
   useEffect(() => {
-    if (permissions?.foreground) {
-      getCurrentLocation();
+    if (user) {
+      console.log('LocationContext: Initializing for user:', user.id);
+      requestPermissions().then(perms => {
+        console.log('LocationContext: Permissions result:', perms);
+        if (perms.foreground) {
+          getCurrentLocation();
+        } else {
+          console.log('LocationContext: No foreground permission, cannot get location');
+        }
+      });
     }
-  }, [permissions]);
+  }, [user]);
 
   // Auto-start tracking for logged in users
   useEffect(() => {

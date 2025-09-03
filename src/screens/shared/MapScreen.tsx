@@ -57,12 +57,20 @@ const MapScreen: React.FC = () => {
 
   const handleShowMe = () => {
     if (currentLocation && mapRef.current) {
+      console.log('Show Me: Centering on current location:', currentLocation);
       mapRef.current.animateToRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
         latitudeDelta: 0.001,
         longitudeDelta: 0.001,
       }, 1000);
+    } else {
+      console.log('Show Me: No current location available');
+      Alert.alert(
+        'Location Unavailable',
+        'Your location is not available. Please enable location services and try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -76,10 +84,10 @@ const MapScreen: React.FC = () => {
       }
     ];
 
-    // Add assigned counterparts based on role
+    // Add assigned counterparts based on role (using deduplicated locations)
     if (user?.role === 'pilgrim') {
       // Add assigned volunteer
-      userLocations.forEach((location: UserLocationData) => {
+      activeUserLocations.forEach((location: UserLocationData) => {
         if (location.user_role === 'volunteer') {
           coordinates.push({
             latitude: location.latitude,
@@ -89,7 +97,7 @@ const MapScreen: React.FC = () => {
       });
     } else if (user?.role === 'volunteer') {
       // Add assigned pilgrims
-      userLocations.forEach((location: UserLocationData) => {
+      activeUserLocations.forEach((location: UserLocationData) => {
         if (location.user_role === 'pilgrim') {
           coordinates.push({
             latitude: location.latitude,
@@ -99,7 +107,7 @@ const MapScreen: React.FC = () => {
       });
     } else if (user?.role === 'admin') {
       // Add all users
-      userLocations.forEach((location: UserLocationData) => {
+      activeUserLocations.forEach((location: UserLocationData) => {
         coordinates.push({
           latitude: location.latitude,
           longitude: location.longitude,
@@ -108,10 +116,40 @@ const MapScreen: React.FC = () => {
     }
 
     if (coordinates.length > 1) {
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 100, right: 50, bottom: 150, left: 50 },
-        animated: true,
-      });
+      // Calculate distance between points to determine appropriate zoom
+      const distances = coordinates.map(coord1 => 
+        coordinates.map(coord2 => {
+          const R = 6371; // Earth's radius in km
+          const dLat = (coord2.latitude - coord1.latitude) * Math.PI / 180;
+          const dLon = (coord2.longitude - coord1.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                   Math.cos(coord1.latitude * Math.PI / 180) * Math.cos(coord2.latitude * Math.PI / 180) * 
+                   Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c; // Distance in km
+        })
+      ).flat();
+      
+      const maxDistance = Math.max(...distances);
+      
+      // If all points are very close (within 1km), use a smaller zoom
+      if (maxDistance < 1) {
+        const centerLat = coordinates.reduce((sum, coord) => sum + coord.latitude, 0) / coordinates.length;
+        const centerLon = coordinates.reduce((sum, coord) => sum + coord.longitude, 0) / coordinates.length;
+        
+        mapRef.current.animateToRegion({
+          latitude: centerLat,
+          longitude: centerLon,
+          latitudeDelta: 0.01, // ~1km view
+          longitudeDelta: 0.01,
+        }, 1000);
+      } else {
+        // Use fitToCoordinates for distant points
+        mapRef.current.fitToCoordinates(coordinates, {
+          edgePadding: { top: 100, right: 50, bottom: 150, left: 50 },
+          animated: true,
+        });
+      }
     } else {
       // If no counterparts, just center on user
       handleShowMe();
@@ -141,46 +179,65 @@ const MapScreen: React.FC = () => {
   }, [permissions?.background]);
 
   useEffect(() => {
+    console.log('MapScreen: Initial load - refreshing locations and getting current location');
     refreshLocations();
     getCurrentLocationAndCenter();
   }, []);
 
   useEffect(() => {
     setLocations(userLocations);
-    console.log('Map markers updated with', userLocations.length, 'locations');
-  }, [userLocations]);
+    console.log('Map markers updated with', userLocations.length, 'locations:', userLocations);
+    console.log('Current location state:', currentLocation);
+    console.log('User role:', user?.role);
+    
+    // If we have user locations but no current location yet, center on the first location
+    if (userLocations.length > 0 && !currentLocation && mapRef.current) {
+      const firstLocation = userLocations[0];
+      if (firstLocation && !firstLocation.isPlaceholder) {
+        console.log('MapScreen: Centering on first user location:', firstLocation);
+        setRegion({
+          latitude: firstLocation.latitude,
+          longitude: firstLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        mapRef.current.animateToRegion({
+          latitude: firstLocation.latitude,
+          longitude: firstLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
+    }
+  }, [userLocations, currentLocation, user]);
+
+  // Separate placeholder entries from real locations
+  const realLocations = userLocations.filter(location => !location.isPlaceholder);
+  const placeholderUsers = userLocations.filter(location => location.isPlaceholder);
+  
+  // Deduplicate locations by user_id to prevent duplicate markers
+  const uniqueLocationMap = new Map<string, UserLocationData>();
+  realLocations.forEach(location => {
+    const existing = uniqueLocationMap.get(location.user_id);
+    if (!existing || new Date(location.last_updated) > new Date(existing.last_updated)) {
+      uniqueLocationMap.set(location.user_id, location);
+    }
+  });
+  
+  // Show all real locations for bi-directional visibility (don't filter by time)
+  // This ensures pilgrims always see their volunteer's last known location
+  // and volunteers always see their pilgrims' last known locations
+  const activeUserLocations = Array.from(uniqueLocationMap.values());
 
   const getCurrentLocationAndCenter = async () => {
     try {
-      const location = await getCurrentLocation();
-      if (location) {
-        // Calculate zoom level based on accuracy
-        const delta = location.accuracy 
-          ? Math.max(0.0005, location.accuracy / 100000)
-          : 0.0005;
-
-        // Update region with proper error handling
-        if (Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
-          setRegion({
-            latitude: location.latitude,
-            longitude: location.longitude,
-            latitudeDelta: delta,
-            longitudeDelta: delta,
-          });
-          
-          // Update location in database
-          await locationService.updateLocation({
-            latitude: location.latitude,
-            longitude: location.longitude,
-            accuracy: location.accuracy,
-            timestamp: Date.now()
-          });
-        } else {
-          throw new Error('Invalid coordinates received');
-        }
-      }
+      console.log('MapScreen: Getting current location and centering map...');
+      await getCurrentLocation(); // Use LocationContext method
+      
+      // The currentLocation will be updated by LocationContext
+      // We'll center the map in the useEffect that watches currentLocation
     } catch (error) {
-      console.error('Could not get current location:', error);
+      console.error('MapScreen: Could not get current location:', error);
       Alert.alert(
         'Location Error',
         'Please check your GPS settings and location permissions.',
@@ -190,13 +247,25 @@ const MapScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentLocation && region.latitude === 19.0760) {
+    if (currentLocation) {
+      console.log('MapScreen: Current location updated, centering map:', currentLocation);
+      // Always center when we get a new location, not just on initial load
       setRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.0005,
-        longitudeDelta: 0.0005,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
       });
+      
+      // Also animate the map to the new region
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 1000);
+      }
     }
   }, [currentLocation]);
 
@@ -271,26 +340,26 @@ const MapScreen: React.FC = () => {
             </Marker>
           )}
 
-          {userLocations.map((location) => {
-            // Check if location is stale (older than 2 minutes)
-            const isStale = (Date.now() - new Date(location.last_updated).getTime()) > 2 * 60 * 1000;
+          {activeUserLocations.map((location) => {
+            // Check if location is stale (older than 5 minutes) for visual indication only
+            const isStale = (Date.now() - new Date(location.last_updated).getTime()) > 5 * 60 * 1000;
             
             return (
               <Marker
-                key={location.location_id}
+                key={`marker-${location.user_id}-${location.last_updated}`}
                 coordinate={{
                   latitude: location.latitude,
                   longitude: location.longitude,
                 }}
                 flat={true}
                 onPress={() => setSelectedLocation(location)}
-                opacity={isStale ? 0.5 : 1.0}
+                opacity={isStale ? 0.7 : 1.0}
               >
                 <View style={[
                   styles.userMarker,
                   location.user_role === 'admin' ? styles.adminMarker :
                   location.user_role === 'volunteer' ? styles.volunteerMarker : styles.pilgrimMarker,
-                  isStale && { opacity: 0.5 }
+                  isStale && { opacity: 0.7 }
                 ]}>
                   <Ionicons 
                     name={
@@ -310,7 +379,10 @@ const MapScreen: React.FC = () => {
         {showLocationNotice && (
           <Animated.View style={[styles.locationNotice, { opacity: noticeOpacity }]}>
             <Text style={styles.locationNoticeText}>
-              Please enable background location for better tracking
+              {Platform.OS === 'ios' 
+                ? 'Please set location to "Always Allow" for better tracking'
+                : 'Please enable background location for better tracking'
+              }
             </Text>
           </Animated.View>
         )}
@@ -426,10 +498,23 @@ const MapScreen: React.FC = () => {
           )}
         </View>
 
+        {/* Notification for users without location data */}
+        {placeholderUsers.length > 0 && (
+          <View style={styles.noLocationNotification}>
+            <Ionicons name="information-circle" size={16} color="#F59E0B" />
+            <Text style={styles.noLocationText}>
+              {placeholderUsers.length} assigned {placeholderUsers.length === 1 ? 'user' : 'users'} without location data
+            </Text>
+          </View>
+        )}
+
         {!permissions?.background && (
           <View style={styles.warningOverlay}>
             <Text style={styles.warningText}>
-              Enable background location for better tracking
+              {Platform.OS === 'ios' 
+                ? 'Set location to "Always Allow" for better tracking'
+                : 'Enable background location for better tracking'
+              }
             </Text>
           </View>
         )}
@@ -523,14 +608,38 @@ const styles = StyleSheet.create({
   },
   warningOverlay: {
     position: 'absolute',
-    bottom: 88,
+    bottom: 80,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(220, 38, 38, 0.9)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    backgroundColor: '#FEF3C7',
+    padding: 12,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  warningText: {
+    color: '#92400E',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  noLocationNotification: {
+    position: 'absolute',
+    bottom: 140,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  noLocationText: {
+    color: '#92400E',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
   },
   locationNotice: {
     position: 'absolute',
@@ -551,11 +660,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  warningText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
   },
   currentLocationMarker: {
     alignItems: 'center',

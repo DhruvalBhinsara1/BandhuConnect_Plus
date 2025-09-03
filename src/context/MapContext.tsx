@@ -47,17 +47,28 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   }, [userLocations]);
 
   const refreshLocations = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('MapContext: No user found, skipping location refresh');
+      return;
+    }
     
+    console.log('MapContext: Refreshing locations for user:', user.id, 'role:', (user as any).user_metadata?.role);
     setLoading(true);
     try {
       const result = await mapService.getAssignmentLocations();
+      console.log('MapContext: Assignment locations result:', result);
 
       if (result.data && !result.error) {
+        console.log('MapContext: Setting user locations:', result.data.length, 'locations');
+        console.log('MapContext: Location details:', result.data);
         setUserLocations(result.data);
+      } else {
+        console.error('MapContext: Error in assignment locations:', result.error);
+        setUserLocations([]); // Set empty array on error
       }
     } catch (error) {
       console.error('Error refreshing locations:', error);
+      setUserLocations([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -107,32 +118,27 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
     const unsubscribe = mapService.subscribeToLocationUpdates((locations) => {
       console.log('Real-time location update received:', locations);
       setUserLocations(prevLocations => {
-        // Merge new locations with existing ones, updating positions
-        const updatedLocations = [...prevLocations];
+        // Create a map for efficient deduplication by user_id
+        const locationMap = new Map<string, UserLocationData>();
         
-        locations.forEach(newLocation => {
-          const existingIndex = updatedLocations.findIndex(
-            loc => loc.user_id === newLocation.user_id
-          );
-          
-          if (existingIndex >= 0) {
-            // Update existing location
-            updatedLocations[existingIndex] = {
-              ...updatedLocations[existingIndex],
-              ...newLocation,
-              last_updated: newLocation.last_updated
-            };
-          } else {
-            // Add new location
-            updatedLocations.push(newLocation);
+        // Add existing locations to map
+        prevLocations.forEach(loc => {
+          const existing = locationMap.get(loc.user_id);
+          if (!existing || new Date(loc.last_updated) > new Date(existing.last_updated)) {
+            locationMap.set(loc.user_id, loc);
           }
         });
         
-        // Filter out stale locations (older than 2 minutes)
-        const cutoffTime = new Date(Date.now() - 2 * 60 * 1000);
-        return updatedLocations.filter(loc => 
-          new Date(loc.last_updated) > cutoffTime
-        );
+        // Add/update with new locations
+        locations.forEach(newLocation => {
+          const existing = locationMap.get(newLocation.user_id);
+          if (!existing || new Date(newLocation.last_updated) > new Date(existing.last_updated)) {
+            locationMap.set(newLocation.user_id, newLocation);
+          }
+        });
+        
+        // Convert back to array
+        return Array.from(locationMap.values());
       });
     });
 

@@ -56,9 +56,27 @@ class LocationService {
         };
       }
 
-      // Only request background permission if foreground is granted
-      const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
-      const backgroundGranted = backgroundStatus.status === 'granted';
+      // For iOS, check if we have "Always" permission (equivalent to background)
+      // For Android, request explicit background permission
+      const Platform = require('react-native').Platform;
+      let backgroundGranted = false;
+      
+      if (Platform.OS === 'ios') {
+        // On iOS, check if we have "Always" permission
+        const currentPermissions = await Location.getForegroundPermissionsAsync();
+        backgroundGranted = currentPermissions.status === 'granted' && 
+                           (currentPermissions as any).ios?.scope === 'always';
+        
+        if (!backgroundGranted) {
+          // Request "Always" permission on iOS
+          const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+          backgroundGranted = backgroundStatus.status === 'granted';
+        }
+      } else {
+        // On Android, request background permission explicitly
+        const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+        backgroundGranted = backgroundStatus.status === 'granted';
+      }
       
       if (!backgroundGranted) {
         console.log('Background location permission denied');
@@ -92,13 +110,22 @@ class LocationService {
 
   async getCurrentLocation(): Promise<LocationData | null> {
     try {
+      console.log('LocationService: Getting current location...');
+      
+      // Check permissions first
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('LocationService: Foreground permission not granted:', status);
+        return null;
+      }
+
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
         timeInterval: 5000,
         distanceInterval: 10,
       });
 
-      return {
+      const locationData = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy || undefined,
@@ -107,9 +134,11 @@ class LocationService {
         speed: location.coords.speed || undefined,
         timestamp: location.timestamp,
       };
+
+      console.log('LocationService: Got location:', locationData);
+      return locationData;
     } catch (error) {
-      // Silent logging - avoid console.error that might trigger system alerts
-      console.log('Location unavailable:', error instanceof Error ? error.message : error);
+      console.log('LocationService: Error getting location:', error instanceof Error ? error.message : error);
       
       // Handle specific iOS location errors gracefully
       if (error instanceof Error) {
