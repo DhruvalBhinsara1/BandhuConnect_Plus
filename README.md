@@ -9,12 +9,12 @@ A comprehensive cross-platform React Native application built with Expo SDK 53 f
 - **Cross-Platform**: iOS, Android, and Web support
 - **Backend**: Supabase (PostgreSQL, Auth, Realtime, Storage)
 - **Navigation**: React Navigation v6
-- **Maps**: react-native-maps with Google Maps API
+- **Maps**: react-native-maps with Google Maps API + Real-time Location Tracking
 - **Styling**: NativeWind (Tailwind CSS for React Native)
 - **State Management**: React Context API + Hooks
 - **Image Handling**: Expo ImagePicker + Supabase Storage
 - **Authentication**: Supabase Auth (Phone OTP + Email/Password)
-- **Real-time**: Supabase Realtime for chat and live updates
+- **Real-time**: Supabase Realtime for location updates, chat, and live coordination
 
 ### Project Structure
 ```
@@ -46,26 +46,30 @@ BandhuConnectPlus/
 
 ### 👥 User Types & Capabilities
 
-#### 🚀 Volunteers (Mobile App) - ✅ IMPLEMENTED
+#### 🚀 Volunteers (Mobile App) - ✅ FULLY IMPLEMENTED
 - **Authentication**: ✅ Phone OTP and email login with role-based access
 - **Dashboard**: ✅ View assigned tasks, status management, live statistics
 - **Task Management**: ✅ Accept/complete assignments with status updates
 - **Profile Management**: ✅ Update skills, availability, contact information
-- **Real-time Updates**: ✅ Live volunteer status and assignment tracking
+- **Real-time Location**: ✅ Live GPS tracking with assigned pilgrims
+- **Map Navigation**: ✅ "Show Me" and "Fit in Frame" controls for efficient coordination
 
 #### 👑 Admins (Mobile/Web Interface) - ✅ FULLY OPERATIONAL
 - **Volunteer Management**: ✅ Monitor all volunteers, update profiles, manage status
 - **Request Management**: ✅ View/create/delete assistance requests
-- **Task Assignment**: ✅ Manual and auto-assignment with skill matching (76% success rate)
+- **Task Assignment**: ✅ Manual and auto-assignment with skill matching
 - **Analytics Dashboard**: ✅ Real-time statistics, volunteer counts, request tracking
 - **Profile Editing**: ✅ Full CRUD operations on volunteer profiles with persistence
+- **Live Oversight**: ✅ Real-time map view of all volunteers and pilgrims
 - **Auto-Assignment System**: ✅ Intelligent matching based on skills, location, availability
 
-#### 🙏 Pilgrims/Attendees (Mobile App) - 🚧 BASIC IMPLEMENTATION
+#### 🙏 Pilgrims/Attendees (Mobile App) - ✅ FULLY IMPLEMENTED
 - **Authentication**: ✅ Registration and login system
 - **Request Creation**: ✅ Submit assistance requests with details
-- **Status Tracking**: ✅ Monitor request progress
-- **Profile Management**: ✅ Basic profile functionality
+- **Status Tracking**: ✅ Monitor request progress with live updates
+- **Profile Management**: ✅ Complete profile functionality
+- **Live Tracking**: ✅ Real-time location sharing with assigned volunteers
+- **Volunteer Visibility**: ✅ See assigned volunteer approaching in real-time
 
 ## 🗄️ Database Schema
 
@@ -113,6 +117,21 @@ BandhuConnectPlus/
 - accepted_at (timestamp)
 - started_at (timestamp)
 - completed_at (timestamp)
+```
+
+#### `user_locations` Table
+```sql
+- id (uuid, primary key)
+- user_id (uuid, references profiles)
+- latitude (numeric)
+- longitude (numeric)
+- accuracy (numeric, nullable)
+- altitude (numeric, nullable)
+- heading (numeric, nullable)
+- speed (numeric, nullable)
+- is_active (boolean, default true)
+- last_updated (timestamp)
+- created_at (timestamp)
 ```
 
 #### `messages` Table
@@ -177,10 +196,15 @@ BandhuConnectPlus/
 - **Image Upload Security**: Secure file handling with Supabase Storage
 
 ### Real-time Features
+- **Live Location Tracking**: Real-time GPS updates with role-based visibility
+  - 🔴 Pilgrims see assigned volunteer moving live
+  - 🟢 Volunteers see all assigned pilgrims moving live  
+  - 🔵 Admins see everyone moving live
+- **Dynamic Map Updates**: Markers update without refresh, stale user detection
 - **Live Chat**: Instant messaging with Supabase Realtime
 - **Status Updates**: Real-time task and volunteer status changes
-- **Location Tracking**: Live GPS updates for volunteers
 - **Push Notifications**: Expo Push Notifications for alerts
+- **Smart Navigation**: "Show Me" and "Fit in Frame" buttons for efficient coordination
 
 ## 🚀 Getting Started
 

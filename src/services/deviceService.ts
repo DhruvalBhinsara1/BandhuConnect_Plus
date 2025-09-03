@@ -45,66 +45,38 @@ export class DeviceService {
 
         try {
             const deviceName = await this.getDeviceName();
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { user } } = await supabase.auth.getUser();
             
-            if (!session?.user?.id) {
-                console.error('No authenticated user found');
+            if (!user?.id) {
+                console.log('No authenticated user found for device registration');
                 return null;
             }
 
-            // Try to find existing device
-            const { data: existingDevices, error: queryError } = await supabase
-                .from('user_devices')
-                .select('device_id')
-                .eq('device_token', this.deviceToken)
-                .eq('user_id', session.user.id);
-
-            if (queryError) {
-                console.error('Error querying devices:', queryError);
-                return null;
-            }
-
-            if (existingDevices && existingDevices.length > 0) {
-                // Update existing device
-                const { data: updatedDevice, error: updateError } = await supabase
-                    .from('user_devices')
-                    .update({
-                        device_name: deviceName,
-                        is_active: true,
-                        last_active: new Date().toISOString()
-                    })
-                    .eq('device_id', existingDevices[0].device_id)
-                    .select('device_id')
-                    .single();
-
-                if (updateError) {
-                    console.error('Error updating device:', updateError);
-                    return null;
-                }
-
-                return updatedDevice?.device_id || null;
-            }
-
-            // Insert new device
-            const { data: newDevice, error: insertError } = await supabase
+            // Generate unique device token for each registration to allow multiple devices
+            const uniqueDeviceToken = `${this.deviceToken}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Insert the device with unique token
+            const { data: deviceData, error } = await supabase
                 .from('user_devices')
                 .insert({
-                    user_id: session.user.id,
+                    user_id: user.id,
                     device_name: deviceName,
-                    device_token: this.deviceToken,
-                    is_active: true
+                    device_token: uniqueDeviceToken,
+                    is_active: true,
+                    last_active: new Date().toISOString()
                 })
                 .select('device_id')
                 .single();
 
-            if (insertError) {
-                console.error('Error inserting device:', insertError);
+            if (error) {
+                console.error('Error registering device:', error);
                 return null;
             }
 
-            return newDevice?.device_id || null;
+            console.log('Device registered successfully:', deviceData?.device_id);
+            return deviceData?.device_id || null;
         } catch (error) {
-            console.error('Error registering device:', error);
+            console.error('Error in device registration process:', error);
             return null;
         }
     }

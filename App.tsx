@@ -6,6 +6,7 @@ import LocationProvider from './src/context/LocationContext';
 import { MapProvider } from './src/context/MapContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { NotificationService } from './src/services/notificationService';
+import { LocationWrapper } from './src/components/LocationWrapper';
 
 export default function App() {
   useEffect(() => {
@@ -28,8 +29,10 @@ export default function App() {
       <RequestProvider>
         <LocationProvider>
           <MapProvider>
-            <AppNavigator />
-            <StatusBar style="auto" />
+            <LocationWrapper>
+              <AppNavigator />
+              <StatusBar style="auto" />
+            </LocationWrapper>
           </MapProvider>
         </LocationProvider>
       </RequestProvider>

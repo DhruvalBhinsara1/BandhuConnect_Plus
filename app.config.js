@@ -15,7 +15,12 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      jsEngine: "jsc"
+      jsEngine: "jsc",
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "This app needs access to location when open to track volunteer locations for emergency assistance coordination.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "This app needs access to location when open and in the background to track volunteer locations for emergency assistance coordination.",
+        NSLocationAlwaysUsageDescription: "This app needs access to location in the background to track volunteer locations for emergency assistance coordination."
+      }
     },
     android: {
       adaptiveIcon: {
@@ -26,7 +31,12 @@ export default {
       config: {
         ndkVersion: "29.0.13846066"
       },
-      minSdkVersion: 24
+      minSdkVersion: 24,
+      permissions: [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
     },
     plugins: [
       [

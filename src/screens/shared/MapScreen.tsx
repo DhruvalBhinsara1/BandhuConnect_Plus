@@ -38,6 +38,8 @@ const MapScreen: React.FC = () => {
   });
   const [mapType, setMapType] = useState<MapType>('standard');
   const [showBuildingView, setShowBuildingView] = useState(true);
+  const mapRef = React.useRef<MapView>(null);
+  const [realtimeLocations, setRealtimeLocations] = useState<UserLocationData[]>([]);
 
   const getTrackingStatusText = () => {
     if (!permissions?.foreground) return 'Location permission required';
@@ -51,6 +53,69 @@ const MapScreen: React.FC = () => {
     if (isBackgroundTracking) return '#16A34A';
     if (isTracking) return '#F59E0B';
     return '#6B7280';
+  };
+
+  const handleShowMe = () => {
+    if (currentLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        latitudeDelta: 0.001,
+        longitudeDelta: 0.001,
+      }, 1000);
+    }
+  };
+
+  const handleFitInFrame = () => {
+    if (!currentLocation || !mapRef.current) return;
+
+    const coordinates: Array<{ latitude: number; longitude: number }> = [
+      {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      }
+    ];
+
+    // Add assigned counterparts based on role
+    if (user?.role === 'pilgrim') {
+      // Add assigned volunteer
+      userLocations.forEach((location: UserLocationData) => {
+        if (location.user_role === 'volunteer') {
+          coordinates.push({
+            latitude: location.latitude,
+            longitude: location.longitude,
+          });
+        }
+      });
+    } else if (user?.role === 'volunteer') {
+      // Add assigned pilgrims
+      userLocations.forEach((location: UserLocationData) => {
+        if (location.user_role === 'pilgrim') {
+          coordinates.push({
+            latitude: location.latitude,
+            longitude: location.longitude,
+          });
+        }
+      });
+    } else if (user?.role === 'admin') {
+      // Add all users
+      userLocations.forEach((location: UserLocationData) => {
+        coordinates.push({
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
+      });
+    }
+
+    if (coordinates.length > 1) {
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 100, right: 50, bottom: 150, left: 50 },
+        animated: true,
+      });
+    } else {
+      // If no counterparts, just center on user
+      handleShowMe();
+    }
   };
 
   useEffect(() => {
@@ -79,6 +144,11 @@ const MapScreen: React.FC = () => {
     refreshLocations();
     getCurrentLocationAndCenter();
   }, []);
+
+  useEffect(() => {
+    setLocations(userLocations);
+    console.log('Map markers updated with', userLocations.length, 'locations');
+  }, [userLocations]);
 
   const getCurrentLocationAndCenter = async () => {
     try {
@@ -145,13 +215,14 @@ const MapScreen: React.FC = () => {
 
       <View style={styles.mapContainer}>
         <MapView
+          ref={mapRef}
           style={styles.map}
           provider={PROVIDER_GOOGLE}
           initialRegion={region}
           region={region}
           onRegionChangeComplete={setRegion}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
           showsCompass={false}
           showsScale={true}
           mapType={mapType}
@@ -181,27 +252,59 @@ const MapScreen: React.FC = () => {
               }}
               flat={true}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              tracksInfoWindowChanges={false}
             >
-              <View style={styles.currentLocationMarker}>
-                <View style={styles.currentLocationDot} />
-                <View style={styles.currentLocationRing} />
-              </View>
+              {user?.role === 'admin' ? (
+                <View style={[styles.userMarker, styles.adminMarker]}>
+                  <Ionicons name="star" size={16} color="#fff" />
+                </View>
+              ) : user?.role === 'volunteer' ? (
+                <View style={[styles.userMarker, styles.volunteerMarker]}>
+                  <Ionicons name="shield" size={16} color="#fff" />
+                </View>
+              ) : (
+                <View style={[styles.userMarker, styles.pilgrimMarker]}>
+                  <Ionicons name="person" size={16} color="#fff" />
+                </View>
+              )}
             </Marker>
           )}
 
-          {userLocations.map((location) => (
-            <Marker
-              key={location.location_id}
-              coordinate={{
-                latitude: location.latitude,
-                longitude: location.longitude,
-              }}
-              flat={true}
-              onPress={() => setSelectedLocation(location)}
-            >
-              <MarkerCallout location={location} />
-            </Marker>
-          ))}
+          {userLocations.map((location) => {
+            // Check if location is stale (older than 2 minutes)
+            const isStale = (Date.now() - new Date(location.last_updated).getTime()) > 2 * 60 * 1000;
+            
+            return (
+              <Marker
+                key={location.location_id}
+                coordinate={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                }}
+                flat={true}
+                onPress={() => setSelectedLocation(location)}
+                opacity={isStale ? 0.5 : 1.0}
+              >
+                <View style={[
+                  styles.userMarker,
+                  location.user_role === 'admin' ? styles.adminMarker :
+                  location.user_role === 'volunteer' ? styles.volunteerMarker : styles.pilgrimMarker,
+                  isStale && { opacity: 0.5 }
+                ]}>
+                  <Ionicons 
+                    name={
+                      location.user_role === 'admin' ? 'star' :
+                      location.user_role === 'volunteer' ? 'shield' : 'person'
+                    } 
+                    size={16} 
+                    color="#fff" 
+                  />
+                </View>
+                <MarkerCallout location={location} />
+              </Marker>
+            );
+          })}
         </MapView>
 
         {showLocationNotice && (
@@ -233,6 +336,94 @@ const MapScreen: React.FC = () => {
               <Text style={[styles.mapButtonText, showBuildingView && styles.activeButtonText]}>Buildings</Text>
             </TouchableOpacity>
           </View>
+          
+          <View style={styles.navigationControls}>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={handleShowMe}
+            >
+              <Ionicons name="locate" size={20} color="#2563EB" />
+              <Text style={styles.navButtonText}>Show Me</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={handleFitInFrame}
+            >
+              <Ionicons name="resize" size={20} color="#2563EB" />
+              <Text style={styles.navButtonText}>Fit in Frame</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Legend */}
+        <View style={styles.legend}>
+          {user?.role === 'pilgrim' ? (
+            <>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.pilgrimMarker]}>
+                  <Ionicons name="person" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Pilgrim (You)</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.volunteerMarker]}>
+                  <Ionicons name="shield" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Assigned Volunteer</Text>
+              </View>
+            </>
+          ) : user?.role === 'volunteer' ? (
+            <>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.volunteerMarker]}>
+                  <Ionicons name="shield" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Volunteer (You)</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.pilgrimMarker]}>
+                  <Ionicons name="person" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Assigned Pilgrims</Text>
+              </View>
+            </>
+          ) : user?.role === 'admin' ? (
+            <>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.adminMarker]}>
+                  <Ionicons name="star" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Admin (You)</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.volunteerMarker]}>
+                  <Ionicons name="shield" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>All Volunteers</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.pilgrimMarker]}>
+                  <Ionicons name="person" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>All Pilgrims</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.volunteerMarker]}>
+                  <Ionicons name="shield" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Volunteers</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendMarker, styles.pilgrimMarker]}>
+                  <Ionicons name="person" size={12} color="#fff" />
+                </View>
+                <Text style={styles.legendText}>Pilgrims</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {!permissions?.background && (
@@ -386,6 +577,86 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#2563EB',
     opacity: 0.3,
+  },
+  userMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  volunteerMarker: {
+    backgroundColor: '#16A34A',
+  },
+  pilgrimMarker: {
+    backgroundColor: '#DC2626',
+  },
+  adminMarker: {
+    backgroundColor: '#2563EB',
+  },
+  legend: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  legendMarker: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  navigationControls: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  navButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 6,
+  },
+  navButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#2563EB',
   },
 });
 

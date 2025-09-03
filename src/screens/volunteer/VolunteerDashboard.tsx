@@ -7,6 +7,7 @@ import { useRequest } from '../../context/RequestContext';
 import { useLocation } from '../../context/LocationContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import LocationMinimap from '../../components/LocationMinimap';
 import { assignmentService } from '../../services/assignmentService';
 import { volunteerService } from '../../services/volunteerService';
 import { COLORS, STATUS_COLORS } from '../../constants';
@@ -302,20 +303,8 @@ const VolunteerDashboard: React.FC = () => {
             </View>
           </Card>
 
-          {/* Location Status */}
-          {currentLocation && (
-            <Card style={styles.locationCard}>
-              <View style={styles.locationRow}>
-                <Ionicons name="location" size={20} color={COLORS.success} />
-                <Text style={styles.locationText}>
-                  Location: {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
-                </Text>
-              </View>
-              <Text style={styles.locationTimestamp}>
-                Last updated: {new Date().toLocaleTimeString()}
-              </Text>
-            </Card>
-          )}
+          {/* Location Minimap */}
+          <LocationMinimap />
         </View>
       </ScrollView>
     </SafeAreaView>

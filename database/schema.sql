@@ -104,15 +104,20 @@ CREATE TABLE direct_messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Location tracking table
-CREATE TABLE location_updates (
+-- Real-time location tracking table (current implementation)
+CREATE TABLE user_locations (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-    location GEOGRAPHY(POINT, 4326) NOT NULL,
-    accuracy DECIMAL(10,2),
-    speed DECIMAL(10,2),
-    heading DECIMAL(5,2),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    latitude NUMERIC(10,8) NOT NULL,
+    longitude NUMERIC(11,8) NOT NULL,
+    accuracy NUMERIC(10,2),
+    altitude NUMERIC(10,2),
+    heading NUMERIC(5,2),
+    speed NUMERIC(10,2),
+    is_active BOOLEAN DEFAULT true,
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
 );
 
 -- Notifications table
@@ -148,8 +153,9 @@ CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at DESC);
 CREATE INDEX idx_direct_messages_sender_receiver ON direct_messages(sender_id, receiver_id);
 CREATE INDEX idx_direct_messages_created_at ON direct_messages(created_at DESC);
 
-CREATE INDEX idx_location_updates_user_id ON location_updates(user_id);
-CREATE INDEX idx_location_updates_created_at ON location_updates(created_at DESC);
+CREATE INDEX idx_user_locations_user_id ON user_locations(user_id);
+CREATE INDEX idx_user_locations_is_active ON user_locations(is_active);
+CREATE INDEX idx_user_locations_last_updated ON user_locations(last_updated DESC);
 
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);
@@ -213,9 +219,25 @@ CREATE POLICY "Users can view their direct messages" ON direct_messages FOR SELE
 );
 CREATE POLICY "Users can send direct messages" ON direct_messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
--- Location updates policies
-CREATE POLICY "Users can view location updates" ON location_updates FOR SELECT USING (true);
-CREATE POLICY "Users can insert own location" ON location_updates FOR INSERT WITH CHECK (auth.uid() = user_id);
+-- User locations policies (real-time tracking)
+CREATE POLICY "Users can view relevant locations" ON user_locations FOR SELECT USING (
+    -- Users can see their own location
+    auth.uid() = user_id OR
+    -- Volunteers can see assigned pilgrims' locations
+    (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'volunteer') AND
+     EXISTS (SELECT 1 FROM assignments a 
+             JOIN assistance_requests ar ON a.request_id = ar.id 
+             WHERE a.volunteer_id = auth.uid() AND ar.user_id = user_locations.user_id AND a.status IN ('accepted', 'in_progress'))) OR
+    -- Pilgrims can see assigned volunteers' locations
+    (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'pilgrim') AND
+     EXISTS (SELECT 1 FROM assignments a 
+             JOIN assistance_requests ar ON a.request_id = ar.id 
+             WHERE ar.user_id = auth.uid() AND a.volunteer_id = user_locations.user_id AND a.status IN ('accepted', 'in_progress'))) OR
+    -- Admins can see all locations
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "Users can insert own location" ON user_locations FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own location" ON user_locations FOR UPDATE USING (auth.uid() = user_id);
 
 -- Notifications policies
 CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);

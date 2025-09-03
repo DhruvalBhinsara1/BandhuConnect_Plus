@@ -633,46 +633,58 @@ const TaskDetails: React.FC = () => {
       </Card>
 
       {/* Location */}
-      {assignment.request?.location && (
-        <Card style={styles.cardMargin}>
-          <View style={styles.locationHeader}>
-            <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.sectionTitle}>Location</Text>
+      <Card style={styles.cardMargin}>
+        <View style={styles.locationHeader}>
+          <Ionicons name="location-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.sectionTitle}>Pilgrim Location</Text>
+          {assignment.request?.location?.latitude && assignment.request?.location?.longitude && (
             <Button
               title="View on Map"
-              onPress={() => {/* TODO: Open map */}}
+              onPress={() => navigation.navigate('Map', {
+                initialLocation: {
+                  latitude: assignment.request.location.latitude,
+                  longitude: assignment.request.location.longitude
+                }
+              })}
               variant="outline"
               size="small"
             />
-          </View>
-          <View style={styles.locationInfo}>
-            {assignment.request?.location && assignment.request.location.latitude && assignment.request.location.longitude ? (
-              <Text style={styles.locationText}>
-                Lat: {assignment.request.location.latitude.toFixed(6)}, Lng: {assignment.request.location.longitude.toFixed(6)}
-              </Text>
-            ) : (
-              <Text style={styles.locationText}>Location not available</Text>
-            )}
-            <Text style={styles.distanceText}>
-              Estimated distance: {assignment.request?.location ? '0.5 km' : 'Unknown'}
-            </Text>
-          </View>
-          
-          {assignment.status === 'completed' && (assignment as any).completion_latitude && (
-            <View style={styles.completionLocationContainer}>
-              <Text style={styles.completionLocationTitle}>Task Completed At:</Text>
-              <Text style={styles.completionLocationText}>
-                Lat: {(assignment as any).completion_latitude?.toFixed(6) || 'N/A'}, Lng: {(assignment as any).completion_longitude?.toFixed(6) || 'N/A'}
-              </Text>
-              {(assignment as any).completion_address && (
-                <Text style={styles.completionAddressText}>
-                  {(assignment as any).completion_address}
-                </Text>
-              )}
-            </View>
           )}
-        </Card>
-      )}
+        </View>
+        <View style={styles.locationInfo}>
+          {assignment.request?.location?.latitude && assignment.request?.location?.longitude ? (
+            <>
+              <Text style={styles.locationText}>
+                📍 Lat: {assignment.request.location.latitude.toFixed(6)}
+              </Text>
+              <Text style={styles.locationText}>
+                📍 Lng: {assignment.request.location.longitude.toFixed(6)}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.locationText}>
+              ⚠️ Pilgrim location not available
+            </Text>
+          )}
+          <Text style={styles.distanceText}>
+            Estimated distance: {assignment.request?.location?.latitude ? '0.5 km' : 'Unknown'}
+          </Text>
+        </View>
+          
+        {assignment.status === 'completed' && (assignment as any).completion_latitude && (
+          <View style={styles.completionLocationContainer}>
+            <Text style={styles.completionLocationTitle}>Task Completed At:</Text>
+            <Text style={styles.completionLocationText}>
+              Lat: {(assignment as any).completion_latitude?.toFixed(6) || 'N/A'}, Lng: {(assignment as any).completion_longitude?.toFixed(6) || 'N/A'}
+            </Text>
+            {(assignment as any).completion_address && (
+              <Text style={styles.completionAddressText}>
+                {(assignment as any).completion_address}
+              </Text>
+            )}
+          </View>
+        )}
+      </Card>
 
       {/* Action Button */}
       <View style={styles.actionContainer}>
@@ -681,6 +693,6 @@ const TaskDetails: React.FC = () => {
     </ScrollView>
   </SafeAreaView>
 );
-}
+};
 
 export default TaskDetails;
