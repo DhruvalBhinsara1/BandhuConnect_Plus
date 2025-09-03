@@ -39,6 +39,8 @@ export interface MapBounds {
 interface MapServiceInterface {
   updateUserLocation(location: LocationData): Promise<{ data: any; error: any }>;
   getAssignmentLocations(): Promise<{ data: UserLocationData[] | null; error: any }>;
+  getUserLocation(userId: string): Promise<{ data: UserLocationData | null; error: any }>;
+  getVisibleLocations(): Promise<{ data: UserLocationData[] | null; error: any }>;
   subscribeToLocationUpdates(callback: (locations: UserLocationData[]) => void): () => void;
   deactivateUserLocation(): Promise<{ error: any }>;
   getCenter(): Promise<{ latitude: number; longitude: number; error: any }>;
@@ -50,6 +52,14 @@ class MapService implements MapServiceInterface {
 
   async updateUserLocation(location: LocationData): Promise<{ data: any; error: any }> {
     try {
+      // Check if user is authenticated before attempting location update
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.session?.user) {
+        console.log('User not authenticated, skipping location update');
+        return { data: null, error: null }; // Silently skip if not authenticated
+      }
+
       const { data, error } = await supabase.rpc('update_user_location', {
         p_latitude: location.latitude,
         p_longitude: location.longitude,
@@ -83,13 +93,18 @@ class MapService implements MapServiceInterface {
       let error;
 
       if (role === 'volunteer') {
-        ({ data, error } = await supabase.rpc('get_volunteer_assigned_locations', {
+        // Volunteers see pilgrim locations (people they can help)
+        ({ data, error } = await supabase.rpc('get_pilgrim_locations_for_volunteer', {
           p_volunteer_id: user.id
         }));
       } else if (role === 'pilgrim') {
-        ({ data, error } = await supabase.rpc('get_pilgrim_assigned_locations', {
+        // Pilgrims see volunteer locations (people who can help them)
+        ({ data, error } = await supabase.rpc('get_volunteer_locations_for_pilgrim', {
           p_pilgrim_id: user.id
         }));
+      } else if (role === 'admin') {
+        // Admins see all locations
+        ({ data, error } = await supabase.rpc('get_all_active_locations'));
       }
 
       if (error) throw error;
@@ -100,28 +115,77 @@ class MapService implements MapServiceInterface {
     }
   }
 
+  async getUserLocation(userId: string): Promise<{ data: UserLocationData | null; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('user_locations')
+        .select(`
+          id,
+          user_id,
+          latitude,
+          longitude,
+          accuracy,
+          last_updated,
+          users!inner(name, role)
+        `)
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (error) throw error;
+
+      const userLocation: UserLocationData = {
+        location_id: data.id,
+        user_id: data.user_id,
+        user_name: data.users[0]?.name || 'Unknown User',
+        user_role: data.users[0]?.role || 'pilgrim',
+        latitude: data.latitude,
+        longitude: data.longitude,
+        accuracy: data.accuracy,
+        last_updated: data.last_updated,
+        assignment_info: []
+      };
+
+      return { data: userLocation, error: null };
+    } catch (error) {
+      console.error('Error getting user location:', error);
+      return { data: null, error };
+    }
+  }
+
+  async getVisibleLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
+    return this.getAssignmentLocations();
+  }
+
   subscribeToLocationUpdates(callback: (locations: UserLocationData[]) => void): () => void {
     if (this.locationSubscription) {
       this.locationSubscription.unsubscribe();
     }
 
     this.locationSubscription = supabase
-      .channel('location-updates')
+      .channel('realtime-location-updates')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_locations',
+          filter: 'is_active=eq.true'
         },
-        async () => {
+        async (payload) => {
+          console.log('Real-time location change detected:', payload);
+          
+          // Get fresh assignment locations after any change
           const { data, error } = await this.getAssignmentLocations();
           if (!error && data) {
+            console.log('Broadcasting updated locations:', data.length);
             callback(data);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Location subscription status:', status);
+      });
 
     return () => {
       if (this.locationSubscription) {

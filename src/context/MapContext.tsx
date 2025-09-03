@@ -105,8 +105,35 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
     if (!user) return;
 
     const unsubscribe = mapService.subscribeToLocationUpdates((locations) => {
-      console.log('Location update received:', locations);
-      setUserLocations(locations);
+      console.log('Real-time location update received:', locations);
+      setUserLocations(prevLocations => {
+        // Merge new locations with existing ones, updating positions
+        const updatedLocations = [...prevLocations];
+        
+        locations.forEach(newLocation => {
+          const existingIndex = updatedLocations.findIndex(
+            loc => loc.user_id === newLocation.user_id
+          );
+          
+          if (existingIndex >= 0) {
+            // Update existing location
+            updatedLocations[existingIndex] = {
+              ...updatedLocations[existingIndex],
+              ...newLocation,
+              last_updated: newLocation.last_updated
+            };
+          } else {
+            // Add new location
+            updatedLocations.push(newLocation);
+          }
+        });
+        
+        // Filter out stale locations (older than 2 minutes)
+        const cutoffTime = new Date(Date.now() - 2 * 60 * 1000);
+        return updatedLocations.filter(loc => 
+          new Date(loc.last_updated) > cutoffTime
+        );
+      });
     });
 
     setSubscription(unsubscribe);

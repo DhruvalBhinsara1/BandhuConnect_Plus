@@ -167,35 +167,17 @@ export class AuthService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Register device if we have an active user
-      if (user) {
-        await deviceService.registerDevice();
-      }
-      
       if (!user) return null;
 
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error('Error getting current user profile:', error);
         return null;
-      }
-
-      // If no profile exists, return user with basic info
-      if (!profile) {
-        console.error('[AuthService] No profile found for user:', user.id, 'Email:', user.email);
-        console.error('[AuthService] This indicates signup did not create profile properly');
-        return {
-          id: user.id,
-          email: user.email,
-          name: null,
-          phone: null,
-          role: null,
-        } as User;
       }
 
       return profile;

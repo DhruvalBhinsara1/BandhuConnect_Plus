@@ -35,31 +35,74 @@ All other files have been marked with `.DELETE` extension and should be removed.
 
 3. Run `auto-assignment-functions.sql` for the auto-assignment system
 
-4. Run `admin-profile-update-policy.sql` for the latest RLS fixes
+## Setup Steps
 
-**That's it! Your database is ready.**
+### 1. Run Core Schema
+Execute the following files in order in your Supabase SQL Editor:
 
----
+1. **schema.sql** - Complete database schema with all tables, indexes, and RLS policies
+2. **functions.sql** - Database functions for location tracking and assignments
+3. **auto-assignment-functions.sql** - Intelligent volunteer assignment system
 
-## Manual Setup (Alternative)
+### 2. Create Initial Admin User
+Run this file to set up the initial admin:
 
-If you prefer step-by-step setup:
+1. **create-admin-dhruval.sql** - Creates the initial admin user with proper permissions
 
-### Step 1: Create Database Schema
-1. Go to your Supabase project SQL Editor
-2. Run `schema.sql` to create all tables and types
+### 3. Configure Storage
+Set up Supabase Storage buckets:
 
-### Step 2: Add Functions
-1. Run `functions.sql` for core database functions
-2. Run `auto-assignment-functions.sql` for auto-assignment
-3. Run `simple-admin-functions.sql` for admin operations
+1. Go to Storage in Supabase dashboard
+2. Create bucket named `request-images`
+3. Set bucket to public
+4. Configure RLS policies for the bucket
 
-### Step 3: Setup RLS Policies
-1. Run `admin-profile-update-policy.sql` for current RLS policies
+### 4. Enable Realtime
+Enable realtime for required tables:
 
-### Step 4: Add Demo Data
-1. Run `final-setup.sql` for demo users and data
-2. Optionally run `demo-users-simple.sql` for additional test data
+1. Go to Database > Replication in Supabase dashboard
+2. Enable realtime for these tables:
+   - `assistance_requests` - For live request updates
+   - `assignments` - For assignment status changes
+   - `user_locations` - For real-time location tracking
+   - `chat_messages` - For live messaging
+
+## Current Database Schema
+
+### Core Tables
+- **profiles** - User profiles with roles (volunteer, admin, pilgrim)
+- **assistance_requests** - Help requests from pilgrims
+- **assignments** - Volunteer-pilgrim assignments
+- **user_locations** - Real-time location tracking
+- **chat_messages** - Messaging system
+- **notifications** - Push notification management
+
+### Key Features
+- **Real-time Location Tracking** - Live GPS updates with role-based visibility
+- **Intelligent Assignment System** - Auto-matching based on skills and location
+- **Comprehensive RLS Policies** - Secure data access based on user roles
+- **Location-based Queries** - PostGIS integration for spatial operations
+
+## Verification
+
+After setup, verify:
+- All tables are created successfully
+- RLS policies are active and working
+- Location tracking functions are operational
+- Auto-assignment system is functional
+- Storage bucket is accessible
+- Realtime is enabled for required tables
+
+## Troubleshooting
+
+**Common Issues:**
+- Permission errors: Check RLS policies in schema.sql
+- Location tracking not working: Verify user_locations table and functions
+- Assignment system failing: Check auto-assignment-functions.sql
+- Realtime not updating: Verify table replication settings
+- Storage upload issues: Check bucket permissions and RLS
+
+For additional help, check ENVIRONMENT_SETUP.md or the main README.md file.
 
 ---
 

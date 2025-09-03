@@ -45,17 +45,48 @@ class LocationService {
   async requestPermissions() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Location permission not granted');
+      const foregroundGranted = status === 'granted';
+      
+      if (!foregroundGranted) {
+        console.log('Foreground location permission denied');
+        return { 
+          foreground: false, 
+          background: false,
+          error: 'Location permission not granted'
+        };
       }
 
+      // Only request background permission if foreground is granted
       const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+      const backgroundGranted = backgroundStatus.status === 'granted';
+      
+      if (!backgroundGranted) {
+        console.log('Background location permission denied');
+      }
+
       return { 
-        foreground: status === 'granted',
-        background: backgroundStatus.status === 'granted'
+        foreground: foregroundGranted,
+        background: backgroundGranted
       };
     } catch (error) {
-      return { foreground: false, background: false };
+      // Silent error handling - no console.error that might trigger alerts
+      console.log('Location permission request failed:', error instanceof Error ? error.message : error);
+      
+      // Handle Expo Go limitation gracefully
+      if (error instanceof Error && error.message.includes('NSLocation')) {
+        console.log('Location permissions not available in Expo Go - use development build for full functionality');
+        return { 
+          foreground: false, 
+          background: false,
+          error: 'Location not available in Expo Go. Use development build for location features.'
+        };
+      }
+      
+      return { 
+        foreground: false, 
+        background: false,
+        error: error instanceof Error ? error.message : 'Unknown permission error'
+      };
     }
   }
 
@@ -63,16 +94,37 @@ class LocationService {
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+        distanceInterval: 10,
       });
 
       return {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         accuracy: location.coords.accuracy || undefined,
+        altitude: location.coords.altitude || undefined,
+        heading: location.coords.heading || undefined,
+        speed: location.coords.speed || undefined,
         timestamp: location.timestamp,
       };
     } catch (error) {
-      console.error('Error getting current location:', error);
+      // Silent logging - avoid console.error that might trigger system alerts
+      console.log('Location unavailable:', error instanceof Error ? error.message : error);
+      
+      // Handle specific iOS location errors gracefully
+      if (error instanceof Error) {
+        if (error.message.includes('kCLErrorDomain error 0') || 
+            error.message.includes('Cannot obtain current location')) {
+          console.log('Location services unavailable - GPS may be disabled or no signal');
+          return null;
+        }
+        if (error.message.includes('NSLocation') || 
+            error.message.includes('Info.plist')) {
+          console.log('Location permission configuration issue - check app.config.js');
+          return null;
+        }
+      }
+      
       return null;
     }
   }
@@ -88,6 +140,13 @@ class LocationService {
 
   async watchPosition(callback: (location: LocationData) => void) {
     try {
+      // Check permissions before starting watch
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission not granted for watchPosition');
+        return null;
+      }
+
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
