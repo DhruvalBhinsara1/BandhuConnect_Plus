@@ -3,13 +3,15 @@ import { locationService } from '../services/locationService';
 import { LocationData } from '../types';
 import { useAuth } from './AuthContext';
 import * as Location from 'expo-location';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { LocationErrorHandler, LocationErrorType } from '../utils/locationErrorHandler';
 
 interface LocationPermissions {
   foreground: boolean;
   background: boolean;
   error?: any;
+  dontAskAgain?: boolean;
+  highestAvailable?: boolean;
 }
 
 interface LocationContextType {
@@ -53,11 +55,28 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   const requestPermissions = async () => {
     try {
       const perms = await locationService.requestPermissions();
-      setPermissions(perms);
-      return perms;
+      
+      // Check if we have the highest available permission to stop nagging
+      const highestAvailable = perms.background || 
+        (perms.foreground && Platform.OS === 'ios' && perms.error?.includes('denied'));
+      
+      const enhancedPerms = {
+        ...perms,
+        highestAvailable,
+        dontAskAgain: perms.error?.includes('denied') || perms.error?.includes('never_ask_again')
+      };
+      
+      setPermissions(enhancedPerms);
+      return enhancedPerms;
     } catch (error) {
       console.log('Permission request failed:', error);
-      const errorPerms = { foreground: false, background: false, error };
+      const errorPerms = { 
+        foreground: false, 
+        background: false, 
+        error,
+        dontAskAgain: error?.toString().includes('denied'),
+        highestAvailable: false
+      };
       setPermissions(errorPerms);
       return errorPerms;
     }
@@ -127,6 +146,9 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
           return; // Don't throw error, just return silently
         }
       }
+
+      // Force publish location on tracking start
+      await locationService.forcePublishLocation();
 
       const subscription = await locationService.watchPosition((location) => {
         setCurrentLocation(location);

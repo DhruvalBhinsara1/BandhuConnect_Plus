@@ -4,6 +4,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { RequestProvider } from './src/context/RequestContext';
 import LocationProvider from './src/context/LocationContext';
 import { MapProvider } from './src/context/MapContext';
+import { SecureLocationProvider } from './src/context/SecureLocationContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { NotificationService } from './src/services/notificationService';
 import { LocationWrapper } from './src/components/LocationWrapper';
@@ -26,16 +27,18 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <RequestProvider>
-        <LocationProvider>
-          <MapProvider>
-            <LocationWrapper>
-              <AppNavigator />
-              <StatusBar style="auto" />
-            </LocationWrapper>
-          </MapProvider>
-        </LocationProvider>
-      </RequestProvider>
+      <SecureLocationProvider>
+        <RequestProvider>
+          <LocationProvider>
+            <MapProvider>
+              <LocationWrapper>
+                <AppNavigator />
+                <StatusBar style="auto" />
+              </LocationWrapper>
+            </MapProvider>
+          </LocationProvider>
+        </RequestProvider>
+      </SecureLocationProvider>
     </AuthProvider>
   );
 }

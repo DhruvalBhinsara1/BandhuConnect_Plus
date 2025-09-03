@@ -167,6 +167,9 @@ class LocationService {
     }
   }
 
+  private lastPublishedLocation: LocationData | null = null;
+  private lastPublishTime: number = 0;
+
   async watchPosition(callback: (location: LocationData) => void) {
     try {
       // Check permissions before starting watch
@@ -179,8 +182,8 @@ class LocationService {
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 30000, // 30 seconds for battery optimization
-          distanceInterval: 50, // 50 meters to reduce unnecessary updates
+          timeInterval: 5000, // 5 seconds for responsive UI updates
+          distanceInterval: 10, // 10 meters for UI responsiveness
         },
         async (location) => {
           const locationData = {
@@ -193,14 +196,20 @@ class LocationService {
             timestamp: location.timestamp,
           };
           
-          // First update the UI through callback
+          // Always update UI immediately for self marker
           callback(locationData);
           
-          // Then update the database
-          try {
-            await this.updateLocation(locationData);
-          } catch (error) {
-            console.error('Failed to update location:', error);
+          // Publish to database based on 10s/25m strategy
+          const shouldPublish = this.shouldPublishLocation(locationData);
+          if (shouldPublish) {
+            try {
+              await this.updateLocation(locationData);
+              this.lastPublishedLocation = locationData;
+              this.lastPublishTime = Date.now();
+              console.log('Location published to database:', locationData);
+            } catch (error) {
+              console.error('Failed to update location:', error);
+            }
           }
         }
       );
@@ -218,6 +227,30 @@ class LocationService {
     }
   }
 
+  private shouldPublishLocation(newLocation: LocationData): boolean {
+    const now = Date.now();
+    
+    // Always publish on first location or app resume
+    if (!this.lastPublishedLocation || (now - this.lastPublishTime) > 60000) {
+      return true;
+    }
+    
+    // Publish every 10 seconds minimum
+    if ((now - this.lastPublishTime) >= 10000) {
+      return true;
+    }
+    
+    // Publish if moved more than 25 meters
+    if (this.lastPublishedLocation) {
+      const distance = this.calculateDistance(this.lastPublishedLocation, newLocation) * 1000; // Convert to meters
+      if (distance >= 25) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
   async startBackgroundLocationUpdates() {
     try {
       const { granted } = await Location.getBackgroundPermissionsAsync();
@@ -233,20 +266,37 @@ class LocationService {
 
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 60000, // 1 minute for background
-        distanceInterval: 100, // 100 meters for background
+        timeInterval: 10000, // 10 seconds for background (matching foreground strategy)
+        distanceInterval: 25, // 25 meters for background (matching foreground strategy)
         foregroundService: {
           notificationTitle: 'BandhuConnect+ Location Tracking',
           notificationBody: 'Tracking your location for volunteer coordination',
         },
       });
 
-      console.log('Background location tracking started');
+      console.log('Background location tracking started with 10s/25m strategy');
       return true;
     } catch (error) {
       console.error('Error starting background location updates:', error);
       return false;
     }
+  }
+
+  // Method to force publish location (for app resume, tracking start)
+  async forcePublishLocation() {
+    try {
+      const location = await this.getCurrentLocation();
+      if (location) {
+        await this.updateLocation(location);
+        this.lastPublishedLocation = location;
+        this.lastPublishTime = Date.now();
+        console.log('Force published location on app resume/tracking start');
+        return location;
+      }
+    } catch (error) {
+      console.error('Failed to force publish location:', error);
+    }
+    return null;
   }
 
   async stopBackgroundLocationUpdates() {
