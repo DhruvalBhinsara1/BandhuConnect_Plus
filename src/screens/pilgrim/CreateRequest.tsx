@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Image } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { Picker } from '@react-native-picker/picker';
+import { CustomSelector } from '../../components/CustomSelector';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
@@ -157,7 +157,6 @@ const CreateRequest: React.FC = () => {
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-
         <ScrollView 
           style={{ flex: 1 }} 
           contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 16 }}
@@ -201,63 +200,23 @@ const CreateRequest: React.FC = () => {
 
           <View style={{ marginBottom: 20 }}>
             <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', marginBottom: 10 }}>Request Type</Text>
-            <View style={{ 
-              borderWidth: 1.5, 
-              borderColor: '#d1d5db', 
-              borderRadius: 12, 
-              backgroundColor: '#ffffff',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.05,
-              shadowRadius: 2,
-              elevation: 1
-            }}>
-              <Picker
-                selectedValue={formData.type}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}
-                style={{ height: 56 }}
-              >
-                {REQUEST_TYPES.map((type) => (
-                  <Picker.Item key={type.value} label={type.label} value={type.value} />
-                ))}
-              </Picker>
-            </View>
+            <CustomSelector
+              options={REQUEST_TYPES}
+              value={formData.type}
+              onSelect={(value) => setFormData(prev => ({ ...prev, type: value as RequestType }))}
+              placeholder="Select request type"
+            />
           </View>
 
 
-          <View style={{ marginBottom: 0 }}>
+          <View style={{ marginBottom: 20 }}>
             <Text style={{ color: '#374151', fontSize: 14, fontWeight: '600', marginBottom: 12 }}>Priority Level</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {PRIORITY_LEVELS.map((priority) => (
-                <TouchableOpacity
-                  key={priority.value}
-                  onPress={() => setFormData(prev => ({ ...prev, priority: priority.value as Priority }))}
-                  style={{
-                    marginRight: 12,
-                    marginBottom: 8,
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
-                    borderRadius: 25,
-                    borderWidth: formData.priority === priority.value ? 2 : 1.5,
-                    borderColor: formData.priority === priority.value ? priority.color : '#e5e7eb',
-                    backgroundColor: formData.priority === priority.value ? priority.color + '15' : '#ffffff',
-                    shadowColor: formData.priority === priority.value ? priority.color : '#000',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: formData.priority === priority.value ? 0.2 : 0.05,
-                    shadowRadius: 3,
-                    elevation: formData.priority === priority.value ? 3 : 1
-                  }}
-                >
-                  <Text style={{ 
-                    fontSize: 14, 
-                    fontWeight: formData.priority === priority.value ? '700' : '600',
-                    color: formData.priority === priority.value ? priority.color : '#6b7280'
-                  }}>
-                    {priority.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <CustomSelector
+              options={PRIORITY_LEVELS}
+              value={formData.priority}
+              onSelect={(value) => setFormData(prev => ({ ...prev, priority: value as Priority }))}
+              placeholder="Select priority level"
+            />
           </View>
         </Card>
 
@@ -338,9 +297,9 @@ const CreateRequest: React.FC = () => {
             borderRadius: 12
           }}
         />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 };
 

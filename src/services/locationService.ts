@@ -6,7 +6,7 @@ import { mapService } from './mapService';
 const LOCATION_TASK_NAME = 'background-location-task';
 
 // Define the background task
-TaskManager.defineTask(LOCATION_TASK_NAME, ({ data, error }) => {
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   if (error) {
     console.error('Background location task error:', error);
     return;
@@ -15,20 +15,33 @@ TaskManager.defineTask(LOCATION_TASK_NAME, ({ data, error }) => {
     const { locations } = data as any;
     const location = locations[0];
     if (location) {
-      // Update location in database
-      mapService.updateUserLocation({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
-        timestamp: location.timestamp,
-      }).catch(error => {
+      try {
+        const locationData = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          accuracy: location.coords.accuracy || undefined,
+          timestamp: location.timestamp,
+        };
+        await locationService.updateLocation(locationData);
+      } catch (error) {
         console.error('Failed to update location in background:', error);
-      });
+      }
     }
   }
 });
 
-export class LocationService {
+class LocationService {
+  private static instance: LocationService;
+  
+  private constructor() {}
+  
+  public static getInstance(): LocationService {
+    if (!LocationService.instance) {
+      LocationService.instance = new LocationService();
+    }
+    return LocationService.instance;
+  }
+
   async requestPermissions() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -42,7 +55,7 @@ export class LocationService {
         background: backgroundStatus.status === 'granted'
       };
     } catch (error) {
-      return { foreground: false, background: false, error };
+      return { foreground: false, background: false };
     }
   }
 
@@ -64,29 +77,53 @@ export class LocationService {
     }
   }
 
+  async updateLocation(location: LocationData) {
+    try {
+      await mapService.updateUserLocation(location);
+    } catch (error) {
+      console.error('Failed to update location:', error);
+      throw error;
+    }
+  }
+
   async watchPosition(callback: (location: LocationData) => void) {
     try {
-      return await Location.watchPositionAsync(
+      const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
           timeInterval: 30000, // 30 seconds for battery optimization
           distanceInterval: 50, // 50 meters to reduce unnecessary updates
         },
-        (location) => {
+        async (location) => {
           const locationData = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy || undefined,
+            accuracy: location.coords.accuracy,
+            altitude: location.coords.altitude,
+            heading: location.coords.heading,
+            speed: location.coords.speed,
             timestamp: location.timestamp,
           };
+          
+          // First update the UI through callback
           callback(locationData);
           
-          // Also update database immediately
-          mapService.updateUserLocation(locationData).catch(error => {
+          // Then update the database
+          try {
+            await this.updateLocation(locationData);
+          } catch (error) {
             console.error('Failed to update location:', error);
-          });
+          }
         }
       );
+
+      return {
+        remove: () => {
+          if (subscription) {
+            subscription.remove();
+          }
+        }
+      };
     } catch (error) {
       console.error('Error watching position:', error);
       return null;
@@ -190,5 +227,5 @@ export class LocationService {
   }
 }
 
-export const locationService = new LocationService();
+export const locationService = LocationService.getInstance();
 export { LOCATION_TASK_NAME };

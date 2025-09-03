@@ -2,6 +2,16 @@ export type UserRole = 'volunteer' | 'admin' | 'pilgrim';
 
 export type RequestType = 'medical' | 'emergency' | 'lost_person' | 'sanitation' | 'crowd_management' | 'guidance' | 'general';
 
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  altitude?: number;
+  heading?: number;
+  speed?: number;
+  timestamp?: number;
+}
+
 export interface LocationDetails {
   name: string;
   address: string;

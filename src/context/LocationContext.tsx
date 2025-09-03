@@ -2,19 +2,34 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { locationService } from '../services/locationService';
 import { LocationData } from '../types';
 import { useAuth } from './AuthContext';
+import * as Location from 'expo-location';
+
+interface LocationPermissions {
+  foreground: boolean;
+  background: boolean;
+  error?: any;
+}
 
 interface LocationContextType {
   currentLocation: LocationData | null;
   isTracking: boolean;
   isBackgroundTracking: boolean;
-  permissions: { foreground: boolean; background: boolean } | null;
+  permissions: LocationPermissions | null;
   startTracking: () => Promise<void>;
   stopTracking: () => void;
   getCurrentLocation: () => Promise<LocationData | null>;
-  requestPermissions: () => Promise<void>;
+  requestPermissions: () => Promise<LocationPermissions>;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
+
+export const useLocation = () => {
+  const context = useContext(LocationContext);
+  if (context === undefined) {
+    throw new Error('useLocation must be used within a LocationProvider');
+  }
+  return context;
+};
 
 interface LocationProviderProps {
   children: ReactNode;
@@ -24,103 +39,129 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);
   const [isTracking, setIsTracking] = useState(false);
   const [isBackgroundTracking, setIsBackgroundTracking] = useState(false);
-  const [permissions, setPermissions] = useState<{ foreground: boolean; background: boolean } | null>(null);
-  const [watchSubscription, setWatchSubscription] = useState<any>(null);
+  const [permissions, setPermissions] = useState<LocationPermissions | null>(null);
+  const [watchSubscription, setWatchSubscription] = useState<Location.LocationSubscription | null>(null);
   const { user } = useAuth();
 
   const requestPermissions = async () => {
-    const perms = await locationService.requestPermissions();
-    setPermissions(perms);
+    try {
+      const perms = await locationService.requestPermissions();
+      setPermissions(perms);
+      return perms;
+    } catch (error) {
+      console.error('Error requesting permissions:', error);
+      const errorPerms = { foreground: false, background: false, error };
+      setPermissions(errorPerms);
+      return errorPerms;
+    }
   };
 
   const getCurrentLocation = async () => {
-    const location = await locationService.getCurrentLocation();
-    if (location) {
-      setCurrentLocation(location);
+    try {
+      const location = await locationService.getCurrentLocation();
+      if (location) {
+        setCurrentLocation(location);
+      }
+      return location;
+    } catch (error) {
+      console.error('Could not get current location:', error);
+      return null;
     }
-    return location;
+  };
+
+  const stopTracking = () => {
+    try {
+      if (watchSubscription) {
+        watchSubscription.remove();
+        setWatchSubscription(null);
+      }
+      setIsTracking(false);
+
+      // Stop background tracking if it's running
+      locationService.stopBackgroundLocationUpdates()
+        .then(() => setIsBackgroundTracking(false))
+        .catch(error => console.error('Error stopping background tracking:', error));
+    } catch (error) {
+      console.error('Error stopping location tracking:', error);
+    }
   };
 
   const startTracking = async () => {
-    if (!permissions?.foreground) {
-      await requestPermissions();
-    }
+    try {
+      if (!permissions?.foreground) {
+        const newPerms = await requestPermissions();
+        if (!newPerms.foreground) {
+          throw new Error('Location permission not granted');
+        }
+      }
 
-    if (permissions?.foreground) {
-      setIsTracking(true);
       const subscription = await locationService.watchPosition((location) => {
         setCurrentLocation(location);
       });
-      setWatchSubscription(subscription);
       
-      // Also start background tracking if permission granted
-      if (permissions?.background) {
-        const backgroundStarted = await locationService.startBackgroundLocationUpdates();
-        setIsBackgroundTracking(backgroundStarted);
+      if (subscription) {
+        setWatchSubscription(subscription);
+        setIsTracking(true);
+        
+        // Start background updates if we have permission
+        if (permissions?.background) {
+          try {
+            await locationService.startBackgroundLocationUpdates();
+            setIsBackgroundTracking(true);
+          } catch (error) {
+            console.error('Failed to start background tracking:', error);
+          }
+        }
       }
+    } catch (error) {
+      console.error('Error starting location tracking:', error);
+      throw error;
     }
   };
 
-  const stopTracking = async () => {
-    if (watchSubscription) {
-      watchSubscription.remove();
-      setWatchSubscription(null);
-    }
-    setIsTracking(false);
-    
-    // Stop background tracking
-    await locationService.stopBackgroundLocationUpdates();
-    setIsBackgroundTracking(false);
-  };
-
+  // Initial setup
   useEffect(() => {
-    // Request permissions on mount
     requestPermissions();
-
-    return () => {
-      stopTracking();
-    };
   }, []);
 
+  // Get initial location when permissions granted
   useEffect(() => {
-    getCurrentLocation();
-  }, []);
+    if (permissions?.foreground) {
+      getCurrentLocation();
+    }
+  }, [permissions]);
 
-  // Auto-start tracking when user is logged in and permissions are granted
+  // Auto-start tracking for logged in users
   useEffect(() => {
     const autoStartTracking = async () => {
       if (user && permissions?.foreground && !isTracking) {
         console.log('[LocationContext] Auto-starting location tracking for logged-in user');
-        await startTracking();
+        await startTracking().catch(error => {
+          console.error('Failed to auto-start tracking:', error);
+        });
       }
     };
 
     autoStartTracking();
   }, [user, permissions, isTracking]);
 
-
-  const value: LocationContextType = {
-    currentLocation,
-    isTracking,
-    isBackgroundTracking,
-    permissions,
-    startTracking,
-    stopTracking,
-    getCurrentLocation,
-    requestPermissions,
-  };
-
   return (
-    <LocationContext.Provider value={value}>
+    <LocationContext.Provider
+      value={{
+        currentLocation,
+        isTracking,
+        isBackgroundTracking,
+        permissions,
+        startTracking,
+        stopTracking,
+        getCurrentLocation,
+        requestPermissions,
+      }}
+    >
       {children}
     </LocationContext.Provider>
   );
 };
 
-export const useLocation = (): LocationContextType => {
-  const context = useContext(LocationContext);
-  if (context === undefined) {
-    throw new Error('useLocation must be used within a LocationProvider');
-  }
-  return context;
-};
+export { LocationContext };
+export default LocationProvider;

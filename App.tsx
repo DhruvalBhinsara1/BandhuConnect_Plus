@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/context/AuthContext';
 import { RequestProvider } from './src/context/RequestContext';
-import { LocationProvider } from './src/context/LocationContext';
+import LocationProvider from './src/context/LocationContext';
 import { MapProvider } from './src/context/MapContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { NotificationService } from './src/services/notificationService';

@@ -31,27 +31,32 @@ export interface UserLocationData {
   assignment_info: AssignmentInfo[];
 }
 
-type MapBounds = {
-  southwest: { latitude: number; longitude: number };
+export interface MapBounds {
   northeast: { latitude: number; longitude: number };
-} | null;
+  southwest: { latitude: number; longitude: number };
+}
 
-type Coordinates = {
-  latitude: number;
-  longitude: number;
-} | null;
+interface MapServiceInterface {
+  updateUserLocation(location: LocationData): Promise<{ data: any; error: any }>;
+  getAssignmentLocations(): Promise<{ data: UserLocationData[] | null; error: any }>;
+  subscribeToLocationUpdates(callback: (locations: UserLocationData[]) => void): () => void;
+  deactivateUserLocation(): Promise<{ error: any }>;
+  getCenter(): Promise<{ latitude: number; longitude: number; error: any }>;
+  getBounds(): Promise<{ bounds: MapBounds; error: any }>;
+}
 
-class MapService {
-  // Update user's current location in database
+class MapService implements MapServiceInterface {
+  private locationSubscription: any = null;
+
   async updateUserLocation(location: LocationData): Promise<{ data: any; error: any }> {
     try {
       const { data, error } = await supabase.rpc('update_user_location', {
         p_latitude: location.latitude,
         p_longitude: location.longitude,
         p_accuracy: location.accuracy || null,
-        p_heading: location.heading || null,
-        p_speed: location.speed || null,
         p_altitude: location.altitude || null,
+        p_heading: location.heading || null,
+        p_speed: location.speed || null
       });
 
       if (error) throw error;
@@ -62,7 +67,70 @@ class MapService {
     }
   }
 
-  // Deactivate user location when going offline
+  async getAssignmentLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
+    try {
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
+      if (!session?.session?.user) {
+        return { data: [], error: null };
+      }
+
+      const user = session.session.user;
+      const role = user.user_metadata.role;
+
+      let data;
+      let error;
+
+      if (role === 'volunteer') {
+        ({ data, error } = await supabase.rpc('get_volunteer_assigned_locations', {
+          p_volunteer_id: user.id
+        }));
+      } else if (role === 'pilgrim') {
+        ({ data, error } = await supabase.rpc('get_pilgrim_assigned_locations', {
+          p_pilgrim_id: user.id
+        }));
+      }
+
+      if (error) throw error;
+      return { data: data || [], error: null };
+    } catch (error) {
+      console.error('Error getting assignment locations:', error);
+      return { data: null, error };
+    }
+  }
+
+  subscribeToLocationUpdates(callback: (locations: UserLocationData[]) => void): () => void {
+    if (this.locationSubscription) {
+      this.locationSubscription.unsubscribe();
+    }
+
+    this.locationSubscription = supabase
+      .channel('location-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_locations',
+        },
+        async () => {
+          const { data, error } = await this.getAssignmentLocations();
+          if (!error && data) {
+            callback(data);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (this.locationSubscription) {
+        this.locationSubscription.unsubscribe();
+        this.locationSubscription = null;
+      }
+    };
+  }
+
   async deactivateUserLocation(): Promise<{ error: any }> {
     try {
       const { error } = await supabase.rpc('deactivate_user_location');
@@ -74,167 +142,128 @@ class MapService {
     }
   }
 
-  // Get locations for current user's assignments (volunteer/pilgrim view)
-  async getAssignmentLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
+  async getCenter(): Promise<{ latitude: number; longitude: number; error: any }> {
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-
-      const user = userData.user;
+      const { data, error } = await this.getAssignmentLocations();
+      if (error) throw error;
       
-      if (!user) {
-        return { data: [], error: null };
+      if (!data || data.length === 0) {
+        // Default to India's center if no locations available
+        return { latitude: 20.5937, longitude: 78.9629, error: null };
       }
 
-      // For volunteers: Get assigned pilgrims' locations
-      if (user.user_metadata.role === 'volunteer') {
-        const { data, error } = await supabase
-          .rpc('get_volunteer_assigned_locations', {
-            p_volunteer_id: user.id
-          });
-        if (error) throw error;
-        return { data, error: null };
-      }
-      
-      // For pilgrims: Get assigned volunteer's location
-      else if (user.user_metadata.role === 'pilgrim') {
-        const { data, error } = await supabase
-          .rpc('get_pilgrim_assigned_locations', {
-            p_pilgrim_id: user.id
-          });
-        if (error) throw error;
-        return { data, error: null };
-      }
+      // Calculate the center point of all locations
+      const totalLat = data.reduce((sum, loc) => sum + loc.latitude, 0);
+      const totalLong = data.reduce((sum, loc) => sum + loc.longitude, 0);
+      const count = data.length;
 
-      return { data: [], error: null };
+      return {
+        latitude: totalLat / count,
+        longitude: totalLong / count,
+        error: null
+      };
     } catch (error) {
-      console.error('Error getting assignment locations:', error);
-      return { data: null, error };
+      console.error('Error getting map center:', error);
+      // Default to India's center on error
+      return { latitude: 20.5937, longitude: 78.9629, error };
     }
   }
 
-  // Subscribe to location updates
-  subscribeToLocationUpdates(callback: (payload: any) => void) {
-    return supabase
-      .channel('user_locations')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_locations',
-        },
-        callback
-      )
-      .subscribe();
-  }
-
-  // Calculate distance between two points
-  calculateDistance(point1: LocationData, point2: LocationData): number {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRadians(point2.latitude - point1.latitude);
-    const dLon = this.toRadians(point2.longitude - point1.longitude);
-    const lat1 = this.toRadians(point1.latitude);
-    const lat2 = this.toRadians(point2.latitude);
-
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1) * Math.cos(lat2) * 
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in kilometers
-  }
-
-  // Convert degrees to radians
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
-  }
-
-  // Get location details using reverse geocoding
   async getLocationDetails(latitude: number, longitude: number): Promise<LocationDetails | null> {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}`
-      );
-      const data = await response.json();
-
-      if (data.status === 'OK' && data.results.length > 0) {
-        const result = data.results[0];
-        const addressComponents = result.address_components;
-        
-        const locationDetails: LocationDetails = {
-          name: result.formatted_address,
-          address: result.formatted_address,
-          locality: this.extractLocality(addressComponents),
-          landmark: this.extractLandmark(addressComponents),
-          placeId: result.place_id
-        };
-
-        return locationDetails;
+      // Use OpenStreetMap's Nominatim service (free, no API key needed)
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'BandhuConnect+ App' // Required by Nominatim's usage policy
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch location details');
       }
-      return null;
+
+      const data = await response.json();
+      
+      // Extract relevant information from Nominatim response
+      const locationDetails: LocationDetails = {
+        name: data.display_name || 'Unknown Location',
+        address: data.display_name || '',
+        locality: data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || '',
+        landmark: data.address?.amenity || data.address?.building || '',
+        placeId: data.place_id?.toString() || ''
+      };
+
+      return locationDetails;
     } catch (error) {
       console.error('Error getting location details:', error);
-      return null;
+      // Return a basic location object instead of null
+      return {
+        name: 'Unknown Location',
+        address: `${latitude}, ${longitude}`,
+        locality: '',
+        landmark: '',
+        placeId: ''
+      };
     }
   }
 
-  private extractLocality(addressComponents: any[]): string {
-    const locality = addressComponents.find(
-      (component: any) => component.types.includes('sublocality_level_1') || 
-                         component.types.includes('locality')
-    );
-    return locality ? locality.long_name : '';
-  }
+  async getBounds(): Promise<{ bounds: MapBounds; error: any }> {
+    try {
+      const { data, error } = await this.getAssignmentLocations();
+      if (error) throw error;
 
-  private extractLandmark(addressComponents: any[]): string | undefined {
-    const landmark = addressComponents.find(
-      (component: any) => component.types.includes('point_of_interest') || 
-                         component.types.includes('establishment')
-    );
-    return landmark ? landmark.long_name : undefined;
-  }
+      if (!data || data.length === 0) {
+        // Default bounds covering most of India
+        return {
+          bounds: {
+            northeast: { latitude: 35.5, longitude: 97.5 },  // Roughly covers northern and eastern extremes
+            southwest: { latitude: 6.5, longitude: 68.5 }   // Roughly covers southern and western extremes
+          },
+          error: null
+        };
+      }
 
-  // Get center for map view
-  getCenter(locations: UserLocationData[]): Coordinates {
-    if (locations.length === 0) return null;
+      // Find min and max coordinates
+      const lats = data.map(loc => loc.latitude);
+      const longs = data.map(loc => loc.longitude);
 
-    const sum = locations.reduce(
-      (acc, loc) => ({
-        latitude: acc.latitude + loc.latitude,
-        longitude: acc.longitude + loc.longitude,
-      }),
-      { latitude: 0, longitude: 0 }
-    );
+      const maxLat = Math.max(...lats);
+      const minLat = Math.min(...lats);
+      const maxLong = Math.max(...longs);
+      const minLong = Math.min(...longs);
 
-    return {
-      latitude: sum.latitude / locations.length,
-      longitude: sum.longitude / locations.length,
-    };
-  }
+      // Add padding to bounds (about 10% of the range)
+      const latPadding = (maxLat - minLat) * 0.1;
+      const longPadding = (maxLong - minLong) * 0.1;
 
-  // Get bounds for fitting all markers in view
-  getBounds(locations: UserLocationData[]): MapBounds {
-    if (locations.length === 0) return null;
-
-    let minLat = locations[0].latitude;
-    let maxLat = locations[0].latitude;
-    let minLng = locations[0].longitude;
-    let maxLng = locations[0].longitude;
-
-    locations.forEach(location => {
-      minLat = Math.min(minLat, location.latitude);
-      maxLat = Math.max(maxLat, location.latitude);
-      minLng = Math.min(minLng, location.longitude);
-      maxLng = Math.max(maxLng, location.longitude);
-    });
-
-    return {
-      southwest: { latitude: minLat, longitude: minLng },
-      northeast: { latitude: maxLat, longitude: maxLng },
-    };
+      return {
+        bounds: {
+          northeast: {
+            latitude: maxLat + latPadding,
+            longitude: maxLong + longPadding
+          },
+          southwest: {
+            latitude: minLat - latPadding,
+            longitude: minLong - longPadding
+          }
+        },
+        error: null
+      };
+    } catch (error) {
+      console.error('Error getting map bounds:', error);
+      // Default bounds on error
+      return {
+        bounds: {
+          northeast: { latitude: 35.5, longitude: 97.5 },
+          southwest: { latitude: 6.5, longitude: 68.5 }
+        },
+        error
+      };
+    }
   }
 }
 
+// Create and export singleton instance
 export const mapService = new MapService();
