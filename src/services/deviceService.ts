@@ -45,21 +45,64 @@ export class DeviceService {
 
         try {
             const deviceName = await this.getDeviceName();
+            const { data: { session } } = await supabase.auth.getSession();
             
-            const { data, error } = await supabase.rpc(
-                'register_device',
-                {
-                    p_device_name: deviceName,
-                    p_device_token: this.deviceToken
-                }
-            );
-
-            if (error) {
-                console.error('Error registering device:', error);
+            if (!session?.user?.id) {
+                console.error('No authenticated user found');
                 return null;
             }
 
-            return data;
+            // Try to find existing device
+            const { data: existingDevices, error: queryError } = await supabase
+                .from('user_devices')
+                .select('device_id')
+                .eq('device_token', this.deviceToken)
+                .eq('user_id', session.user.id);
+
+            if (queryError) {
+                console.error('Error querying devices:', queryError);
+                return null;
+            }
+
+            if (existingDevices && existingDevices.length > 0) {
+                // Update existing device
+                const { data: updatedDevice, error: updateError } = await supabase
+                    .from('user_devices')
+                    .update({
+                        device_name: deviceName,
+                        is_active: true,
+                        last_active: new Date().toISOString()
+                    })
+                    .eq('device_id', existingDevices[0].device_id)
+                    .select('device_id')
+                    .single();
+
+                if (updateError) {
+                    console.error('Error updating device:', updateError);
+                    return null;
+                }
+
+                return updatedDevice?.device_id || null;
+            }
+
+            // Insert new device
+            const { data: newDevice, error: insertError } = await supabase
+                .from('user_devices')
+                .insert({
+                    user_id: session.user.id,
+                    device_name: deviceName,
+                    device_token: this.deviceToken,
+                    is_active: true
+                })
+                .select('device_id')
+                .single();
+
+            if (insertError) {
+                console.error('Error inserting device:', insertError);
+                return null;
+            }
+
+            return newDevice?.device_id || null;
         } catch (error) {
             console.error('Error registering device:', error);
             return null;

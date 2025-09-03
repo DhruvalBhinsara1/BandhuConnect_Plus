@@ -30,20 +30,28 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   const [subscription, setSubscription] = useState<any>(null);
 
   // Calculate center and bounds
-  const centerLocation = mapService.getCenter(userLocations);
-  const mapBounds = mapService.getBounds(userLocations);
+  const [centerLocation, setCenterLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [mapBounds, setMapBounds] = useState<{ southwest: { latitude: number; longitude: number }; northeast: { latitude: number; longitude: number } } | null>(null);
+
+  // Update center and bounds when locations change
+  useEffect(() => {
+    const updateCenterAndBounds = async () => {
+      const { latitude, longitude } = await mapService.getCenter();
+      setCenterLocation({ latitude, longitude });
+
+      const { bounds } = await mapService.getBounds();
+      setMapBounds(bounds);
+    };
+
+    updateCenterAndBounds();
+  }, [userLocations]);
 
   const refreshLocations = async () => {
     if (!user) return;
     
     setLoading(true);
     try {
-      let result;
-      if (user.role === 'admin') {
-        result = await mapService.getAllActiveLocations();
-      } else {
-        result = await mapService.getAssignmentLocations();
-      }
+      const result = await mapService.getAssignmentLocations();
 
       if (result.data && !result.error) {
         setUserLocations(result.data);
@@ -96,16 +104,16 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    const locationSubscription = mapService.subscribeToLocationUpdates((payload) => {
-      console.log('Location update received:', payload);
-      refreshLocations();
+    const unsubscribe = mapService.subscribeToLocationUpdates((locations) => {
+      console.log('Location update received:', locations);
+      setUserLocations(locations);
     });
 
-    setSubscription(locationSubscription);
+    setSubscription(unsubscribe);
 
     return () => {
-      if (locationSubscription) {
-        locationSubscription.unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
       }
     };
   }, [user]);
@@ -129,13 +137,13 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
         clearInterval(locationUpdateInterval);
       }
       if (subscription) {
-        subscription.unsubscribe();
+        subscription();  // Call the unsubscribe function directly
       }
       if (isTracking) {
         mapService.deactivateUserLocation();
       }
     };
-  }, []);
+  }, [locationUpdateInterval, subscription, isTracking]);
 
   const value: MapContextType = {
     userLocations,

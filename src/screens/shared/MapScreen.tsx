@@ -1,5 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert, 
+  SafeAreaView, 
+  Dimensions, 
+  Platform,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, Region, MapType } from 'react-native-maps';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +18,7 @@ import { useLocation } from '../../context/LocationContext';
 import { MarkerCallout } from '../../components/MarkerCallout';
 import { LocationPreview } from '../../components/LocationPreview';
 import type { UserLocationData } from '../../services/mapService';
+import { locationService } from '../../services/locationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,11 +28,13 @@ const MapScreen: React.FC = () => {
   const { currentLocation, isTracking, isBackgroundTracking, permissions, getCurrentLocation } = useLocation();
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<UserLocationData | null>(null);
+  const [showLocationNotice, setShowLocationNotice] = useState(true);
+  const noticeOpacity = useState(new Animated.Value(1))[0];
   const [region, setRegion] = useState<Region>({
     latitude: 19.0760,
     longitude: 72.8777,
-    latitudeDelta: 0.0005,
-    longitudeDelta: 0.0005,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
   });
   const [mapType, setMapType] = useState<MapType>('standard');
   const [showBuildingView, setShowBuildingView] = useState(true);
@@ -41,6 +54,28 @@ const MapScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!permissions?.background) {
+      setShowLocationNotice(true);
+      // Fade out after 3 seconds
+      const timer = setTimeout(() => {
+        Animated.timing(noticeOpacity, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowLocationNotice(false);
+          // Reset opacity for next time
+          noticeOpacity.setValue(1);
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    } else {
+      setShowLocationNotice(false);
+    }
+  }, [permissions?.background]);
+
+  useEffect(() => {
     refreshLocations();
     getCurrentLocationAndCenter();
   }, []);
@@ -49,16 +84,30 @@ const MapScreen: React.FC = () => {
     try {
       const location = await getCurrentLocation();
       if (location) {
+        // Calculate zoom level based on accuracy
         const delta = location.accuracy 
           ? Math.max(0.0005, location.accuracy / 100000)
           : 0.0005;
 
-        setRegion({
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: delta,
-          longitudeDelta: delta,
-        });
+        // Update region with proper error handling
+        if (Number.isFinite(location.latitude) && Number.isFinite(location.longitude)) {
+          setRegion({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: delta,
+            longitudeDelta: delta,
+          });
+          
+          // Update location in database
+          await locationService.updateLocation({
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            timestamp: Date.now()
+          });
+        } else {
+          throw new Error('Invalid coordinates received');
+        }
       }
     } catch (error) {
       console.error('Could not get current location:', error);
@@ -103,7 +152,7 @@ const MapScreen: React.FC = () => {
           onRegionChangeComplete={setRegion}
           showsUserLocation={true}
           showsMyLocationButton={true}
-          showsCompass={true}
+          showsCompass={false}
           showsScale={true}
           mapType={mapType}
           loadingEnabled={true}
@@ -111,7 +160,8 @@ const MapScreen: React.FC = () => {
           rotateEnabled={true}
           scrollEnabled={true}
           zoomEnabled={true}
-          minZoomLevel={19}
+          minZoomLevel={15}
+          maxZoomLevel={20}
           showsBuildings={showBuildingView}
           showsIndoors={true}
           showsIndoorLevelPicker={true}
@@ -154,33 +204,36 @@ const MapScreen: React.FC = () => {
           ))}
         </MapView>
 
-        <View style={styles.mapControls}>
-          <TouchableOpacity
-            style={[styles.mapButton, mapType === 'standard' && styles.activeMapButton]}
-            onPress={() => setMapType('standard')}
-          >
-            <Text style={[styles.mapButtonText, mapType === 'standard' && styles.activeButtonText]}>Map</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.mapButton, mapType === 'satellite' && styles.activeMapButton]}
-            onPress={() => setMapType('satellite')}
-          >
-            <Text style={[styles.mapButtonText, mapType === 'satellite' && styles.activeButtonText]}>Satellite</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.mapButton, showBuildingView && styles.activeMapButton]}
-            onPress={() => setShowBuildingView(!showBuildingView)}
-          >
-            <Text style={[styles.mapButtonText, showBuildingView && styles.activeButtonText]}>Buildings</Text>
-          </TouchableOpacity>
-        </View>
+        {showLocationNotice && (
+          <Animated.View style={[styles.locationNotice, { opacity: noticeOpacity }]}>
+            <Text style={styles.locationNoticeText}>
+              Please enable background location for better tracking
+            </Text>
+          </Animated.View>
+        )}
 
-        <TouchableOpacity
-          style={styles.recenterButton}
-          onPress={getCurrentLocationAndCenter}
-        >
-          <Ionicons name="locate" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.mapControls}>
+          <View style={styles.mapTypeControls}>
+            <TouchableOpacity
+              style={[styles.mapButton, mapType === 'standard' && styles.activeMapButton]}
+              onPress={() => setMapType('standard')}
+            >
+              <Text style={[styles.mapButtonText, mapType === 'standard' && styles.activeButtonText]}>Map</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mapButton, mapType === 'satellite' && styles.activeMapButton]}
+              onPress={() => setMapType('satellite')}
+            >
+              <Text style={[styles.mapButtonText, mapType === 'satellite' && styles.activeButtonText]}>Satellite</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.mapButton, showBuildingView && styles.activeMapButton]}
+              onPress={() => setShowBuildingView(!showBuildingView)}
+            >
+              <Text style={[styles.mapButtonText, showBuildingView && styles.activeButtonText]}>Buildings</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {!permissions?.background && (
           <View style={styles.warningOverlay}>
@@ -246,6 +299,10 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     right: 16,
+    flexDirection: 'column',
+    gap: 16,
+  },
+  mapTypeControls: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
@@ -261,6 +318,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+
   activeMapButton: {
     backgroundColor: '#2563EB',
   },
@@ -272,22 +330,6 @@ const styles = StyleSheet.create({
   activeButtonText: {
     color: '#fff',
   },
-  recenterButton: {
-    position: 'absolute',
-    bottom: 24,
-    right: 16,
-    backgroundColor: '#2563EB',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   warningOverlay: {
     position: 'absolute',
     bottom: 88,
@@ -298,6 +340,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     flexDirection: 'row',
+  },
+  locationNotice: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: '#0891B2',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationNoticeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
     alignItems: 'center',
     justifyContent: 'center',
   },
