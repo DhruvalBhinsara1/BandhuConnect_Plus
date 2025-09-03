@@ -16,6 +16,7 @@ export default {
     ios: {
       supportsTablet: true,
       jsEngine: "jsc",
+      bundleIdentifier: "com.dhruvalbhinsara.bandhuconnectplus",
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "This app needs access to location when open to track volunteer locations for emergency assistance coordination.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "This app needs access to location when open and in the background to track volunteer locations for emergency assistance coordination.",
@@ -52,6 +53,7 @@ export default {
     extra: {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      appRole: "volunteer", // Hardcoded role for this build
       eas: {
         projectId: "90504708-ed95-48b8-b8a0-86d1de6303a1"
       }

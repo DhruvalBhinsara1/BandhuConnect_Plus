@@ -6,9 +6,11 @@ import { UserLocationData } from '../services/mapService';
 
 interface MarkerCalloutProps {
   location: UserLocationData;
+  isStale?: boolean;
+  minutesAgo?: number;
 }
 
-export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location }) => {
+export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location, isStale, minutesAgo }) => {
   return (
     <Callout tooltip>
       <View style={styles.container}>
@@ -33,8 +35,8 @@ export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location }) => {
           </View>
         )}
         
-        <Text style={styles.timestamp}>
-          Last updated: {new Date(location.last_updated).toLocaleTimeString()}
+        <Text style={[styles.timestamp, isStale && styles.staleText]}>
+          {isStale && minutesAgo ? `Last seen ${minutesAgo} min ago` : `Last updated: ${new Date(location.last_updated).toLocaleTimeString()}`}
         </Text>
       </View>
     </Callout>
@@ -82,5 +84,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     marginTop: 8,
+  },
+  staleText: {
+    color: '#DC2626',
+    fontWeight: '600',
   },
 });

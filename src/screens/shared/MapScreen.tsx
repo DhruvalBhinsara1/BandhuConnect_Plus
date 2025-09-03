@@ -13,12 +13,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, Region, MapType } from 'react-native-maps';
 import { useAuth } from '../../context/AuthContext';
-import { useMap } from '../../context/MapContext';
 import { useLocation } from '../../context/LocationContext';
+import { useMap } from '../../context/MapContext';
 import { MarkerCallout } from '../../components/MarkerCallout';
-import { LocationPreview } from '../../components/LocationPreview';
+import { DebugDrawer } from '../../components/DebugDrawer';
 import type { UserLocationData } from '../../services/mapService';
 import { locationService } from '../../services/locationService';
+import { APP_CONFIG, getUserRole, shouldShowMarker } from '../../constants/appConfig';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,12 +41,29 @@ const MapScreen: React.FC = () => {
   const [showBuildingView, setShowBuildingView] = useState(true);
   const mapRef = React.useRef<MapView>(null);
   const [realtimeLocations, setRealtimeLocations] = useState<UserLocationData[]>([]);
+  const [showDebugDrawer, setShowDebugDrawer] = useState(false);
+  const [debugTapCount, setDebugTapCount] = useState(0);
 
   const getTrackingStatusText = () => {
     if (!permissions?.foreground) return 'Location permission required';
     if (isBackgroundTracking) return 'Background tracking active';
     if (isTracking) return 'Foreground tracking active';
     return 'Location tracking inactive';
+  };
+
+  const handleDebugTap = () => {
+    if (!APP_CONFIG.SHOW_DEBUG_DRAWER) return;
+    
+    const newCount = debugTapCount + 1;
+    setDebugTapCount(newCount);
+    
+    if (newCount >= 5) {
+      setShowDebugDrawer(true);
+      setDebugTapCount(0);
+    }
+    
+    // Reset counter after 3 seconds
+    setTimeout(() => setDebugTapCount(0), 3000);
   };
 
   const getTrackingStatusColor = () => {
@@ -157,9 +175,15 @@ const MapScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!permissions?.background) {
+    // Only show notice if we don't have the highest available permission and user hasn't chosen "don't ask again"
+    const shouldShowNotice = permissions && 
+      !permissions.highestAvailable && 
+      !permissions.dontAskAgain && 
+      permissions.foreground; // Only show if we at least have foreground
+    
+    if (shouldShowNotice) {
       setShowLocationNotice(true);
-      // Fade out after 3 seconds
+      // Fade out after 5 seconds
       const timer = setTimeout(() => {
         Animated.timing(noticeOpacity, {
           toValue: 0,
@@ -170,13 +194,13 @@ const MapScreen: React.FC = () => {
           // Reset opacity for next time
           noticeOpacity.setValue(1);
         });
-      }, 3000);
+      }, 5000);
 
       return () => clearTimeout(timer);
     } else {
       setShowLocationNotice(false);
     }
-  }, [permissions?.background]);
+  }, [permissions]);
 
   useEffect(() => {
     console.log('MapScreen: Initial load - refreshing locations and getting current location');
@@ -224,10 +248,13 @@ const MapScreen: React.FC = () => {
     }
   });
   
-  // Show all real locations for bi-directional visibility (don't filter by time)
-  // This ensures pilgrims always see their volunteer's last known location
-  // and volunteers always see their pilgrims' last known locations
-  const activeUserLocations = Array.from(uniqueLocationMap.values());
+  // Filter locations based on hardcoded role to show only relevant counterparts
+  const userRole = getUserRole();
+  const filteredLocations = Array.from(uniqueLocationMap.values()).filter(location => 
+    shouldShowMarker(location.user_role, userRole) && location.user_id !== user?.id
+  );
+  
+  const activeUserLocations = filteredLocations;
 
   const getCurrentLocationAndCenter = async () => {
     try {
@@ -272,7 +299,10 @@ const MapScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Location Tracking</Text>
+        <TouchableOpacity onPress={handleDebugTap} style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Location Tracking</Text>
+          <Text style={styles.versionText}>v{APP_CONFIG.VERSION}</Text>
+        </TouchableOpacity>
         <View style={styles.headerStats}>
           <Text style={styles.statsText}>{userLocations.length} users online</Text>
           <View style={styles.trackingStatus}>
@@ -341,8 +371,9 @@ const MapScreen: React.FC = () => {
           )}
 
           {activeUserLocations.map((location) => {
-            // Check if location is stale (older than 5 minutes) for visual indication only
-            const isStale = (Date.now() - new Date(location.last_updated).getTime()) > 5 * 60 * 1000;
+            // Check if location is stale (older than 2 minutes) as per requirements
+            const isStale = (Date.now() - new Date(location.last_updated).getTime()) > 2 * 60 * 1000;
+            const minutesAgo = Math.floor((Date.now() - new Date(location.last_updated).getTime()) / (60 * 1000));
             
             return (
               <Marker
@@ -353,13 +384,14 @@ const MapScreen: React.FC = () => {
                 }}
                 flat={true}
                 onPress={() => setSelectedLocation(location)}
-                opacity={isStale ? 0.7 : 1.0}
+                opacity={isStale ? 0.5 : 1.0}
+                title={isStale ? `Last seen ${minutesAgo} min ago` : location.user_name}
               >
                 <View style={[
                   styles.userMarker,
                   location.user_role === 'admin' ? styles.adminMarker :
                   location.user_role === 'volunteer' ? styles.volunteerMarker : styles.pilgrimMarker,
-                  isStale && { opacity: 0.7 }
+                  isStale && { opacity: 0.5 }
                 ]}>
                   <Ionicons 
                     name={
@@ -367,10 +399,10 @@ const MapScreen: React.FC = () => {
                       location.user_role === 'volunteer' ? 'shield' : 'person'
                     } 
                     size={16} 
-                    color="#fff" 
+                    color={isStale ? '#999' : '#fff'} 
                   />
                 </View>
-                <MarkerCallout location={location} />
+                <MarkerCallout location={location} isStale={isStale} minutesAgo={minutesAgo} />
               </Marker>
             );
           })}
@@ -421,7 +453,7 @@ const MapScreen: React.FC = () => {
               style={styles.navButton}
               onPress={handleFitInFrame}
             >
-              <Ionicons name="resize" size={20} color="#2563EB" />
+ 
               <Text style={styles.navButtonText}>Fit in Frame</Text>
             </TouchableOpacity>
           </View>
@@ -500,10 +532,15 @@ const MapScreen: React.FC = () => {
 
         {/* Notification for users without location data */}
         {placeholderUsers.length > 0 && (
-          <View style={styles.noLocationNotification}>
+          <View style={styles.noLocationBanner}>
             <Ionicons name="information-circle" size={16} color="#F59E0B" />
             <Text style={styles.noLocationText}>
-              {placeholderUsers.length} assigned {placeholderUsers.length === 1 ? 'user' : 'users'} without location data
+              {APP_CONFIG.ROLE === 'pilgrim' 
+                ? `Your volunteer's location is not available`
+                : APP_CONFIG.ROLE === 'volunteer'
+                ? `${placeholderUsers.length} ${placeholderUsers.length === 1 ? 'pilgrim' : 'pilgrims'} ${placeholderUsers.length === 1 ? 'is' : 'are'} not sharing location`
+                : `${placeholderUsers.length} ${placeholderUsers.length === 1 ? 'user' : 'users'} not sharing location`
+              }
             </Text>
           </View>
         )}
@@ -534,10 +571,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
+  headerTitleContainer: {
+    alignItems: 'flex-start',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
+  },
+  versionText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
   headerStats: {
     flexDirection: 'row',
@@ -606,6 +651,28 @@ const styles = StyleSheet.create({
   activeButtonText: {
     color: '#fff',
   },
+  noLocationBanner: {
+    position: 'absolute',
+    top: 140,
+    left: 16,
+    right: 16,
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  noLocationText: {
+    fontSize: 14,
+    color: '#92400E',
+    marginLeft: 8,
+    flex: 1,
+  },
   warningOverlay: {
     position: 'absolute',
     bottom: 80,
@@ -621,25 +688,6 @@ const styles = StyleSheet.create({
     color: '#92400E',
     fontSize: 14,
     textAlign: 'center',
-  },
-  noLocationNotification: {
-    position: 'absolute',
-    bottom: 140,
-    left: 16,
-    right: 16,
-    backgroundColor: '#FEF3C7',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  noLocationText: {
-    color: '#92400E',
-    fontSize: 14,
-    marginLeft: 8,
-    flex: 1,
   },
   locationNotice: {
     position: 'absolute',

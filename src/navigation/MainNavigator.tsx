@@ -25,7 +25,7 @@ import RequestStatus from '../screens/pilgrim/RequestStatus';
 import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 
 // Shared Screens
-import MapScreen from '../screens/shared/MapScreen';
+import SecureMapScreen from '../screens/shared/SecureMapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
 import { DevicesScreen } from '../screens/DevicesScreen';
 
@@ -133,7 +133,7 @@ const MainNavigator: React.FC = () => {
       >
         <Tab.Screen name="Home" component={VolunteerStack} />
         <Tab.Screen name="Tasks" component={TaskStack} />
-        <Tab.Screen name="Map" component={MapScreen} />
+        <Tab.Screen name="Map" component={SecureMapScreen} />
         <Tab.Screen name="Profile" component={VolunteerProfile} />
       </Tab.Navigator>
     );
@@ -172,7 +172,7 @@ const MainNavigator: React.FC = () => {
     >
       <Tab.Screen name="Home" component={PilgrimStack} />
       <Tab.Screen name="Requests" component={CreateRequest} />
-      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen name="Map" component={SecureMapScreen} />
       <Tab.Screen name="Profile" component={PilgrimProfile} />
     </Tab.Navigator>
   );
