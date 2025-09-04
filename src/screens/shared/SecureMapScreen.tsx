@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -47,7 +48,23 @@ export default function SecureMapScreen() {
   useEffect(() => {
     initializeMap();
     initializeAssignmentTracking();
+    
+    // Handle app state changes for reconnection
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        console.log('[SecureMapScreen] App became active - refreshing subscriptions');
+        // Re-initialize subscriptions when app becomes active
+        setTimeout(() => {
+          initializeAssignmentTracking();
+          refreshLocations();
+        }, 1000);
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
     return () => {
+      subscription?.remove();
       secureMapService.cleanup();
       secureLocationService.stopTracking();
     };
@@ -55,22 +72,31 @@ export default function SecureMapScreen() {
 
   // State-driven subscription management
   useEffect(() => {
-    if (currentAssignment?.assigned) {
-      // Subscribe to counterpart location when assigned
+    if (currentAssignment?.assigned && currentAssignment?.isActive) {
+      console.log(`[SecureMapScreen] Subscribing to counterpart ${currentAssignment.counterpartId} location`);
+      // Subscribe to counterpart location when assigned and active
       secureMapService.subscribeToCounterpartLocation(
         currentAssignment.counterpartId,
-        setCounterpartLocation
+        (location) => {
+          console.log('[SecureMapScreen] Counterpart location update:', location);
+          setCounterpartLocation(location);
+          // Refresh all locations to update map
+          refreshLocations();
+        }
       );
     } else {
-      // Unsubscribe and clear counterpart data when not assigned
+      console.log('[SecureMapScreen] Unsubscribing from counterpart location - not assigned or not active');
+      // Unsubscribe and clear counterpart data when not assigned or not active
       secureMapService.unsubscribeFromCounterpartLocation();
       setCounterpartLocation(null);
+      // Clear locations to show only own location
+      refreshLocations();
     }
 
     return () => {
       secureMapService.unsubscribeFromCounterpartLocation();
     };
-  }, [currentAssignment?.assigned, currentAssignment?.counterpartId]);
+  }, [currentAssignment?.assigned, currentAssignment?.isActive, currentAssignment?.counterpartId]);
 
   const initializeAssignmentTracking = async () => {
     try {

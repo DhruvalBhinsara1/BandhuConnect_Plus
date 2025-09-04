@@ -1,7 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { LocationData } from '../types';
-import { mapService } from './mapService';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
@@ -26,17 +25,15 @@ const handleBackgroundLocationUpdate = async ({ data, error }: any) => {
         const locationData = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy || undefined,
+          accuracy: location.coords.accuracy || null,
+          speed: location.coords.speed || null,
+          bearing: location.coords.heading || null,
           timestamp: location.timestamp,
         };
         
-        // Use mapService directly to avoid circular dependency
-        const result = await mapService.updateUserLocation(locationData);
-        if (result.error) {
-          console.error('❌ Failed to update location in background:', result.error);
-        } else {
-          console.log('✅ Background location updated successfully');
-        }
+        // Location updates are handled by secureLocationService automatically
+        // when it's initialized and tracking
+        console.log('✅ Background location received - handled by secure service');
       } catch (error) {
         console.error('❌ Failed to process background location:', error);
       }
@@ -191,7 +188,8 @@ class LocationService {
 
   async updateLocation(location: LocationData) {
     try {
-      await mapService.updateUserLocation(location);
+      // Location updates are now handled by secureLocationService
+      console.log('Location update delegated to secureLocationService');
     } catch (error) {
       console.error('Failed to update location:', error);
       throw error;

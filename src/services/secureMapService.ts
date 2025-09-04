@@ -104,7 +104,16 @@ class SecureMapService {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[SecureMapService] Assignment subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[SecureMapService] Successfully subscribed to assignment updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[SecureMapService] Assignment subscription failed');
+          // Attempt reconnection after delay
+          setTimeout(() => this.subscribeToAssignmentChanges(callback), 5000);
+        }
+      });
   }
 
   /**
@@ -130,20 +139,9 @@ class SecureMapService {
           try {
             const newData = payload.new as any;
             if (newData && newData.is_active) {
-              const location: UserLocationData = {
-                userId: newData.user_id,
-                name: '', // Will be populated by getCounterpartLocation
-                role: 'pilgrim', // Will be populated by getCounterpartLocation
-                latitude: parseFloat(newData.latitude),
-                longitude: parseFloat(newData.longitude),
-                accuracy: newData.accuracy ? parseFloat(newData.accuracy) : null,
-                speed: null,
-                bearing: null,
-                lastUpdated: newData.last_updated,
-                minutesAgo: 0,
-                isStale: false
-              };
-              this.counterpartLocationCallback?.(location);
+              // Get full counterpart location with proper data
+              const counterpartLocation = await this.getCounterpartLocation();
+              this.counterpartLocationCallback?.(counterpartLocation);
             } else {
               this.counterpartLocationCallback?.(null);
             }
@@ -153,7 +151,16 @@ class SecureMapService {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[SecureMapService] Counterpart location subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`[SecureMapService] Successfully subscribed to counterpart ${counterpartId} location`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`[SecureMapService] Counterpart ${counterpartId} location subscription failed`);
+          // Attempt reconnection after delay
+          setTimeout(() => this.subscribeToCounterpartLocation(counterpartId, callback), 5000);
+        }
+      });
   }
 
   /**
@@ -342,7 +349,7 @@ class SecureMapService {
     try {
       this.locationUpdateCallback = callback;
 
-      // Subscribe to changes in locations table
+      // Subscribe to changes in user_locations table (correct table name)
       this.realtimeSubscription = supabase
         .channel('location-updates')
         .on(
@@ -350,7 +357,7 @@ class SecureMapService {
           {
             event: '*',
             schema: 'public',
-            table: 'locations'
+            table: 'user_locations'
           },
           async (payload) => {
             console.log('[SecureMapService] Real-time location update:', payload);
@@ -360,9 +367,16 @@ class SecureMapService {
             callback(updatedLocations);
           }
         )
-        .subscribe();
-
-      console.log('[SecureMapService] Subscribed to real-time location updates');
+        .subscribe((status) => {
+          console.log('[SecureMapService] Location subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('[SecureMapService] Successfully subscribed to location updates');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('[SecureMapService] Location subscription failed');
+            // Attempt reconnection after delay
+            setTimeout(() => this.subscribeToLocationUpdates(callback), 5000);
+          }
+        });
 
     } catch (error) {
       console.error('[SecureMapService] Failed to subscribe to location updates:', error);

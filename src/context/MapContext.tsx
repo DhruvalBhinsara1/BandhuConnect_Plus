@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { mapService, UserLocationData } from '../services/mapService';
+import { secureMapService, UserLocationData } from '../services/secureMapService';
 import { useAuth } from './AuthContext';
 import { useLocation } from './LocationContext';
 
@@ -36,11 +36,20 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   // Update center and bounds when locations change
   useEffect(() => {
     const updateCenterAndBounds = async () => {
-      const { latitude, longitude } = await mapService.getCenter();
-      setCenterLocation({ latitude, longitude });
-
-      const { bounds } = await mapService.getBounds();
-      setMapBounds(bounds);
+      const bounds = secureMapService.calculateMapBounds(userLocations);
+      if (bounds) {
+        setCenterLocation({ latitude: bounds.latitude, longitude: bounds.longitude });
+        setMapBounds({
+          southwest: {
+            latitude: bounds.latitude - bounds.latitudeDelta / 2,
+            longitude: bounds.longitude - bounds.longitudeDelta / 2
+          },
+          northeast: {
+            latitude: bounds.latitude + bounds.latitudeDelta / 2,
+            longitude: bounds.longitude + bounds.longitudeDelta / 2
+          }
+        });
+      }
     };
 
     updateCenterAndBounds();
@@ -52,20 +61,12 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
       return;
     }
     
-    console.log('MapContext: Refreshing locations for user:', user.id, 'role:', (user as any).user_metadata?.role);
+    console.log('MapContext: Refreshing locations for user:', user.id);
     setLoading(true);
     try {
-      const result = await mapService.getAssignmentLocations();
-      console.log('MapContext: Assignment locations result:', result);
-
-      if (result.data && !result.error) {
-        console.log('MapContext: Setting user locations:', result.data.length, 'locations');
-        console.log('MapContext: Location details:', result.data);
-        setUserLocations(result.data);
-      } else {
-        console.error('MapContext: Error in assignment locations:', result.error);
-        setUserLocations([]); // Set empty array on error
-      }
+      const locations = await secureMapService.getAllRelevantLocations();
+      console.log('MapContext: Retrieved locations:', locations.length);
+      setUserLocations(locations);
     } catch (error) {
       console.error('Error refreshing locations:', error);
       setUserLocations([]); // Set empty array on error
@@ -78,7 +79,8 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
     if (!currentLocation || !user) return;
 
     try {
-      await mapService.updateUserLocation(currentLocation);
+      // SecureMapService handles location updates through secureLocationService
+      console.log('Location updates handled by secureLocationService');
     } catch (error) {
       console.error('Error updating location in database:', error);
     }
@@ -100,8 +102,8 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
       setLocationUpdateInterval(null);
     }
 
-    // Deactivate location in database
-    mapService.deactivateUserLocation();
+    // Cleanup handled by secureMapService
+    secureMapService.cleanup();
   };
 
   // Update location in database when current location changes
@@ -115,25 +117,25 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    const unsubscribe = mapService.subscribeToLocationUpdates((locations) => {
+    secureMapService.subscribeToLocationUpdates((locations) => {
       console.log('Real-time location update received:', locations);
       setUserLocations(prevLocations => {
-        // Create a map for efficient deduplication by user_id
+        // Create a map for efficient deduplication by userId
         const locationMap = new Map<string, UserLocationData>();
         
         // Add existing locations to map
         prevLocations.forEach(loc => {
-          const existing = locationMap.get(loc.user_id);
-          if (!existing || new Date(loc.last_updated) > new Date(existing.last_updated)) {
-            locationMap.set(loc.user_id, loc);
+          const existing = locationMap.get(loc.userId);
+          if (!existing || new Date(loc.lastUpdated) > new Date(existing.lastUpdated)) {
+            locationMap.set(loc.userId, loc);
           }
         });
         
         // Add/update with new locations
         locations.forEach(newLocation => {
-          const existing = locationMap.get(newLocation.user_id);
-          if (!existing || new Date(newLocation.last_updated) > new Date(existing.last_updated)) {
-            locationMap.set(newLocation.user_id, newLocation);
+          const existing = locationMap.get(newLocation.userId);
+          if (!existing || new Date(newLocation.lastUpdated) > new Date(existing.lastUpdated)) {
+            locationMap.set(newLocation.userId, newLocation);
           }
         });
         
@@ -142,12 +144,8 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
       });
     });
 
-    setSubscription(unsubscribe);
-
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      secureMapService.unsubscribeFromLocationUpdates();
     };
   }, [user]);
 
@@ -173,7 +171,7 @@ export const MapProvider: React.FC<MapProviderProps> = ({ children }) => {
         subscription();  // Call the unsubscribe function directly
       }
       if (isTracking) {
-        mapService.deactivateUserLocation();
+        secureMapService.cleanup();
       }
     };
   }, [locationUpdateInterval, subscription, isTracking]);
