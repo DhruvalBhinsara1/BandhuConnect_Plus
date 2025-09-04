@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { LocationData } from '../types';
+import Constants from 'expo-constants';
 
 interface AssignmentInfo {
   request_id: string;
@@ -53,14 +54,27 @@ class MapService implements MapServiceInterface {
 
   async updateUserLocation(location: LocationData): Promise<{ data: any; error: any }> {
     try {
+      console.log('🔄 MapService.updateUserLocation: Starting location update', {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        timestamp: new Date().toISOString()
+      });
+      
       // Check if user is authenticated before attempting location update
       const { data: session, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError || !session?.session?.user) {
-        console.log('User not authenticated, skipping location update');
+      if (sessionError) {
+        console.error('❌ MapService.updateUserLocation: Session error:', sessionError);
+        return { data: null, error: sessionError };
+      }
+      
+      if (!session?.session?.user) {
+        console.log('⚠️ MapService.updateUserLocation: User not authenticated, skipping location update');
         return { data: null, error: null }; // Silently skip if not authenticated
       }
 
+      console.log('✅ MapService.updateUserLocation: User authenticated, calling RPC function');
       const { data, error } = await supabase.rpc('update_user_location', {
         p_latitude: location.latitude,
         p_longitude: location.longitude,
@@ -70,120 +84,138 @@ class MapService implements MapServiceInterface {
         p_speed: location.speed || null
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ MapService.updateUserLocation: RPC error:', error);
+        throw error;
+      }
+      
+      console.log('✅ MapService.updateUserLocation: Location updated successfully', data);
       return { data, error: null };
     } catch (error) {
-      console.error('Error updating user location:', error);
+      console.error('❌ MapService.updateUserLocation: Unexpected error:', error);
       return { data: null, error };
     }
   }
 
   async getAssignmentLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
     try {
+      console.log('🔍 MapService.getAssignmentLocations: Starting location fetch');
+      
       const { data: session, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        console.error('❌ MapService.getAssignmentLocations: Session error:', sessionError);
+        throw sessionError;
+      }
 
       if (!session?.session?.user) {
-        console.log('MapService: No user session found');
+        console.log('⚠️ MapService.getAssignmentLocations: No user session found');
         return { data: [], error: null };
       }
 
       const user = session.session.user;
       
-      // Get user role from profiles table since it's not in metadata
-      console.log('MapService: Attempting to fetch profile for user ID:', user.id);
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-        
-      let role = profile?.role;
-      
-      if (profileError) {
-        console.error('MapService: Error fetching user profile:', profileError);
-        console.error('MapService: Profile error details:', {
-          code: profileError.code,
-          message: profileError.message,
-          details: profileError.details,
-          hint: profileError.hint
-        });
-        
-        // Try to get role from user metadata as fallback
-        const metadataRole = user.user_metadata?.role || user.app_metadata?.role;
-        if (metadataRole) {
-          console.log('MapService: Using role from metadata:', metadataRole);
-          role = metadataRole;
-        } else {
-          console.error('MapService: No role found in metadata either');
-          return { data: [], error: `Could not fetch user profile: ${profileError.message}` };
-        }
-      }
-      console.log('MapService: Fetching locations for user:', user.id, 'role:', role);
-      console.log('MapService: Profile data:', profile);
+      // Use hardcoded app role from config instead of database lookup to avoid role mismatch issues
+      const userRole = Constants.expoConfig?.extra?.appRole || 'pilgrim';
+      console.log('🎯 MapService.getAssignmentLocations: Using hardcoded app role:', userRole, 'for user:', user.id);
 
       let data;
       let error;
       let fallbackData = [];
 
-      if (role === 'volunteer') {
+      if (userRole === 'volunteer') {
         // Volunteers see pilgrim locations (people they can help)
-        console.log('MapService: Calling get_pilgrim_locations_for_volunteer');
+        console.log('🟢 MapService.getAssignmentLocations: VOLUNTEER - Calling get_pilgrim_locations_for_volunteer');
         ({ data, error } = await supabase.rpc('get_pilgrim_locations_for_volunteer', {
           p_volunteer_id: user.id
         }));
-        console.log('MapService: Volunteer locations result:', { data, error });
+        console.log('📊 MapService.getAssignmentLocations: VOLUNTEER RPC result:', { 
+          dataCount: data?.length || 0, 
+          error: error,
+          data: data 
+        });
         
         // If function doesn't exist, fall back to basic query
-        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
-          console.log('MapService: Function not found, using fallback query for volunteer');
-          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, role));
+        if (error && (error.message?.includes('function') || error.code === '42883')) {
+          console.log('⚠️ MapService.getAssignmentLocations: VOLUNTEER - Function not found, using fallback query');
+          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, userRole));
         }
         
-      } else if (role === 'pilgrim') {
+      } else if (userRole === 'pilgrim') {
         // Pilgrims see volunteer locations (people who can help them)
-        console.log('MapService: Calling get_volunteer_locations_for_pilgrim');
+        console.log('🔴 MapService.getAssignmentLocations: PILGRIM - Calling get_volunteer_locations_for_pilgrim');
         ({ data, error } = await supabase.rpc('get_volunteer_locations_for_pilgrim', {
           p_pilgrim_id: user.id
         }));
-        console.log('MapService: Pilgrim locations result:', { data, error });
+        console.log('📊 MapService.getAssignmentLocations: PILGRIM RPC result:', { 
+          dataCount: data?.length || 0, 
+          error: error,
+          data: data 
+        });
         
         // If function doesn't exist, fall back to basic query
-        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
-          console.log('MapService: Function not found, using fallback query for pilgrim');
-          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, role));
+        if (error && (error.message?.includes('function') || error.code === '42883')) {
+          console.log('⚠️ MapService.getAssignmentLocations: PILGRIM - Function not found, using fallback query');
+          ({ data, error } = await this.getFallbackAssignmentLocations(user.id, userRole));
         }
         
-      } else if (role === 'admin') {
+      } else if (userRole === 'admin') {
         // Admins see all locations
+        console.log('🔵 MapService.getAssignmentLocations: ADMIN - Calling get_all_active_locations');
         ({ data, error } = await supabase.rpc('get_all_active_locations'));
+        console.log('📊 MapService.getAssignmentLocations: ADMIN RPC result:', { 
+          dataCount: data?.length || 0, 
+          error: error,
+          data: data 
+        });
         
         // If function doesn't exist, fall back to basic query
-        if (error && error.message?.includes('function') && error.message?.includes('does not exist')) {
-          console.log('MapService: Function not found, using fallback query for admin');
+        if (error && (error.message?.includes('function') || error.code === '42883')) {
+          console.log('⚠️ MapService.getAssignmentLocations: ADMIN - Function not found, using fallback query');
           ({ data, error } = await this.getFallbackAllLocations());
         }
       } else {
-        console.log('MapService: No valid role found, cannot fetch assignment locations');
+        console.error('❌ MapService.getAssignmentLocations: Invalid role:', userRole);
         return { data: [], error: 'No valid user role found' };
       }
 
       if (error) {
-        console.error('MapService: Error fetching locations:', error);
+        console.error('❌ MapService.getAssignmentLocations: Final error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        });
         return { data: [], error };
       }
       
       // Process location data and mark placeholders
       const locationData = data || [];
-      const processedData = locationData.map(location => ({
-        ...location,
-        isPlaceholder: location.assignment_info?.is_placeholder || (location.latitude === 0 && location.longitude === 0)
-      }));
+      console.log('🔧 MapService.getAssignmentLocations: Processing location data:', locationData);
       
-      console.log('MapService: Returning', processedData.length, 'locations');
+      const processedData = locationData.map(location => {
+        const processed = {
+          ...location,
+          isPlaceholder: location.assignment_info?.is_placeholder || (location.latitude === 0 && location.longitude === 0)
+        };
+        console.log('📍 MapService.getAssignmentLocations: Processed location:', {
+          user_name: processed.user_name,
+          user_role: processed.user_role,
+          latitude: processed.latitude,
+          longitude: processed.longitude,
+          isPlaceholder: processed.isPlaceholder
+        });
+        return processed;
+      });
+      
+      console.log('✅ MapService.getAssignmentLocations: Returning', processedData.length, 'locations');
       return { data: processedData, error: null };
     } catch (error) {
-      console.error('Error getting assignment locations:', error);
+      console.error('❌ MapService.getAssignmentLocations: Unexpected error:', {
+        message: error.message,
+        stack: error.stack,
+        fullError: error
+      });
       return { data: [], error };
     }
   }
@@ -191,7 +223,7 @@ class MapService implements MapServiceInterface {
   // Fallback method when database functions don't exist
   private async getFallbackAssignmentLocations(userId: string, role: string): Promise<{ data: UserLocationData[] | null; error: any }> {
     try {
-      console.log('MapService: Using fallback assignment locations query');
+      console.log('🔄 MapService.getFallbackAssignmentLocations: Using fallback query for role:', role, 'userId:', userId);
       
       if (role === 'volunteer') {
         // Get assigned pilgrims' locations
@@ -262,7 +294,7 @@ class MapService implements MapServiceInterface {
       
       return { data: [], error: null };
     } catch (error) {
-      console.error('MapService: Fallback query error:', error);
+      console.error('❌ MapService.getFallbackAssignmentLocations: Fallback query error:', error);
       return { data: [], error };
     }
   }
@@ -270,7 +302,7 @@ class MapService implements MapServiceInterface {
   // Fallback method for admin to get all locations
   private async getFallbackAllLocations(): Promise<{ data: UserLocationData[] | null; error: any }> {
     try {
-      console.log('MapService: Using fallback all locations query');
+      console.log('🔄 MapService.getFallbackAllLocations: Using fallback all locations query');
       
       const { data, error } = await supabase
         .from('user_locations')
@@ -302,7 +334,7 @@ class MapService implements MapServiceInterface {
         error: null
       };
     } catch (error) {
-      console.error('MapService: Fallback all locations query error:', error);
+      console.error('❌ MapService.getFallbackAllLocations: Fallback all locations query error:', error);
       return { data: [], error };
     }
   }

@@ -5,17 +5,12 @@ export class AssignmentService {
   async createAssignment(requestId: string, volunteerId: string) {
     console.log('📝 Creating assignment:', { requestId, volunteerId });
     
-    // Check if volunteer has too many active assignments (limit to 3)
+    // Check if volunteer has too many active assignments (limit to 3) - simplified to avoid RLS recursion
     const { data: existingAssignments, error: checkError } = await supabase
       .from('assignments')
-      .select(`
-        id,
-        status,
-        assistance_requests!inner(status)
-      `)
+      .select('id, status')
       .eq('volunteer_id', volunteerId)
-      .in('status', ['pending', 'accepted', 'in_progress'])
-      .in('assistance_requests.status', ['assigned', 'in_progress']);
+      .in('status', ['pending', 'accepted', 'in_progress']);
 
     if (checkError) {
       console.error('❌ Error checking existing assignments:', checkError);
@@ -87,11 +82,7 @@ export class AssignmentService {
     try {
       let query = supabase
         .from('assignments')
-        .select(`
-          *,
-          request:assistance_requests(*),
-          volunteer:profiles!assignments_volunteer_id_fkey(*)
-        `)
+        .select('*')
         .order('assigned_at', { ascending: false });
 
       if (filters?.volunteerId) {
@@ -149,10 +140,7 @@ export class AssignmentService {
         .from('assignments')
         .update(updateData)
         .eq('id', id)
-        .select(`
-          *,
-          request:assistance_requests(*)
-        `)
+        .select('*')
         .single();
 
       console.log('📝 Assignment update result:', { data, error });
@@ -160,7 +148,7 @@ export class AssignmentService {
       if (error) throw error;
 
       // Update request status based on assignment status
-      if (data.request) {
+      if (data.request_id) {
         let requestStatus = 'assigned';
         switch (status) {
           case 'accepted':
@@ -190,10 +178,7 @@ export class AssignmentService {
     try {
       const { data, error } = await supabase
         .from('assignments')
-        .select(`
-          *,
-          request:assistance_requests(*)
-        `)
+        .select('*')
         .eq('volunteer_id', volunteerId)
         .in('status', ['assigned', 'accepted', 'in_progress'])
         .order('assigned_at', { ascending: false });

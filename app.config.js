@@ -53,7 +53,7 @@ export default {
     extra: {
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-      appRole: "volunteer", // Hardcoded role for this build
+      appRole: "admin", // Hardcoded role for this build
       eas: {
         projectId: "90504708-ed95-48b8-b8a0-86d1de6303a1"
       }

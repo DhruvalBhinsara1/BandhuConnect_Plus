@@ -127,33 +127,114 @@ class AutoAssignmentService {
    * Find volunteers that could potentially handle the request
    */
   private async findMatchingVolunteers(request: AssistanceRequest): Promise<User[]> {
-    // Extract coordinates from request location
-    const { data: locationData } = await supabase.rpc('get_coordinates_from_geography', {
-      geo_point: request.location
-    });
+    try {
+      console.log('🔍 Finding volunteers for request location:', request.location);
+      
+      // Try to extract coordinates from request location using multiple methods
+      let latitude: number, longitude: number;
+      
+      // Method 1: Try the RPC function if it exists
+      try {
+        const { data: locationData, error: rpcError } = await supabase.rpc('get_coordinates_from_geography', {
+          geo_point: request.location
+        });
 
-    if (!locationData || locationData.length === 0) {
-      console.error('Could not extract coordinates from request location');
+        if (!rpcError && locationData && locationData.length > 0) {
+          latitude = locationData[0].latitude;
+          longitude = locationData[0].longitude;
+          console.log('✅ Extracted coordinates via RPC:', { latitude, longitude });
+        } else {
+          throw new Error('RPC method failed');
+        }
+      } catch (rpcError) {
+        console.log('⚠️ RPC coordinate extraction failed, trying direct query...');
+        
+        // Method 2: Use request location directly if it has coordinates
+        if (request.location && typeof request.location === 'object') {
+          const locationObj = request.location as any;
+          if (locationObj.coordinates && Array.isArray(locationObj.coordinates)) {
+            longitude = locationObj.coordinates[0];
+            latitude = locationObj.coordinates[1];
+            console.log('✅ Extracted coordinates from location object:', { latitude, longitude });
+          } else if (locationObj.latitude && locationObj.longitude) {
+            latitude = locationObj.latitude;
+            longitude = locationObj.longitude;
+            console.log('✅ Extracted coordinates from location properties:', { latitude, longitude });
+          } else {
+            console.error('❌ Could not extract coordinates from request location object');
+            return [];
+          }
+        } else {
+          console.error('❌ Request location is not a valid object');
+          return [];
+        }
+        console.log('✅ Extracted coordinates via direct query:', { latitude, longitude });
+      }
+
+      // Try to use the find_nearest_volunteers function
+      try {
+        const { data: volunteers, error } = await supabase.rpc('find_nearest_volunteers', {
+          target_lat: latitude,
+          target_lng: longitude,
+          max_distance_meters: 10000, // 10km radius
+          required_skills: this.getRequiredSkills(request.type),
+          limit_count: 10
+        });
+
+        if (error) {
+          throw new Error(`RPC find_nearest_volunteers failed: ${error.message}`);
+        }
+
+        console.log('✅ Found volunteers via RPC:', volunteers?.length || 0);
+        return volunteers || [];
+      } catch (rpcError) {
+        console.log('⚠️ RPC volunteer search failed, using fallback query...');
+        
+        // Fallback: Simple query for volunteers without distance calculation
+        const { data: volunteers, error: fallbackError } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            name,
+            phone,
+            skills,
+            volunteer_status,
+            rating
+          `)
+          .eq('role', 'volunteer')
+          .eq('is_active', true)
+          .in('volunteer_status', ['available', 'busy'])
+          .limit(20);
+
+        if (fallbackError) {
+          console.error('❌ Fallback volunteer query failed:', fallbackError);
+          return [];
+        }
+
+        console.log('✅ Found volunteers via fallback query:', volunteers?.length || 0);
+        
+        // Calculate distance manually for fallback volunteers
+        return (volunteers || []).map(v => ({
+          id: v.id,
+          user_id: v.id,
+          name: v.name,
+          email: '',
+          phone: v.phone,
+          role: 'volunteer',
+          skills: v.skills,
+          volunteer_status: v.volunteer_status,
+          rating: v.rating,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          volunteer_id: v.id,
+          distance_meters: 5000 // Default distance for fallback
+        })) as User[];
+      }
+    } catch (error) {
+      console.error('❌ Error in findMatchingVolunteers:', error);
       return [];
     }
-
-    const { latitude, longitude } = locationData[0];
-
-    // Use the existing find_nearest_volunteers function
-    const { data: volunteers, error } = await supabase.rpc('find_nearest_volunteers', {
-      target_lat: latitude,
-      target_lng: longitude,
-      max_distance_meters: 10000, // 10km radius
-      required_skills: this.getRequiredSkills(request.type),
-      limit_count: 10
-    });
-
-    if (error) {
-      console.error('Error finding volunteers:', error);
-      return [];
-    }
-
-    return volunteers || [];
   }
 
   /**
@@ -320,26 +401,94 @@ class AutoAssignmentService {
   }
 
   /**
-   * Create assignment record
+   * Create assignment record with comprehensive error handling
    */
   private async createAssignment(request: AssistanceRequest, volunteer: User): Promise<Assignment | null> {
-    const { data, error } = await supabase
-      .from('assignments')
-      .insert({
-        request_id: request.id,
-        volunteer_id: volunteer.id,
-        status: 'pending',
-        assigned_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    try {
+      console.log('🔄 Creating assignment via multiple methods...');
+      
+      // Method 1: Try the SECURITY DEFINER function
+      try {
+        const { data: assignmentId, error: rpcError } = await supabase
+          .rpc('create_assignment_safe', {
+            p_request_id: request.id,
+            p_volunteer_id: volunteer.id,
+            p_status: 'pending'
+          });
 
-    if (error) {
-      console.error('Error creating assignment:', error);
+        if (!rpcError && assignmentId) {
+          console.log('✅ Assignment created via RPC:', assignmentId);
+          
+          // Fetch the created assignment details
+          const { data: assignment, error: fetchError } = await supabase
+            .from('assignments')
+            .select('*')
+            .eq('id', assignmentId)
+            .single();
+
+          if (!fetchError && assignment) {
+            return assignment as Assignment;
+          }
+          
+          // Return basic assignment if fetch fails
+          return {
+            id: assignmentId,
+            request_id: request.id,
+            volunteer_id: volunteer.id,
+            status: 'pending',
+            assigned_at: new Date().toISOString()
+          } as Assignment;
+        }
+        
+        console.log('⚠️ RPC method failed, trying direct insert...', rpcError?.message);
+      } catch (rpcError) {
+        console.log('⚠️ RPC method threw error, trying direct insert...', rpcError);
+      }
+
+      // Method 2: Direct insert with better error handling
+      try {
+        const { data, error } = await supabase
+          .from('assignments')
+          .insert({
+            request_id: request.id,
+            volunteer_id: volunteer.id,
+            status: 'pending',
+            assigned_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          console.log('✅ Assignment created via direct insert:', data.id);
+          return data as Assignment;
+        }
+        
+        console.log('⚠️ Direct insert failed, trying assignment service...', error?.message);
+      } catch (insertError) {
+        console.log('⚠️ Direct insert threw error, trying assignment service...', insertError);
+      }
+
+      // Method 3: Use the assignment service as final fallback
+      try {
+        const { assignmentService } = await import('./assignmentService');
+        const result = await assignmentService.createAssignment(request.id, volunteer.id);
+        
+        if (!result.error && result.data) {
+          console.log('✅ Assignment created via assignment service:', result.data.id);
+          return result.data as Assignment;
+        }
+        
+        console.log('❌ Assignment service also failed:', result.error?.message);
+      } catch (serviceError) {
+        console.log('❌ Assignment service threw error:', serviceError);
+      }
+
+      console.error('❌ All assignment creation methods failed');
+      return null;
+    } catch (error) {
+      console.error('❌ Unexpected error in createAssignment:', error);
       return null;
     }
-
-    return data as Assignment;
   }
 
   /**

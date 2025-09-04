@@ -205,9 +205,28 @@ export class VolunteerService {
 
   async getVolunteerStats(volunteerId: string) {
     try {
-      console.log('Fetching volunteer statistics:', volunteerId);
+      console.log('🔍 Fetching volunteer statistics:', volunteerId);
       
-      // Get assignment statistics
+      // First try using the RPC function to bypass RLS
+      const { data: rpcStats, error: rpcError } = await supabase
+        .rpc('get_volunteer_stats', {
+          p_volunteer_id: volunteerId
+        });
+
+      if (rpcStats && !rpcError) {
+        console.log('✅ Got stats via RPC function:', rpcStats);
+        const stats = {
+          totalTasks: Number(rpcStats[0]?.total_assignments || 0),
+          completedTasks: Number(rpcStats[0]?.completed_assignments || 0),
+          activeAssignments: Number(rpcStats[0]?.active_assignments || 0),
+          hoursWorked: Number(rpcStats[0]?.hours_worked || 0),
+        };
+        return { data: stats, error: null };
+      }
+
+      console.log('⚠️ RPC function failed, falling back to direct query:', rpcError);
+      
+      // Fallback: Get assignment statistics directly
       const { data: assignments, error: assignmentError } = await supabase
         .from('assignments')
         .select(`
@@ -262,10 +281,10 @@ export class VolunteerService {
         assignments: assignments || []
       };
       
-      console.log('Volunteer stats result:', stats);
+      console.log('📊 Volunteer stats result (fallback):', stats);
       return { data: stats, error: null };
     } catch (error) {
-      console.error('Error fetching volunteer stats:', error);
+      console.error('❌ Error fetching volunteer stats:', error);
       return { data: null, error };
     }
   }

@@ -7,13 +7,16 @@ import { AssistanceRequest, User, Assignment } from '../../types';
 import { autoAssignmentService } from '../../services/autoAssignmentService';
 import { assignmentService } from '../../services/assignmentService';
 import { requestService } from '../../services/requestService';
+import { bulkCompletionService } from '../../services/bulkCompletionService';
+import { realTimeStatusService } from '../../services/realTimeStatusService';
 import { Logger } from '../../utils/logger';
 import AutoAssignModal from './AutoAssignModal';
 
-const TaskAssignment: React.FC = ({ route }: any) => {
+const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
   const navigation = useNavigation<any>();
-  const [activeTab, setActiveTab] = useState<'assign' | 'create'>('assign');
+  const [activeTab, setActiveTab] = useState<'all' | 'assign' | 'create'>('all');
   const [requests, setRequests] = useState<any[]>([]);
+  const [allRequests, setAllRequests] = useState<any[]>([]);
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
@@ -40,17 +43,52 @@ const TaskAssignment: React.FC = ({ route }: any) => {
   useEffect(() => {
     loadData();
     
+    // Set up real-time subscriptions for status changes
+    const subscriptions = realTimeStatusService.subscribeToAllStatusChanges((event) => {
+      Logger.info('📡 Received real-time status change:', event);
+      
+      // Refresh data when status changes occur
+      if (event.eventType === 'UPDATE' && 
+          (event.new?.status !== event.old?.status)) {
+        Logger.info('🔄 Status changed, refreshing data...');
+        loadData();
+      }
+    });
+
+    // Listen for force refresh broadcasts
+    const refreshChannel = supabase.channel('data_refresh_listener')
+      .on('broadcast', { event: 'force_refresh' }, (payload) => {
+        Logger.info('📡 Received force refresh signal:', payload);
+        loadData();
+      })
+      .subscribe();
+    
     // If coming from volunteer management with auto-assign mode
     if (preSelectedVolunteer && assignmentMode === 'auto_assign_to_volunteer') {
       setSelectedVolunteer(preSelectedVolunteer);
       setShowAutoAssignModal(true);
     }
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      subscriptions.forEach(sub => sub.unsubscribe());
+      supabase.removeChannel(refreshChannel);
+    };
   }, [preSelectedVolunteer, assignmentMode]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      // Load pending requests
+      
+      // Load all requests for overview tab
+      const { data: allRequestsData } = await supabase
+        .from('assistance_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (allRequestsData) setAllRequests(allRequestsData);
+      
+      // Load pending requests for assignment tab
       const { data: requestsData } = await supabase
         .from('assistance_requests')
         .select('*')
@@ -59,37 +97,33 @@ const TaskAssignment: React.FC = ({ route }: any) => {
       
       if (requestsData) setRequests(requestsData);
 
-      // Load available volunteers with assignment count
+      // Load available volunteers - simplified to avoid RLS recursion
       const { data: volunteersData } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          assignments!assignments_volunteer_id_fkey(
-            id,
-            status,
-            assistance_requests!inner(status)
-          )
-        `)
+        .select('*')
         .eq('role', 'volunteer')
         .eq('is_active', true)
         .in('volunteer_status', ['available', 'busy']);
       
       if (volunteersData) {
-        // Process volunteers to add assignment count and availability info
-        const processedVolunteers = volunteersData.map(volunteer => {
-          const activeAssignments = volunteer.assignments?.filter(assignment => 
-            ['pending', 'accepted', 'in_progress'].includes(assignment.status) &&
-            ['assigned', 'in_progress'].includes(assignment.assistance_requests?.status)
-          ) || [];
+        // Get assignment counts separately to avoid RLS recursion
+        const processedVolunteers = await Promise.all(volunteersData.map(async volunteer => {
+          const { data: assignments } = await supabase
+            .from('assignments')
+            .select('id, status')
+            .eq('volunteer_id', volunteer.id)
+            .in('status', ['pending', 'accepted', 'in_progress']);
+          
+          const activeAssignmentCount = assignments?.length || 0;
           
           return {
             ...volunteer,
-            activeAssignmentCount: activeAssignments.length,
-            canTakeMoreAssignments: activeAssignments.length < 3,
-            workloadStatus: activeAssignments.length === 0 ? 'free' : 
-                           activeAssignments.length < 3 ? 'busy' : 'overloaded'
+            activeAssignmentCount,
+            canTakeMoreAssignments: activeAssignmentCount < 3,
+            workloadStatus: activeAssignmentCount === 0 ? 'free' : 
+                           activeAssignmentCount < 3 ? 'busy' : 'overloaded'
           };
-        });
+        }));
         
         // Sort by availability (free volunteers first, then by assignment count)
         processedVolunteers.sort((a, b) => {
@@ -159,11 +193,45 @@ const TaskAssignment: React.FC = ({ route }: any) => {
         loadData();
       } else {
         console.error('❌ Auto-assignment failed:', result.message);
-        Alert.alert('Auto-Assignment Failed', result.message);
+        
+        // Provide more helpful error messages and fallback options
+        const errorTitle = 'Auto-Assignment Failed';
+        let errorMessage = result.message;
+        let showManualOption = true;
+        
+        if (result.message.includes('No available volunteers')) {
+          errorMessage = 'No volunteers are currently available for this request type. You can:\n\n• Try manual assignment\n• Wait for volunteers to become available\n• Modify the request priority';
+        } else if (result.message.includes('below threshold')) {
+          errorMessage = 'No volunteers found with sufficient skill match. You can:\n\n• Try manual assignment to override\n• Modify the request details\n• Add more volunteers with relevant skills';
+        } else if (result.message.includes('Failed to create assignment')) {
+          errorMessage = 'Assignment creation failed due to system constraints. You can:\n\n• Try manual assignment instead\n• Check if the volunteer is already assigned\n• Contact system administrator';
+        }
+        
+        Alert.alert(
+          errorTitle, 
+          errorMessage,
+          showManualOption ? [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Try Manual Assignment', 
+              onPress: () => handleAssignRequest(request)
+            }
+          ] : [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('❌ Auto-assignment system error:', error);
-      Alert.alert('Error', `Auto-assignment failed: ${error.message || 'Unknown error'}`);
+      Alert.alert(
+        'System Error', 
+        'Auto-assignment system encountered an error. Please try manual assignment instead.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Manual Assignment', 
+            onPress: () => handleAssignRequest(request)
+          }
+        ]
+      );
     } finally {
       setLoading(false);
     }
@@ -210,6 +278,67 @@ const TaskAssignment: React.FC = ({ route }: any) => {
       Alert.alert('Error', 'Failed to perform batch auto-assignment');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const markAllAsDone = async () => {
+    try {
+      // Check admin permissions first
+      const hasPermission = await bulkCompletionService.hasAdminPermissions();
+      if (!hasPermission) {
+        Alert.alert('Access Denied', 'Only administrators can mark all requests as completed.');
+        return;
+      }
+
+      // Get current stats to show user what will be affected
+      const stats = await bulkCompletionService.getCompletionStats();
+      const pendingCount = stats ? (stats.pendingRequests + stats.assignedRequests + stats.inProgressRequests) : 0;
+
+      if (pendingCount === 0) {
+        Alert.alert('No Action Needed', 'All requests are already completed or cancelled.');
+        return;
+      }
+
+      // Confirm with user
+      Alert.alert(
+        'Mark All as Done',
+        `This will mark ${pendingCount} pending/active requests as completed.\n\nThis action cannot be undone. Continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Mark All Done',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                setLoading(true);
+                Logger.info('🔄 Starting bulk completion of all requests...');
+
+                const result = await bulkCompletionService.markAllRequestsCompleted();
+
+                if (result.success) {
+                  Alert.alert(
+                    'Success',
+                    result.message,
+                    [{ text: 'OK', onPress: () => loadData() }]
+                  );
+                  Logger.info(`✅ Bulk completion successful: ${result.updatedCount} requests`);
+                } else {
+                  Alert.alert('Error', result.message);
+                  Logger.error('❌ Bulk completion failed:', result.error);
+                }
+              } catch (error) {
+                Logger.error('❌ Bulk completion error:', error);
+                Alert.alert('Error', 'Failed to mark requests as completed');
+              } finally {
+                setLoading(false);
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      Logger.error('❌ Error in markAllAsDone:', error);
+      Alert.alert('Error', 'Failed to process bulk completion request');
     }
   };
 
@@ -343,19 +472,127 @@ const TaskAssignment: React.FC = ({ route }: any) => {
     return colors[status as keyof typeof colors] || '#6b7280';
   };
 
+  // New unified overview tab
+  const renderAllRequestsTab = () => {
+    const pendingRequests = allRequests.filter(r => r.status === 'pending');
+    const assignedRequests = allRequests.filter(r => r.status === 'assigned');
+    const inProgressRequests = allRequests.filter(r => r.status === 'in_progress');
+    const completedRequests = allRequests.filter(r => r.status === 'completed');
+
+    return (
+      <View style={styles.tabContent}>
+        <View style={styles.headerSection}>
+          <Text style={styles.sectionTitle}>Request Overview</Text>
+          <Text style={styles.sectionSubtitle}>Manage all assistance requests and tasks in one place</Text>
+          
+          <View style={styles.batchButtonContainer}>
+            <TouchableOpacity 
+              style={styles.batchAutoButton}
+              onPress={batchAutoAssign}
+              disabled={loading}
+            >
+              <Text style={styles.batchAutoButtonText}>🤖 Auto-Assign All Pending</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.markAllDoneButton}
+              onPress={markAllAsDone}
+              disabled={loading}
+            >
+              <Text style={styles.markAllDoneButtonText}>✅ Mark All as Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Status Summary Cards */}
+          <View style={styles.statusSummary}>
+            <View style={[styles.statusCard, { borderLeftColor: '#f59e0b' }]}>
+              <Text style={styles.statusNumber}>{pendingRequests.length}</Text>
+              <Text style={styles.statusLabel}>Pending</Text>
+            </View>
+            <View style={[styles.statusCard, { borderLeftColor: '#3b82f6' }]}>
+              <Text style={styles.statusNumber}>{assignedRequests.length}</Text>
+              <Text style={styles.statusLabel}>Assigned</Text>
+            </View>
+            <View style={[styles.statusCard, { borderLeftColor: '#8b5cf6' }]}>
+              <Text style={styles.statusNumber}>{inProgressRequests.length}</Text>
+              <Text style={styles.statusLabel}>In Progress</Text>
+            </View>
+            <View style={[styles.statusCard, { borderLeftColor: '#10b981' }]}>
+              <Text style={styles.statusNumber}>{completedRequests.length}</Text>
+              <Text style={styles.statusLabel}>Completed</Text>
+            </View>
+          </View>
+        </View>
+        
+        {allRequests.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyText}>No requests found</Text>
+          </View>
+        ) : (
+          allRequests.map((request, index) => (
+            <View key={`${request.id}-${index}`} style={styles.requestCard}>
+              <TouchableOpacity
+                style={styles.requestContent}
+                onPress={() => request.status === 'pending' ? handleAssignRequest(request) : null}
+              >
+                <View style={styles.requestHeader}>
+                  <Text style={styles.requestTitle}>{request.title}</Text>
+                  <View style={styles.requestBadges}>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) + '20' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
+                        {request.status}
+                      </Text>
+                    </View>
+                    <View style={[styles.priorityBadge, { backgroundColor: getStatusColor(request.priority) + '20' }]}>
+                      <Text style={[styles.priorityText, { color: getStatusColor(request.priority) }]}>
+                        {request.priority}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={styles.requestDescription}>{request.description}</Text>
+                <View style={styles.requestMeta}>
+                  <View style={styles.requestType}>
+                    <Text style={styles.metaIcon}>🏥</Text>
+                    <Text style={styles.metaText}>{request.type}</Text>
+                  </View>
+                  <Text style={styles.metaText}>
+                    {new Date(request.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              
+              {request.status === 'pending' && (
+                <View style={styles.assignmentActions}>
+                  <TouchableOpacity 
+                    style={styles.manualAssignButton}
+                    onPress={() => handleAssignRequest(request)}
+                  >
+                    <Text style={styles.manualAssignButtonText}>👤 Assign</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.autoAssignButton}
+                    onPress={() => autoAssignRequest(request)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.autoAssignButtonText}>🤖 Auto</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          ))
+        )}
+      </View>
+    );
+  };
+
   const renderAssignTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.headerSection}>
         <Text style={styles.sectionTitle}>Pending Requests</Text>
-        <Text style={styles.sectionSubtitle}>Select a request to assign to a volunteer</Text>
-        
-        <TouchableOpacity 
-          style={styles.batchAutoButton}
-          onPress={batchAutoAssign}
-          disabled={loading || requests.length === 0}
-        >
-          <Text style={styles.batchAutoButtonText}>🤖 Auto-Assign All (Batch)</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionSubtitle}>Quick assignment for pending requests only</Text>
       </View>
       
       {requests.length === 0 ? (
@@ -412,10 +649,11 @@ const TaskAssignment: React.FC = ({ route }: any) => {
     </View>
   );
 
-  const renderCreateTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.sectionTitle}>Create Custom Task</Text>
-      <Text style={styles.sectionSubtitle}>Create a custom task and assign it to a volunteer</Text>
+  const renderCreateTab = () => {
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.sectionTitle}>Create New Request</Text>
+        <Text style={styles.sectionSubtitle}>Create a new assistance request and assign to volunteer</Text>
       
       <TouchableOpacity 
         style={styles.createButton}
@@ -463,6 +701,7 @@ const TaskAssignment: React.FC = ({ route }: any) => {
       )}
     </View>
   );
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -470,17 +709,25 @@ const TaskAssignment: React.FC = ({ route }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Task Assignment</Text>
+        <Text style={styles.headerTitle}>Request Management</Text>
         <View />
       </View>
 
       <View style={styles.tabBar}>
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+            📋 All Requests
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'assign' && styles.activeTab]}
           onPress={() => setActiveTab('assign')}
         >
           <Text style={[styles.tabText, activeTab === 'assign' && styles.activeTabText]}>
-            Assign Existing
+            ⚡ Quick Assign
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -488,7 +735,7 @@ const TaskAssignment: React.FC = ({ route }: any) => {
           onPress={() => setActiveTab('create')}
         >
           <Text style={[styles.tabText, activeTab === 'create' && styles.activeTabText]}>
-            Create Custom
+            ➕ Create Request
           </Text>
         </TouchableOpacity>
       </View>
@@ -497,7 +744,8 @@ const TaskAssignment: React.FC = ({ route }: any) => {
         style={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
       >
-        {activeTab === 'assign' ? renderAssignTab() : renderCreateTab()}
+        {activeTab === 'all' ? renderAllRequestsTab() : 
+         activeTab === 'assign' ? renderAssignTab() : renderCreateTab()}
       </ScrollView>
 
       {/* Volunteer Selection Modal */}
@@ -735,18 +983,65 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 24,
   },
+  batchButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
   batchAutoButton: {
     backgroundColor: '#8b5cf6',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    marginTop: 12,
     alignItems: 'center',
+    flex: 1,
   },
   batchAutoButtonText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  markAllDoneButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    flex: 1,
+  },
+  markAllDoneButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statusSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    gap: 8,
+  },
+  statusCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 4,
+    alignItems: 'center',
+  },
+  statusNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  requestBadges: {
+    flexDirection: 'row',
+    gap: 8,
   },
   emptyState: {
     alignItems: 'center',

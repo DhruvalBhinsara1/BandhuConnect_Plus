@@ -55,16 +55,10 @@ const AdminDashboard: React.FC = () => {
 
   const loadAutoAssignStats = async () => {
     try {
-      // Get all assignments with their request data
+      // Simplified query without joins to avoid RLS recursion
       const { data: allAssignments, error: assignmentError } = await supabase
         .from('assignments')
-        .select(`
-          id, 
-          created_at, 
-          assigned_at,
-          notes,
-          assistance_requests!inner(status)
-        `);
+        .select('id, created_at, assigned_at, notes');
       
       if (assignmentError) {
         console.error('Error loading assignment stats:', assignmentError);
@@ -95,11 +89,11 @@ const AdminDashboard: React.FC = () => {
         new Date(a.created_at) >= today
       );
 
-      // Get total completed requests for success rate calculation
+      // Get total completed requests for success rate calculation (simplified)
       const { data: completedRequests, error: requestError } = await supabase
         .from('assistance_requests')
         .select('id')
-        .in('status', ['assigned', 'in_progress', 'completed']);
+        .eq('status', 'completed');
 
       if (requestError) {
         console.error('Error loading request stats:', requestError);
@@ -302,7 +296,7 @@ const AdminDashboard: React.FC = () => {
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => navigation.navigate('RequestManagement')}
+                onPress={() => navigation.navigate('TaskAssignment')}
               >
                 <Ionicons name="clipboard" size={24} color="#10b981" />
                 <Text style={styles.actionButtonText}>Manage Requests</Text>
