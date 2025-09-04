@@ -7,6 +7,7 @@ import { useRequest } from '../../context/RequestContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
+import { volunteerService } from '../../services/volunteerService';
 import { COLORS, VOLUNTEER_SKILLS } from '../../constants';
 
 const VolunteerProfile: React.FC = () => {
@@ -35,30 +36,43 @@ const VolunteerProfile: React.FC = () => {
   });
 
   useEffect(() => {
-    if (assignments.length > 0 && user) {
-      calculateStats();
+    if (user) {
+      loadStats();
     }
-  }, [assignments, user]);
+  }, [user]);
 
-  const calculateStats = () => {
-    const userAssignments = assignments.filter(a => a.volunteer_id === user?.id);
-    const completed = userAssignments.filter(a => a.status === 'completed');
+  const loadStats = async () => {
+    if (!user) return;
     
-    let totalHours = 0;
-    completed.forEach(assignment => {
-      if (assignment.started_at && assignment.completed_at) {
-        const start = new Date(assignment.started_at);
-        const end = new Date(assignment.completed_at);
-        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-        totalHours += hours;
-      }
-    });
+    // Use volunteer service to get real statistics from database
+    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
+    if (volunteerStats && !error) {
+      setStats({
+        completedTasks: volunteerStats.completedTasks,
+        totalTasks: volunteerStats.totalTasks,
+        hoursWorked: volunteerStats.hoursWorked,
+      });
+    } else {
+      // Fallback to local calculation if database query fails
+      const userAssignments = assignments.filter(a => a.volunteer_id === user?.id);
+      const completed = userAssignments.filter(a => a.status === 'completed');
+      
+      let totalHours = 0;
+      completed.forEach(assignment => {
+        if (assignment.started_at && assignment.completed_at) {
+          const start = new Date(assignment.started_at);
+          const end = new Date(assignment.completed_at);
+          const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+          totalHours += hours;
+        }
+      });
 
-    setStats({
-      completedTasks: completed.length,
-      totalTasks: userAssignments.length,
-      hoursWorked: totalHours,
-    });
+      setStats({
+        completedTasks: completed.length,
+        totalTasks: userAssignments.length,
+        hoursWorked: totalHours,
+      });
+    }
   };
 
   const handleSave = async () => {

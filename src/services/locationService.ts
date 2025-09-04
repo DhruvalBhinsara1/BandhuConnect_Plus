@@ -5,10 +5,10 @@ import { mapService } from './mapService';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
-// Define the background task
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+// Background task handler function - defined separately to avoid circular dependency
+const handleBackgroundLocationUpdate = async ({ data, error }: any) => {
   if (error) {
-    console.error('Background location task error:', error);
+    console.error('🔴 Background location task error:', error);
     return;
   }
   if (data) {
@@ -16,19 +16,40 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     const location = locations[0];
     if (location) {
       try {
+        console.log('📍 Background location update received:', {
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+          accuracy: location.coords.accuracy,
+          timestamp: new Date(location.timestamp).toISOString()
+        });
+        
         const locationData = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
           accuracy: location.coords.accuracy || undefined,
           timestamp: location.timestamp,
         };
-        await locationService.updateLocation(locationData);
+        
+        // Use mapService directly to avoid circular dependency
+        const result = await mapService.updateUserLocation(locationData);
+        if (result.error) {
+          console.error('❌ Failed to update location in background:', result.error);
+        } else {
+          console.log('✅ Background location updated successfully');
+        }
       } catch (error) {
-        console.error('Failed to update location in background:', error);
+        console.error('❌ Failed to process background location:', error);
       }
     }
   }
-});
+};
+
+// Define the background task with proper error handling
+try {
+  TaskManager.defineTask(LOCATION_TASK_NAME, handleBackgroundLocationUpdate);
+} catch (error) {
+  console.error('❌ Failed to define background location task:', error);
+}
 
 class LocationService {
   private static instance: LocationService;
@@ -44,59 +65,69 @@ class LocationService {
 
   async requestPermissions() {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      const foregroundGranted = status === 'granted';
+      console.log('📍 Requesting location permissions...');
+      
+      // Step 1: Request foreground permissions first
+      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      const foregroundGranted = foregroundStatus === 'granted';
+      
+      console.log('📍 Foreground permission status:', foregroundStatus);
       
       if (!foregroundGranted) {
-        console.log('Foreground location permission denied');
+        console.log('❌ Foreground location permission denied');
         return { 
           foreground: false, 
           background: false,
-          error: 'Location permission not granted'
+          error: 'Location permission not granted. Please enable location access in device settings.'
         };
       }
 
-      // For iOS, check if we have "Always" permission (equivalent to background)
-      // For Android, request explicit background permission
-      const Platform = require('react-native').Platform;
-      let backgroundGranted = false;
+      // Step 2: Request background permissions
+      console.log('🔄 Requesting background location permissions...');
+      const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
+      const backgroundGranted = backgroundStatus.status === 'granted';
       
-      if (Platform.OS === 'ios') {
-        // On iOS, check if we have "Always" permission
+      console.log('📍 Background permission status:', backgroundStatus.status);
+      
+      // Additional iOS-specific checks
+      const Platform = require('react-native').Platform;
+      if (Platform.OS === 'ios' && backgroundGranted) {
         const currentPermissions = await Location.getForegroundPermissionsAsync();
-        backgroundGranted = currentPermissions.status === 'granted' && 
-                           (currentPermissions as any).ios?.scope === 'always';
-        
-        if (!backgroundGranted) {
-          // Request "Always" permission on iOS
-          const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
-          backgroundGranted = backgroundStatus.status === 'granted';
-        }
-      } else {
-        // On Android, request background permission explicitly
-        const backgroundStatus = await Location.requestBackgroundPermissionsAsync();
-        backgroundGranted = backgroundStatus.status === 'granted';
+        const hasAlwaysPermission = (currentPermissions as any).ios?.scope === 'always';
+        console.log('🍎 iOS Always permission:', hasAlwaysPermission);
       }
       
       if (!backgroundGranted) {
-        console.log('Background location permission denied');
+        console.log('⚠️ Background location permission denied - app will work with foreground only');
       }
 
-      return { 
+      const result = { 
         foreground: foregroundGranted,
         background: backgroundGranted
       };
+      
+      console.log('✅ Permission request completed:', result);
+      return result;
     } catch (error) {
-      // Silent error handling - no console.error that might trigger alerts
-      console.log('Location permission request failed:', error instanceof Error ? error.message : error);
+      console.log('❌ Location permission request failed:', error instanceof Error ? error.message : error);
       
       // Handle Expo Go limitation gracefully
       if (error instanceof Error && error.message.includes('NSLocation')) {
-        console.log('Location permissions not available in Expo Go - use development build for full functionality');
+        console.log('⚠️ Location permissions not available in Expo Go - use development build for full functionality');
         return { 
           foreground: false, 
           background: false,
           error: 'Location not available in Expo Go. Use development build for location features.'
+        };
+      }
+      
+      // Handle Android permission issues
+      if (error instanceof Error && error.message.includes('BACKGROUND_LOCATION')) {
+        console.log('⚠️ Android background location permission issue - may need manual settings adjustment');
+        return { 
+          foreground: true, // Assume foreground works
+          background: false,
+          error: 'Background location requires manual permission in Android settings'
         };
       }
       
@@ -253,32 +284,79 @@ class LocationService {
 
   async startBackgroundLocationUpdates() {
     try {
+      console.log('🔄 Starting background location updates...');
+      
+      // Check background permissions
       const { granted } = await Location.getBackgroundPermissionsAsync();
       if (!granted) {
-        console.log('Background location permission not granted');
-        return false;
+        console.log('❌ Background location permission not granted');
+        return { success: false, error: 'Background location permission not granted' };
       }
+      
+      console.log('✅ Background location permission granted');
 
+      // Check if task is already registered and stop it
       const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+      console.log('📋 Background task registered status:', isRegistered);
+      
       if (isRegistered) {
-        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        console.log('🛑 Stopping existing background location task...');
+        try {
+          await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+        } catch (stopError) {
+          console.warn('⚠️ Error stopping existing task (continuing anyway):', stopError);
+        }
       }
 
+      // Ensure task is properly defined before starting
+      if (!TaskManager.isTaskDefined(LOCATION_TASK_NAME)) {
+        console.log('⚠️ Background task not defined, redefining...');
+        try {
+          TaskManager.defineTask(LOCATION_TASK_NAME, handleBackgroundLocationUpdate);
+        } catch (defineError) {
+          console.error('❌ Failed to define background task:', defineError);
+          return { 
+            success: false, 
+            error: 'Failed to define background location task. This may be due to app configuration issues.'
+          };
+        }
+      }
+
+      console.log('🚀 Starting background location updates with config...');
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: 10000, // 10 seconds for background (matching foreground strategy)
         distanceInterval: 25, // 25 meters for background (matching foreground strategy)
+        deferredUpdatesInterval: 10000, // iOS: defer updates for 10 seconds
+        showsBackgroundLocationIndicator: true, // iOS: show location indicator
         foregroundService: {
           notificationTitle: 'BandhuConnect+ Location Tracking',
           notificationBody: 'Tracking your location for volunteer coordination',
+          notificationColor: '#3b82f6',
         },
       });
 
-      console.log('Background location tracking started with 10s/25m strategy');
-      return true;
+      console.log('✅ Background location tracking started with 10s/25m strategy');
+      return { success: true };
     } catch (error) {
-      console.error('Error starting background location updates:', error);
-      return false;
+      console.error('❌ Error starting background location updates:', error);
+      
+      // Provide specific error handling for common issues
+      let userFriendlyError = 'Unable to start location tracking';
+      if (error instanceof Error) {
+        if (error.message.includes('TaskManager')) {
+          userFriendlyError = 'Location tracking configuration error. Please restart the app.';
+        } else if (error.message.includes('permission')) {
+          userFriendlyError = 'Location permissions are required for tracking. Please enable in device settings.';
+        } else if (error.message.includes('not found')) {
+          userFriendlyError = 'Location services not available. Please ensure GPS is enabled.';
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: userFriendlyError
+      };
     }
   }
 

@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import { Colors, Theme } from '../constants/Colors';
 import VolunteerManagement from '../components/VolunteerManagement';
 import PilgrimManagement from '../components/PilgrimManagement';
+import RequestManagement from '../components/RequestManagement';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -304,18 +305,7 @@ function Overview({ setActiveTab }) {
   );
 }
 
-// Placeholder components for other tabs
-function RequestManagement() {
-  return (
-    <div style={styles.placeholderContainer}>
-      <h2 style={styles.sectionTitle}>Request Management</h2>
-      <p style={styles.placeholderText}>
-        Request management system will be implemented here.
-        This will include viewing, assigning, and tracking assistance requests.
-      </p>
-    </div>
-  );
-}
+// Placeholder components for other tabs (RequestManagement moved to separate component)
 
 function Analytics() {
   return (

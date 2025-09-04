@@ -54,28 +54,46 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
   const requestPermissions = async () => {
     try {
-      const perms = await locationService.requestPermissions();
+      console.log('LocationContext: Requesting permissions...');
+      const result = await locationService.requestPermissions();
       
-      // Check if we have the highest available permission to stop nagging
-      const highestAvailable = perms.background || 
-        (perms.foreground && Platform.OS === 'ios' && perms.error?.includes('denied'));
+      if ('error' in result && result.error) {
+        console.log('LocationContext: Permission request failed:', result.error);
+        
+        // Handle Expo Go gracefully without showing error modal
+        if (result.error.includes('Expo Go')) {
+          console.log('LocationContext: Running in Expo Go - location features limited');
+          const expoGoPerms = { 
+            foreground: false, 
+            background: false,
+            highestAvailable: false,
+            dontAskAgain: false
+          };
+          setPermissions(expoGoPerms);
+          return expoGoPerms;
+        }
+        
+        // For other errors, show user-friendly message
+        setShowPermissionModal(true);
+      }
       
-      const enhancedPerms = {
-        ...perms,
-        highestAvailable,
-        dontAskAgain: perms.error?.includes('denied') || perms.error?.includes('never_ask_again')
+      const perms = {
+        foreground: result.foreground,
+        background: result.background,
+        highestAvailable: result.background || result.foreground,
+        dontAskAgain: false
       };
       
-      setPermissions(enhancedPerms);
-      return enhancedPerms;
+      console.log('LocationContext: Permissions result:', perms);
+      setPermissions(perms);
+      return perms;
     } catch (error) {
-      console.log('Permission request failed:', error);
+      console.log('LocationContext: Permission request error:', error);
       const errorPerms = { 
         foreground: false, 
-        background: false, 
-        error,
-        dontAskAgain: error?.toString().includes('denied'),
-        highestAvailable: false
+        background: false,
+        highestAvailable: false,
+        dontAskAgain: false
       };
       setPermissions(errorPerms);
       return errorPerms;
@@ -133,10 +151,13 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
   const startTracking = async () => {
     try {
+      console.log('[LocationContext] Starting location tracking...');
+      
       if (!permissions?.foreground) {
+        console.log('[LocationContext] No foreground permission, requesting...');
         const newPerms = await requestPermissions();
         if (!newPerms.foreground) {
-          const errorMessage = newPerms.error || 'Location permission not granted';
+          const errorMessage = ('error' in newPerms && newPerms.error) ? String(newPerms.error) : 'Location permission not granted';
           console.log('Cannot start tracking - permission denied:', errorMessage);
           
           // Only show modal for actual permission denials, not Expo Go limitations
@@ -162,13 +183,17 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
         
         // Start background updates if we have permission
         if (permissions?.background) {
-          try {
-            await locationService.startBackgroundLocationUpdates();
+          console.log('[LocationContext] Starting background location tracking...');
+          const backgroundResult = await locationService.startBackgroundLocationUpdates();
+          if (backgroundResult.success) {
             setIsBackgroundTracking(true);
-            console.log('Background location tracking started');
-          } catch (error) {
-            console.log('Failed to start background tracking:', error);
+            console.log('✅ Background location tracking started successfully');
+          } else {
+            console.log('❌ Failed to start background tracking:', backgroundResult.error);
+            // Continue with foreground tracking even if background fails
           }
+        } else {
+          console.log('⚠️ Background location permission not available - using foreground only');
         }
       } else {
         console.log('Failed to create location subscription - likely due to Expo Go limitations');

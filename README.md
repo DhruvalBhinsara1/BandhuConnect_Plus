@@ -1,261 +1,147 @@
-# BandhuConnect+ - Community Assistance Platform
+# BandhuConnect+
 
-A comprehensive cross-platform React Native application built with Expo SDK 53 for community assistance during large public events. The platform serves three user types: **Volunteers**, **Admins**, and **Pilgrims/Attendees**.
+A comprehensive React Native application built with Expo for managing volunteers, pilgrims, and administrators during large public events. The app provides real-time location tracking, task assignment, and communication features with robust error handling and cross-app consistency.
 
-## 🏗️ Architecture Overview
+## Features
 
-### Tech Stack
-- **Frontend**: React Native 0.75.4 + Expo SDK 53
-- **Cross-Platform**: iOS, Android, and Web support
-- **Backend**: Supabase (PostgreSQL, Auth, Realtime, Storage)
-- **Navigation**: React Navigation v6
-- **Maps**: react-native-maps with Google Maps API + Real-time Location Tracking
-- **Styling**: NativeWind (Tailwind CSS for React Native)
-- **State Management**: React Context API + Hooks
-- **Image Handling**: Expo ImagePicker + Supabase Storage
-- **Authentication**: Supabase Auth (Phone OTP + Email/Password)
-- **Real-time**: Supabase Realtime for location updates, chat, and live coordination
+### For Volunteers
+- Real-time location tracking and sharing with graceful error handling
+- Receive and accept assistance requests with smart auto-assignment
+- Navigate to pilgrim locations with live updates
+- Update task status and provide feedback
+- View assigned pilgrims on interactive map with role-based markers
 
-### Project Structure
-```
-BandhuConnectPlus/
-├── src/
-│   ├── components/          # Reusable UI components
-│   │   ├── common/         # Common components (Button, Input, etc.)
-│   │   ├── maps/           # Map-related components
-│   │   └── chat/           # Chat components
-│   ├── screens/            # Screen components organized by user type
-│   │   ├── auth/           # Authentication screens
-│   │   ├── volunteer/      # Volunteer-specific screens
-│   │   ├── admin/          # Admin-specific screens
-│   │   └── pilgrim/        # Pilgrim-specific screens
-│   ├── navigation/         # Navigation configuration
-│   ├── context/            # React Context providers
-│   ├── services/           # API services and Supabase client
-│   ├── utils/              # Utility functions
-│   ├── constants/          # App constants and configurations
-│   └── types/              # TypeScript type definitions
-├── assets/                 # Images, fonts, and other assets
-├── app.json               # Expo configuration
-├── package.json           # Dependencies and scripts
-├── tailwind.config.js     # NativeWind configuration
-└── .env                   # Environment variables
-```
+### For Pilgrims
+- Request assistance with various categories and priorities
+- Track assigned volunteer location in real-time with bi-directional visibility
+- Receive updates on request status with user-friendly notifications
+- Rate volunteer services and provide feedback
 
-## 🎯 Core Features (Current Implementation Status)
+### For Administrators
+- Comprehensive dashboard with system overview and analytics
+- Manage volunteers and pilgrims with bulk operations
+- Auto-assign requests to optimal volunteers with skill matching
+- Monitor all activities and locations in real-time
+- Bulk completion and system management tools
 
-### 👥 User Types & Capabilities
+## Tech Stack
 
-#### 🚀 Volunteers (Mobile App) - ✅ FULLY IMPLEMENTED
-- **Authentication**: ✅ Phone OTP and email login with role-based access
-- **Dashboard**: ✅ View assigned tasks, status management, live statistics
-- **Task Management**: ✅ Accept/complete assignments with status updates
-- **Profile Management**: ✅ Update skills, availability, contact information
-- **Real-time Location**: ✅ Live GPS tracking with assigned pilgrims
-- **Map Navigation**: ✅ "Show Me" and "Fit in Frame" controls for efficient coordination
+- **Frontend**: React Native with Expo SDK 53
+- **Backend**: Supabase (PostgreSQL + Real-time subscriptions)
+- **Maps**: Google Maps API with react-native-maps
+- **Authentication**: Supabase Auth with role-based access
+- **Real-time**: Supabase Realtime with intelligent filtering
+- **State Management**: React Context API with error boundaries
+- **UI**: Custom components with modern design and accessibility
 
-#### 👑 Admins (Mobile/Web Interface) - ✅ FULLY OPERATIONAL
-- **Volunteer Management**: ✅ Monitor all volunteers, update profiles, manage status
-- **Request Management**: ✅ View/create/delete assistance requests
-- **Task Assignment**: ✅ Manual and auto-assignment with skill matching
-- **Analytics Dashboard**: ✅ Real-time statistics, volunteer counts, request tracking
-- **Profile Editing**: ✅ Full CRUD operations on volunteer profiles with persistence
-- **Live Oversight**: ✅ Real-time map view of all volunteers and pilgrims
-- **Auto-Assignment System**: ✅ Intelligent matching based on skills, location, availability
+## Real-time Location Features
 
-#### 🙏 Pilgrims/Attendees (Mobile App) - ✅ FULLY IMPLEMENTED
-- **Authentication**: ✅ Registration and login system
-- **Request Creation**: ✅ Submit assistance requests with details
-- **Status Tracking**: ✅ Monitor request progress with live updates
-- **Profile Management**: ✅ Complete profile functionality
-- **Live Tracking**: ✅ Real-time location sharing with assigned volunteers
-- **Volunteer Visibility**: ✅ See assigned volunteer approaching in real-time
+- **Live Tracking**: 10-second interval updates with 25-meter movement threshold
+- **Bi-directional Visibility**: Pilgrims see volunteers, volunteers see pilgrims
+- **Role-based Markers**: 🔴 Pilgrims, 🟢 Volunteers, 🔵 Admins
+- **Smart Navigation**: "Show Me" and "Fit in Frame" buttons with error handling
+- **Stale Detection**: Visual indicators for offline users (>5 minutes)
+- **Graceful Degradation**: Fallback queries when database functions unavailable
+- **Battery Optimization**: Intelligent publishing strategy to preserve battery life
 
-## 🗄️ Database Schema
+## Error Handling & Reliability
 
-### Core Tables (Supabase PostgreSQL)
+- **Location Service**: Graceful handling of permission denials and GPS issues
+- **User-Friendly Messages**: Clear error messages instead of technical jargon
+- **Fallback Systems**: Alternative queries when primary functions fail
+- **Cross-App Consistency**: All changes validated across pilgrim, volunteer, and admin apps
+- **Background Task Management**: Robust handling of location tracking errors
 
-#### `profiles` Table
-```sql
-- id (uuid, primary key)
-- user_id (uuid, references auth.users)
-- name (text)
-- email (text)
-- phone (text)
-- role (enum: 'volunteer', 'admin', 'pilgrim')
-- skills (text[])
-- age (integer)
-- location (geography)
-- status (text)
-- is_active (boolean)
-- created_at (timestamp)
-- updated_at (timestamp)
-```
-
-#### `assistance_requests` Table
-```sql
-- id (uuid, primary key)
-- user_id (uuid, references profiles)
-- type (enum: 'medical', 'safety', 'lost_child', 'sanitation', 'general')
-- title (text)
-- description (text)
-- photo_url (text)
-- location (geography)
-- status (enum: 'pending', 'assigned', 'in_progress', 'completed', 'cancelled')
-- priority (enum: 'low', 'medium', 'high', 'emergency')
-- created_at (timestamp)
-- updated_at (timestamp)
-```
-
-#### `assignments` Table
-```sql
-- id (uuid, primary key)
-- request_id (uuid, references assistance_requests)
-- volunteer_id (uuid, references profiles)
-- status (enum: 'assigned', 'accepted', 'on_duty', 'completed')
-- assigned_at (timestamp)
-- accepted_at (timestamp)
-- started_at (timestamp)
-- completed_at (timestamp)
-```
-
-#### `user_locations` Table
-```sql
-- id (uuid, primary key)
-- user_id (uuid, references profiles)
-- latitude (numeric)
-- longitude (numeric)
-- accuracy (numeric, nullable)
-- altitude (numeric, nullable)
-- heading (numeric, nullable)
-- speed (numeric, nullable)
-- is_active (boolean, default true)
-- last_updated (timestamp)
-- created_at (timestamp)
-```
-
-#### `messages` Table
-```sql
-- id (uuid, primary key)
-- sender_id (uuid, references profiles)
-- receiver_id (uuid, references profiles, nullable)
-- channel_id (text)
-- content (text)
-- message_type (enum: 'text', 'image', 'location')
-- created_at (timestamp)
-```
-
-## 🔄 User Journeys
-
-### Volunteer Journey
-1. **Sign Up** → Enter details, select skills, verify phone/email
-2. **Dashboard** → View assigned tasks, check current status
-3. **Accept Task** → Review request details, accept assignment
-4. **Navigate** → Use integrated maps to reach location
-5. **Check In** → Update status to "on duty" at location
-6. **Complete Task** → Mark task as completed, add notes
-7. **Chat** → Communicate with admins and other volunteers
-
-### Admin Journey
-1. **Login** → Access web dashboard with admin credentials
-2. **Monitor** → View real-time volunteer status and requests
-3. **Assign Tasks** → Match volunteers to incoming requests
-4. **Track Progress** → Monitor task completion and volunteer locations
-5. **Analytics** → Review performance metrics and reports
-6. **Communicate** → Send broadcasts and manage chat channels
-
-### Pilgrim Journey
-1. **Sign Up** → Quick registration with basic details
-2. **Request Help** → Select issue type, add description and photo
-3. **Share Location** → Allow GPS access for precise location
-4. **Track Status** → Monitor request progress and volunteer ETA
-5. **Receive Help** → Interact with assigned volunteer
-6. **Provide Feedback** → Rate service and add comments
-
-## 🔧 Technical Implementation
-
-### State Management
-- **AuthContext**: User authentication and session management
-- **LocationContext**: GPS tracking and location services
-- **ChatContext**: Real-time messaging and notifications
-- **RequestContext**: Request creation and status updates
-
-### API Services
-- **authService**: Authentication operations
-- **profileService**: User profile management
-- **requestService**: Request CRUD operations
-- **assignmentService**: Task assignment management
-- **chatService**: Real-time messaging
-- **locationService**: GPS and mapping utilities
-
-### Security Features
-- **Row Level Security (RLS)**: Database-level access control
-- **JWT Authentication**: Secure token-based auth
-- **Environment Variables**: Secure credential management
-- **Input Validation**: Client and server-side validation
-- **Image Upload Security**: Secure file handling with Supabase Storage
-
-### Real-time Features
-- **Live Location Tracking**: Real-time GPS updates with role-based visibility
-  - 🔴 Pilgrims see assigned volunteer moving live
-  - 🟢 Volunteers see all assigned pilgrims moving live  
-  - 🔵 Admins see everyone moving live
-- **Dynamic Map Updates**: Markers update without refresh, stale user detection
-- **Live Chat**: Instant messaging with Supabase Realtime
-- **Status Updates**: Real-time task and volunteer status changes
-- **Push Notifications**: Expo Push Notifications for alerts
-- **Smart Navigation**: "Show Me" and "Fit in Frame" buttons for efficient coordination
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm/yarn
-- Expo CLI (`npm install -g @expo/cli`)
-- Supabase account and project
-- Google Maps API key (for maps functionality)
+- Node.js 18+
+- Expo CLI
+- Android Studio (for Android development)
+- Xcode (for iOS development)
 
 ### Installation
-1. **Clone and Setup**
-   ```bash
-   cd BandhuConnectPlus
-   npm install
-   ```
 
-2. **Environment Configuration**
-   Create `.env` file with:
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=https://ywntkafcfuugzgcduekj.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-   EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_key
-   ```
+1. Clone the repository
+```bash
+git clone <repository-url>
+cd BandhuConnect_Plus
+```
 
-3. **Database Setup**
-   - Run SQL migrations in Supabase dashboard
-   - Configure Row Level Security policies
-   - Set up Storage buckets for image uploads
+2. Install dependencies
+```bash
+npm install
+```
 
-4. **Development**
-   ```bash
-   # Start development server
-   npx expo start
-   
-   # Run on specific platforms
-   npx expo start --ios
-   npx expo start --android
-   npx expo start --web
-   ```
+3. Set up environment variables (see ENVIRONMENT_SETUP.md)
 
-### Testing
-- **Mobile**: Use Expo Go app to scan QR code
-- **Web**: Open localhost:8081 in browser
-- **Device Testing**: Test on physical devices for location features
+4. Set up database (see database/setup-instructions.md)
 
-## 📱 Platform-Specific Features
+5. Start the development server
+```bash
+npx expo start
+```
 
-### iOS
-- Native map integration with Apple Maps fallback
-- iOS-specific location permissions
-- Push notification support
+## Project Structure
+
+```
+src/
+├── components/          # Reusable UI components with error boundaries
+├── screens/            # Screen components
+│   ├── admin/          # Admin-specific screens with bulk operations
+│   ├── shared/         # Shared screens across all roles
+│   └── volunteer/      # Volunteer-specific screens
+├── services/           # API and business logic with error handling
+├── context/            # React Context providers with state management
+├── constants/          # App constants and configuration
+├── types/              # TypeScript type definitions
+└── utils/              # Utility functions and helpers
+```
+
+## Database Schema
+
+The app uses a consolidated Supabase PostgreSQL schema with:
+- User profiles with role-based access control
+- Assistance requests with priority and status tracking
+- Real-time location tracking with bi-directional visibility
+- Assignment system with auto-assignment and skill matching
+- Comprehensive RLS policies for data security
+- Analytics and reporting functions
+
+**Key Files:**
+- `database/consolidated-schema.sql` - Complete database schema
+- `database/consolidated-functions.sql` - Essential database functions
+- `database/setup-instructions.md` - Setup and deployment guide
+
+## Cross-App Consistency
+
+All changes are validated across:
+- **Pilgrim App**: Request creation and volunteer tracking
+- **Volunteer App**: Assignment management and pilgrim tracking  
+- **Admin App**: System oversight and bulk operations
+
+Changes affecting one app are immediately validated in others to maintain system integrity.
+
+## Development Guidelines
+
+1. **Error Handling**: Always implement graceful error handling with user-friendly messages
+2. **Cross-App Testing**: Test changes across all three app types
+3. **Real-time Updates**: Ensure location and status changes propagate correctly
+4. **Performance**: Optimize for battery life and network efficiency
+5. **Security**: Follow RLS policies and role-based access patterns
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Implement changes with proper error handling
+4. Test across all app types (pilgrim, volunteer, admin)
+5. Update documentation if needed
+6. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
 
 ### Android
 - Google Maps integration
