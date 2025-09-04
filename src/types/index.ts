@@ -72,6 +72,7 @@ export interface Assignment {
   request_id: string;
   volunteer_id: string;
   status: AssignmentStatus;
+  assigned: boolean;
   assigned_at: string;
   accepted_at?: string;
   started_at?: string;

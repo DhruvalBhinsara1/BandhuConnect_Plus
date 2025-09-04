@@ -20,6 +20,7 @@ interface TrackingState {
   isActive: boolean;
   hasPermissions: boolean;
   hasAssignment: boolean;
+  assigned: boolean;
   counterpartName?: string;
   showCompletedStatus?: boolean;
 }
@@ -31,61 +32,109 @@ export default function SecureMapScreen() {
     isActive: false,
     hasPermissions: false,
     hasAssignment: false,
+    assigned: false,
     showCompletedStatus: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [userRole, setUserRole] = useState<string>('');
+  const [currentAssignment, setCurrentAssignment] = useState<any>(null);
+  const [counterpartLocation, setCounterpartLocation] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const roleConfig = getCurrentRoleConfig();
 
   useEffect(() => {
     initializeMap();
+    initializeAssignmentTracking();
     return () => {
-      secureMapService.unsubscribeFromLocationUpdates();
+      secureMapService.cleanup();
       secureLocationService.stopTracking();
     };
   }, []);
 
-  // Check if task was recently completed and handle fade animation
+  // State-driven subscription management
   useEffect(() => {
-    const checkTaskCompletion = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const completionKey = `task_completed_shown_${user.id}`;
-        const hasShownCompletion = await AsyncStorage.getItem(completionKey);
-        
-        // Check if we have counterpart location (active assignment)
-        const hasCounterpart = locations.length > 1;
-        const shouldShowCompleted = !hasCounterpart && trackingState.hasAssignment && !hasShownCompletion;
-        
-        if (shouldShowCompleted) {
-          setTrackingState(prev => ({ ...prev, showCompletedStatus: true }));
-          
-          // Start fade animation after 4 seconds
-          setTimeout(() => {
-            Animated.timing(fadeAnim, {
-              toValue: 0,
-              duration: 1000,
-              useNativeDriver: true,
-            }).start(() => {
-              setTrackingState(prev => ({ ...prev, showCompletedStatus: false }));
-              // Mark as shown so it doesn't appear again
-              AsyncStorage.setItem(completionKey, 'true');
-            });
-          }, 4000);
-        }
-      } catch (error) {
-        console.error('[SecureMapScreen] Error checking task completion:', error);
-      }
-    };
-
-    if (locations.length > 0) {
-      checkTaskCompletion();
+    if (currentAssignment?.assigned) {
+      // Subscribe to counterpart location when assigned
+      secureMapService.subscribeToCounterpartLocation(
+        currentAssignment.counterpartId,
+        setCounterpartLocation
+      );
+    } else {
+      // Unsubscribe and clear counterpart data when not assigned
+      secureMapService.unsubscribeFromCounterpartLocation();
+      setCounterpartLocation(null);
     }
-  }, [locations, trackingState.hasAssignment]);
+
+    return () => {
+      secureMapService.unsubscribeFromCounterpartLocation();
+    };
+  }, [currentAssignment?.assigned, currentAssignment?.counterpartId]);
+
+  const initializeAssignmentTracking = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get user role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) return;
+      setUserRole(profile.role);
+
+      // Initial assignment fetch
+      await refreshAssignmentStatus();
+
+      // Subscribe to assignment changes with state-driven callback
+      secureMapService.subscribeToAssignmentChanges((assignment) => {
+        setCurrentAssignment(assignment);
+        updateTrackingStateFromAssignment(assignment);
+      });
+
+      console.log(`[SecureMapScreen] Initialized assignment tracking for ${profile.role}`);
+    } catch (error) {
+      console.error('[SecureMapScreen] Failed to initialize assignment tracking:', error);
+      // Show empty state on error
+      setTrackingState(prev => ({ ...prev, hasAssignment: false, assigned: false }));
+    }
+  };
+
+  const updateTrackingStateFromAssignment = (assignment: any) => {
+    if (assignment?.assigned) {
+      setTrackingState(prev => ({
+        ...prev,
+        hasAssignment: true,
+        assigned: true,
+        counterpartName: assignment.counterpartName,
+        showCompletedStatus: false
+      }));
+    } else {
+      setTrackingState(prev => ({
+        ...prev,
+        hasAssignment: false,
+        assigned: false,
+        counterpartName: undefined,
+        showCompletedStatus: false
+      }));
+    }
+  };
+
+  const refreshAssignmentStatus = async () => {
+    try {
+      const assignment = await secureMapService.getMyAssignment();
+      setCurrentAssignment(assignment);
+      updateTrackingStateFromAssignment(assignment);
+    } catch (error) {
+      console.error('[SecureMapScreen] Failed to refresh assignment status:', error);
+      setCurrentAssignment(null);
+      updateTrackingStateFromAssignment(null);
+    }
+  };
 
   /**
    * Initialize map with location tracking and assignment check
@@ -101,6 +150,7 @@ export default function SecureMapScreen() {
         setTrackingState(prev => ({
           ...prev,
           hasAssignment: false,
+          assigned: false,
         }));
         setIsLoading(false);
         return;
@@ -113,6 +163,7 @@ export default function SecureMapScreen() {
         isActive: trackingInitialized,
         hasPermissions: trackingInitialized,
         hasAssignment: assignmentStatus.hasAssignment,
+        assigned: assignmentStatus.assigned,
         counterpartName: assignmentStatus.counterpartName,
       });
 
@@ -240,45 +291,36 @@ export default function SecureMapScreen() {
   };
 
   /**
-   * Render tracking status chip
+   * Render tracking status chip - only show when assigned=true
    */
   const renderTrackingStatus = () => {
-    if (!trackingState.hasAssignment) {
-      return (
-        <View style={[styles.statusChip, styles.noAssignmentChip]}>
-          <Ionicons name="alert-circle" size={16} color="#F59E0B" />
-          <Text style={styles.statusText}>No Assignment</Text>
-        </View>
-      );
-    }
-
-    if (!trackingState.hasPermissions) {
-      return (
-        <View style={[styles.statusChip, styles.errorChip]}>
-          <Ionicons name="location-outline" size={16} color="#DC2626" />
-          <Text style={styles.statusText}>Location Disabled</Text>
-        </View>
-      );
-    }
-
-    // Check if we should show completed status with fade animation
-    const hasCounterpart = locations.length > 1;
-    if (!hasCounterpart && trackingState.showCompletedStatus) {
-      return (
-        <Animated.View style={[styles.statusChip, styles.completedChip, { opacity: fadeAnim }]}>
-          <Ionicons name="checkmark-circle" size={16} color="#059669" />
-          <Text style={styles.statusText}>Task Completed</Text>
-        </Animated.View>
-      );
-    }
+    const counterpartRole = roleConfig.counterpartRole;
+    const isTracking = trackingState.isActive;
+    const hasCounterpartLocation = counterpartLocation !== null;
 
     return (
-      <View style={[styles.statusChip, styles.activeChip]}>
-        <Ionicons name="radio" size={16} color="#16A34A" />
-        <Text style={styles.statusText}>
-          Tracking {trackingState.counterpartName}
-        </Text>
-      </View>
+      <Animated.View 
+        style={[styles.trackingBanner, { opacity: fadeAnim }]}
+      >
+        <View style={styles.trackingContent}>
+          <View style={styles.trackingInfo}>
+            <Ionicons 
+              name={hasCounterpartLocation ? "location" : "location-outline"} 
+              size={20} 
+              color={hasCounterpartLocation ? "#10B981" : "#6B7280"} 
+            />
+            <Text style={styles.trackingText}>
+              {hasCounterpartLocation 
+                ? `Tracking ${trackingState.counterpartName || counterpartRole}` 
+                : `Connected to ${trackingState.counterpartName || counterpartRole}`
+              }
+            </Text>
+          </View>
+          <View style={[styles.statusIndicator, { 
+            backgroundColor: hasCounterpartLocation ? '#10B981' : '#6B7280' 
+          }]} />
+        </View>
+      </Animated.View>
     );
   };
 
@@ -367,7 +409,7 @@ export default function SecureMapScreen() {
     <View style={styles.container}>
       {/* Status chip */}
       <View style={styles.statusContainer}>
-        {renderTrackingStatus()}
+        {trackingState.hasAssignment && trackingState.assigned && renderTrackingStatus()}
       </View>
 
       {/* Map legend */}
@@ -449,10 +491,14 @@ export default function SecureMapScreen() {
       {!trackingState.hasAssignment && (
         <View style={styles.noAssignmentContainer}>
           <Ionicons name="people-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.noAssignmentTitle}>No Active Assignment</Text>
+          <Text style={styles.noAssignmentTitle}>
+            {userRole === 'pilgrim' ? 'No active requests' : 'No Active Assignment'}
+          </Text>
           <Text style={styles.noAssignmentText}>
-            You are not currently assigned to a {roleConfig.counterpartRole}.
-            Contact an admin to get assigned.
+            {userRole === 'pilgrim' 
+              ? "There aren't any requests assigned right now. New requests will appear here."
+              : `You are not currently assigned to a ${roleConfig.counterpartRole}. Contact an admin to get assigned.`
+            }
           </Text>
         </View>
       )}
@@ -651,6 +697,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  trackingBanner: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  trackingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  trackingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  trackingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     lineHeight: 20,
   },
 });

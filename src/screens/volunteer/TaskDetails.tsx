@@ -9,6 +9,7 @@ import Button from '../../components/common/Button';
 import { COLORS, STATUS_COLORS } from '../../constants';
 import { Assignment } from '../../types';
 import { NotificationService } from '../../services/notificationService';
+import { secureMapService, UserLocationData } from '../../services/secureMapService';
 
 // Styles definition moved before component
 const styles = StyleSheet.create({
@@ -236,6 +237,8 @@ const TaskDetails: React.FC = () => {
   
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pilgrimLocation, setPilgrimLocation] = useState<UserLocationData | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
 
   const assignmentId = route.params?.assignmentId;
 
@@ -245,6 +248,44 @@ const TaskDetails: React.FC = () => {
       setAssignment(foundAssignment || null);
     }
   }, [assignmentId, assignments]);
+
+  // Fetch pilgrim's real-time location
+  useEffect(() => {
+    const fetchPilgrimLocation = async () => {
+      if (!assignment) {
+        setPilgrimLocation(null);
+        return;
+      }
+
+      setLocationLoading(true);
+      try {
+        // Check if assignment is active - use same logic as map
+        const assignmentStatus = await secureMapService.getAssignmentStatus();
+        if (assignmentStatus.hasAssignment && assignmentStatus.isActive) {
+          // For backward compatibility, if assigned field doesn't exist, treat active assignments as assigned
+          const shouldShowLocation = assignmentStatus.assigned !== undefined 
+            ? assignmentStatus.assigned 
+            : assignmentStatus.isActive;
+            
+          if (shouldShowLocation) {
+            const counterpartLocation = await secureMapService.getCounterpartLocation();
+            setPilgrimLocation(counterpartLocation);
+          } else {
+            setPilgrimLocation(null);
+          }
+        } else {
+          setPilgrimLocation(null);
+        }
+      } catch (error) {
+        console.error('[TaskDetails] Error fetching pilgrim location:', error);
+        setPilgrimLocation(null);
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+
+    fetchPilgrimLocation();
+  }, [assignment]);
 
   const handleAcceptTask = async () => {
     if (!assignment) return;
@@ -652,22 +693,33 @@ const TaskDetails: React.FC = () => {
           )}
         </View>
         <View style={styles.locationInfo}>
-          {assignment.request?.location?.latitude && assignment.request?.location?.longitude ? (
+          {locationLoading ? (
+            <Text style={styles.locationText}>
+              🔄 Loading pilgrim location...
+            </Text>
+          ) : pilgrimLocation ? (
             <>
               <Text style={styles.locationText}>
-                📍 Lat: {assignment.request.location.latitude.toFixed(6)}
+                📍 Lat: {pilgrimLocation.latitude.toFixed(6)}
               </Text>
               <Text style={styles.locationText}>
-                📍 Lng: {assignment.request.location.longitude.toFixed(6)}
+                📍 Lng: {pilgrimLocation.longitude.toFixed(6)}
+              </Text>
+              <Text style={styles.locationText}>
+                🕒 {pilgrimLocation.isStale ? `Last seen ${pilgrimLocation.minutesAgo} min ago` : 'Live location'}
               </Text>
             </>
-          ) : (
+          ) : assignment?.assigned ? (
             <Text style={styles.locationText}>
               ⚠️ Pilgrim location not available
             </Text>
+          ) : (
+            <Text style={styles.locationText}>
+              ℹ️ Location will be available when assignment is active
+            </Text>
           )}
           <Text style={styles.distanceText}>
-            Estimated distance: {assignment.request?.location?.latitude ? '0.5 km' : 'Unknown'}
+            Estimated distance: {pilgrimLocation ? 'Calculating...' : 'Unknown'}
           </Text>
         </View>
           

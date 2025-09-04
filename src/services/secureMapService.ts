@@ -21,14 +21,19 @@ export interface AssignmentData {
   counterpartName: string;
   counterpartRole: 'pilgrim' | 'volunteer' | 'admin';
   isActive: boolean;
+  assigned: boolean;
 }
 
 class SecureMapService {
   private realtimeSubscription: any = null;
+  private assignmentSubscription: any = null;
+  private counterpartLocationSubscription: any = null;
   private locationUpdateCallback: ((locations: UserLocationData[]) => void) | null = null;
+  private assignmentUpdateCallback: ((assignment: AssignmentData | null) => void) | null = null;
+  private counterpartLocationCallback: ((location: UserLocationData | null) => void) | null = null;
 
   /**
-   * Get current user's assignment information
+   * Get current user's assignment information with error handling
    */
   async getMyAssignment(): Promise<AssignmentData | null> {
     try {
@@ -43,27 +48,134 @@ class SecureMapService {
 
       if (error) {
         console.error('[SecureMapService] Failed to get assignment:', error);
-        return null;
+        throw new Error(`Assignment fetch failed: ${error.message}`);
       }
 
       if (!data || data.length === 0) {
-        console.log('[SecureMapService] No active assignment found');
+        console.log('[SecureMapService] No assignment found');
         return null;
       }
 
       const assignment = data[0];
+      
+      // Validate assignment data structure
+      if (!assignment.assignment_id || !assignment.counterpart_id) {
+        console.error('[SecureMapService] Invalid assignment data structure:', assignment);
+        throw new Error('Invalid assignment data structure');
+      }
+
       return {
         assignmentId: assignment.assignment_id,
         counterpartId: assignment.counterpart_id,
         counterpartName: assignment.counterpart_name,
         counterpartRole: assignment.counterpart_role,
-        isActive: assignment.is_active
+        isActive: assignment.is_active,
+        assigned: assignment.assigned || false
       };
 
     } catch (error) {
       console.error('[SecureMapService] Error getting assignment:', error);
       return null;
     }
+  }
+
+  /**
+   * Subscribe to assignment changes with state-driven logic
+   */
+  subscribeToAssignmentChanges(callback: (assignment: AssignmentData | null) => void): void {
+    this.assignmentUpdateCallback = callback;
+    
+    this.assignmentSubscription = supabase
+      .channel('assignment-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'assignments'
+        },
+        async () => {
+          try {
+            const assignment = await this.getMyAssignment();
+            this.assignmentUpdateCallback?.(assignment);
+          } catch (error) {
+            console.error('[SecureMapService] Assignment update failed:', error);
+            this.assignmentUpdateCallback?.(null);
+          }
+        }
+      )
+      .subscribe();
+  }
+
+  /**
+   * Subscribe to counterpart location updates when assigned
+   */
+  subscribeToCounterpartLocation(
+    counterpartId: string,
+    callback: (location: UserLocationData | null) => void
+  ): void {
+    this.counterpartLocationCallback = callback;
+    
+    this.counterpartLocationSubscription = supabase
+      .channel(`location-${counterpartId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_locations',
+          filter: `user_id=eq.${counterpartId}`
+        },
+        async (payload) => {
+          try {
+            const newData = payload.new as any;
+            if (newData && newData.is_active) {
+              const location: UserLocationData = {
+                userId: newData.user_id,
+                name: '', // Will be populated by getCounterpartLocation
+                role: 'pilgrim', // Will be populated by getCounterpartLocation
+                latitude: parseFloat(newData.latitude),
+                longitude: parseFloat(newData.longitude),
+                accuracy: newData.accuracy ? parseFloat(newData.accuracy) : null,
+                speed: null,
+                bearing: null,
+                lastUpdated: newData.last_updated,
+                minutesAgo: 0,
+                isStale: false
+              };
+              this.counterpartLocationCallback?.(location);
+            } else {
+              this.counterpartLocationCallback?.(null);
+            }
+          } catch (error) {
+            console.error('[SecureMapService] Counterpart location update failed:', error);
+            this.counterpartLocationCallback?.(null);
+          }
+        }
+      )
+      .subscribe();
+  }
+
+  /**
+   * Unsubscribe from assignment changes
+   */
+  unsubscribeFromAssignmentChanges(): void {
+    if (this.assignmentSubscription) {
+      this.assignmentSubscription.unsubscribe();
+      this.assignmentSubscription = null;
+    }
+    this.assignmentUpdateCallback = null;
+  }
+
+  /**
+   * Unsubscribe from counterpart location updates
+   */
+  unsubscribeFromCounterpartLocation(): void {
+    if (this.counterpartLocationSubscription) {
+      this.counterpartLocationSubscription.unsubscribe();
+      this.counterpartLocationSubscription = null;
+    }
+    this.counterpartLocationCallback = null;
   }
 
   /**
@@ -110,7 +222,7 @@ class SecureMapService {
   }
 
   /**
-   * Get counterpart's location from database (only if assignment is active)
+   * Get counterpart's location from database (only if assignment is active and assigned)
    */
   async getCounterpartLocation(): Promise<UserLocationData | null> {
     try {
@@ -120,10 +232,10 @@ class SecureMapService {
         return null;
       }
 
-      // First check if there's an active assignment
+      // First check if there's an active assignment with assigned=true
       const assignment = await this.getMyAssignment();
-      if (!assignment || !assignment.isActive) {
-        console.log('[SecureMapService] No active assignment - not fetching counterpart location');
+      if (!assignment || !assignment.isActive || !assignment.assigned) {
+        console.log('[SecureMapService] No active assignment or not assigned - not fetching counterpart location');
         return null;
       }
 
@@ -178,7 +290,7 @@ class SecureMapService {
   }
 
   /**
-   * Get all relevant locations (self + counterpart only if assignment is active)
+   * Get all relevant locations (self + counterpart only if assignment is active and assigned)
    */
   async getAllRelevantLocations(): Promise<UserLocationData[]> {
     try {
@@ -190,9 +302,9 @@ class SecureMapService {
         locations.push(ownLocation);
       }
 
-      // Only get counterpart location if there's an active assignment
+      // Only get counterpart location if there's an active assignment with assigned=true
       const assignment = await this.getMyAssignment();
-      if (assignment && assignment.isActive) {
+      if (assignment && assignment.isActive && assignment.assigned) {
         // Check if assignment status is not completed
         const { data: assignmentDetails } = await supabase
           .from('assignments')
@@ -209,10 +321,10 @@ class SecureMapService {
           console.log('[SecureMapService] Assignment completed - showing only own location');
         }
       } else {
-        console.log('[SecureMapService] No active assignment - showing only own location');
+        console.log('[SecureMapService] No active assignment or not assigned - showing only own location');
       }
 
-      console.log('[SecureMapService] Retrieved locations:', locations.length, '(own + counterpart if active)');
+      console.log('[SecureMapService] Retrieved locations:', locations.length, '(own + counterpart if assigned)');
       return locations;
 
     } catch (error) {
@@ -262,11 +374,19 @@ class SecureMapService {
    */
   unsubscribeFromLocationUpdates(): void {
     if (this.realtimeSubscription) {
-      supabase.removeChannel(this.realtimeSubscription);
+      this.realtimeSubscription.unsubscribe();
       this.realtimeSubscription = null;
-      this.locationUpdateCallback = null;
-      console.log('[SecureMapService] Unsubscribed from location updates');
     }
+    this.locationUpdateCallback = null;
+  }
+
+  /**
+   * Cleanup all subscriptions
+   */
+  cleanup(): void {
+    this.unsubscribeFromLocationUpdates();
+    this.unsubscribeFromAssignmentChanges();
+    this.unsubscribeFromCounterpartLocation();
   }
 
   /**
@@ -340,11 +460,11 @@ class SecureMapService {
   }
 
   /**
-   * Check if user has an active assignment
+   * Check if user has an active assignment with assigned=true
    */
   async hasActiveAssignment(): Promise<boolean> {
     const assignment = await this.getMyAssignment();
-    return assignment !== null && assignment.isActive;
+    return assignment !== null && assignment.isActive && assignment.assigned;
   }
 
   /**
@@ -355,6 +475,7 @@ class SecureMapService {
     counterpartName?: string;
     counterpartRole?: string;
     isActive: boolean;
+    assigned: boolean;
     statusMessage: string;
   }> {
     try {
@@ -364,6 +485,7 @@ class SecureMapService {
         return {
           hasAssignment: false,
           isActive: false,
+          assigned: false,
           statusMessage: 'No active assignments'
         };
       }
@@ -374,7 +496,19 @@ class SecureMapService {
           counterpartName: assignment.counterpartName,
           counterpartRole: assignment.counterpartRole,
           isActive: false,
+          assigned: assignment.assigned,
           statusMessage: `Task with ${assignment.counterpartName} completed. You are no longer tracking.`
+        };
+      }
+
+      if (!assignment.assigned) {
+        return {
+          hasAssignment: true,
+          counterpartName: assignment.counterpartName,
+          counterpartRole: assignment.counterpartRole,
+          isActive: true,
+          assigned: false,
+          statusMessage: `Assignment exists but not assigned to ${assignment.counterpartName}`
         };
       }
 
@@ -383,6 +517,7 @@ class SecureMapService {
         counterpartName: assignment.counterpartName,
         counterpartRole: assignment.counterpartRole,
         isActive: true,
+        assigned: true,
         statusMessage: `Tracking ${assignment.counterpartName}`
       };
     } catch (error) {
@@ -390,6 +525,7 @@ class SecureMapService {
       return {
         hasAssignment: false,
         isActive: false,
+        assigned: false,
         statusMessage: 'Unable to fetch assignment status'
       };
     }
