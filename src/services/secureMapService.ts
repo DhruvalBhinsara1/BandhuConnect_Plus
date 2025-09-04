@@ -76,7 +76,7 @@ class SecureMapService {
 
       // Get user profile for name
       const { data: profile } = await supabase
-        .from('users')
+        .from('profiles')
         .select('name, role')
         .eq('id', user.id)
         .single();
@@ -110,7 +110,7 @@ class SecureMapService {
   }
 
   /**
-   * Get counterpart's location from database
+   * Get counterpart's location from database (only if assignment is active)
    */
   async getCounterpartLocation(): Promise<UserLocationData | null> {
     try {
@@ -120,11 +120,18 @@ class SecureMapService {
         return null;
       }
 
+      // First check if there's an active assignment
+      const assignment = await this.getMyAssignment();
+      if (!assignment || !assignment.isActive) {
+        console.log('[SecureMapService] No active assignment - not fetching counterpart location');
+        return null;
+      }
+
       // Use the secure database function
       const { data, error } = await supabase.rpc('get_counterpart_location');
 
       if (error) {
-        console.error('[SecureMapService] Failed to get counterpart location:', error);
+        console.log('[SecureMapService] Failed to get counterpart location (gracefully handled):', error.message);
         return null;
       }
 
@@ -137,13 +144,13 @@ class SecureMapService {
 
       // Get counterpart user info
       const { data: counterpartProfile } = await supabase
-        .from('users')
+        .from('profiles')
         .select('name, role')
         .eq('id', location.user_id)
         .single();
 
       if (!counterpartProfile) {
-        console.error('[SecureMapService] Counterpart profile not found');
+        console.log('[SecureMapService] Counterpart profile not found (gracefully handled)');
         return null;
       }
 
@@ -171,30 +178,48 @@ class SecureMapService {
   }
 
   /**
-   * Get all relevant locations (self + counterpart)
+   * Get all relevant locations (self + counterpart only if assignment is active)
    */
   async getAllRelevantLocations(): Promise<UserLocationData[]> {
     try {
       const locations: UserLocationData[] = [];
 
-      // Get own location (from device)
+      // Always get own location
       const ownLocation = await this.getOwnLocation();
       if (ownLocation) {
         locations.push(ownLocation);
       }
 
-      // Get counterpart location (from database)
-      const counterpartLocation = await this.getCounterpartLocation();
-      if (counterpartLocation) {
-        locations.push(counterpartLocation);
+      // Only get counterpart location if there's an active assignment
+      const assignment = await this.getMyAssignment();
+      if (assignment && assignment.isActive) {
+        // Check if assignment status is not completed
+        const { data: assignmentDetails } = await supabase
+          .from('assignments')
+          .select('status')
+          .eq('id', assignment.assignmentId)
+          .single();
+
+        if (assignmentDetails && assignmentDetails.status !== 'completed') {
+          const counterpartLocation = await this.getCounterpartLocation();
+          if (counterpartLocation) {
+            locations.push(counterpartLocation);
+          }
+        } else {
+          console.log('[SecureMapService] Assignment completed - showing only own location');
+        }
+      } else {
+        console.log('[SecureMapService] No active assignment - showing only own location');
       }
 
-      console.log('[SecureMapService] Retrieved locations:', locations.length);
+      console.log('[SecureMapService] Retrieved locations:', locations.length, '(own + counterpart if active)');
       return locations;
 
     } catch (error) {
       console.error('[SecureMapService] Error getting all locations:', error);
-      return [];
+      // Always return own location even if there's an error
+      const ownLocation = await this.getOwnLocation();
+      return ownLocation ? [ownLocation] : [];
     }
   }
 
@@ -290,7 +315,7 @@ class SecureMapService {
   }
 
   /**
-   * Get map center for own location
+   * Get map center for own location with 200m zoom radius
    */
   async getOwnLocationCenter(): Promise<{
     latitude: number;
@@ -301,11 +326,16 @@ class SecureMapService {
     const ownLocation = await this.getOwnLocation();
     if (!ownLocation) return null;
 
+    // Calculate delta for 200m radius (400m total diameter)
+    // 1 degree latitude ≈ 111,000 meters
+    // For 400m total view: 400/111000 ≈ 0.0036
+    const radiusDelta = 0.0036;
+
     return {
       latitude: ownLocation.latitude,
       longitude: ownLocation.longitude,
-      latitudeDelta: 0.005, // ~500m zoom
-      longitudeDelta: 0.005
+      latitudeDelta: radiusDelta,
+      longitudeDelta: radiusDelta
     };
   }
 
@@ -325,22 +355,44 @@ class SecureMapService {
     counterpartName?: string;
     counterpartRole?: string;
     isActive: boolean;
+    statusMessage: string;
   }> {
-    const assignment = await this.getMyAssignment();
-    
-    if (!assignment) {
+    try {
+      const assignment = await this.getMyAssignment();
+      
+      if (!assignment) {
+        return {
+          hasAssignment: false,
+          isActive: false,
+          statusMessage: 'No active assignments'
+        };
+      }
+
+      if (!assignment.isActive) {
+        return {
+          hasAssignment: true,
+          counterpartName: assignment.counterpartName,
+          counterpartRole: assignment.counterpartRole,
+          isActive: false,
+          statusMessage: `Task with ${assignment.counterpartName} completed. You are no longer tracking.`
+        };
+      }
+
+      return {
+        hasAssignment: true,
+        counterpartName: assignment.counterpartName,
+        counterpartRole: assignment.counterpartRole,
+        isActive: true,
+        statusMessage: `Tracking ${assignment.counterpartName}`
+      };
+    } catch (error) {
+      console.error('[SecureMapService] Error getting assignment status:', error);
       return {
         hasAssignment: false,
-        isActive: false
+        isActive: false,
+        statusMessage: 'Unable to fetch assignment status'
       };
     }
-
-    return {
-      hasAssignment: true,
-      counterpartName: assignment.counterpartName,
-      counterpartRole: assignment.counterpartRole,
-      isActive: assignment.isActive
-    };
   }
 
   /**

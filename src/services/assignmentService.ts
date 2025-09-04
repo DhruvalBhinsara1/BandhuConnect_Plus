@@ -60,15 +60,8 @@ export class AssignmentService {
       return { data: null, error: updateError };
     }
 
-    // Update volunteer status to busy
-    const { error: volunteerUpdateError } = await supabase
-      .from('profiles')
-      .update({ volunteer_status: 'busy', updated_at: new Date().toISOString() })
-      .eq('id', volunteerId);
-
-    if (volunteerUpdateError) {
-      console.error('❌ Volunteer status update error:', volunteerUpdateError);
-    }
+    // Update volunteer status based on active assignments
+    await this.updateVolunteerStatusBasedOnAssignments(volunteerId);
 
     console.log('✅ Assignment created successfully');
     return { data, error: null };
@@ -82,7 +75,29 @@ export class AssignmentService {
     try {
       let query = supabase
         .from('assignments')
-        .select('*')
+        .select(`
+          *,
+          request:assistance_requests(
+            id,
+            title,
+            description,
+            type,
+            priority,
+            status,
+            address,
+            created_at,
+            user:profiles!assistance_requests_user_id_fkey(
+              id,
+              name,
+              phone
+            )
+          ),
+          volunteer:profiles!assignments_volunteer_id_fkey(
+            id,
+            name,
+            phone
+          )
+        `)
         .order('assigned_at', { ascending: false });
 
       if (filters?.volunteerId) {
@@ -97,12 +112,18 @@ export class AssignmentService {
         query = query.eq('status', filters.status);
       }
 
+      console.log('🔍 AssignmentService.getAssignments: Executing query with filters:', filters);
       const { data, error } = await query;
+      console.log('📊 AssignmentService.getAssignments: Query result:', { data, error, count: data?.length });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ AssignmentService.getAssignments: Query error:', error);
+        throw error;
+      }
 
       return { data, error: null };
     } catch (error) {
+      console.error('❌ AssignmentService.getAssignments: Exception:', error);
       return { data: null, error };
     }
   }
@@ -168,9 +189,62 @@ export class AssignmentService {
           .eq('id', data.request_id);
       }
 
+      // Update volunteer status based on remaining active assignments
+      if (data.volunteer_id) {
+        await this.updateVolunteerStatusBasedOnAssignments(data.volunteer_id);
+      }
+
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
+    }
+  }
+
+  async updateVolunteerStatusBasedOnAssignments(volunteerId: string) {
+    try {
+      console.log('🔄 Updating volunteer status based on active assignments:', volunteerId);
+      
+      // Get count of active assignments for this volunteer
+      const { data: activeAssignments, error: countError } = await supabase
+        .from('assignments')
+        .select('id, status')
+        .eq('volunteer_id', volunteerId)
+        .in('status', ['pending', 'accepted', 'in_progress']);
+
+      if (countError) {
+        console.error('❌ Error counting active assignments:', countError);
+        return;
+      }
+
+      const activeCount = activeAssignments?.length || 0;
+      console.log('📊 Active assignments count:', activeCount);
+
+      // Determine new volunteer status
+      let newStatus = 'available';
+      if (activeCount > 0) {
+        // Check if any assignment is in progress (on duty)
+        const hasInProgress = activeAssignments?.some(a => a.status === 'in_progress');
+        newStatus = hasInProgress ? 'on_duty' : 'busy';
+      }
+
+      console.log('🔄 Setting volunteer status to:', newStatus);
+
+      // Update volunteer status
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          volunteer_status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', volunteerId);
+
+      if (updateError) {
+        console.error('❌ Error updating volunteer status:', updateError);
+      } else {
+        console.log('✅ Volunteer status updated successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error in updateVolunteerStatusBasedOnAssignments:', error);
     }
   }
 

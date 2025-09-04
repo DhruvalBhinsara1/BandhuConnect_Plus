@@ -114,25 +114,58 @@ export class AuthService {
   async signInWithEmail(email: string, password: string) {
     try {
       console.log('[AuthService] SignIn attempt for email:', email);
+      console.log('[AuthService] Password length:', password.length);
+      console.log('[AuthService] Email trimmed:', email.trim());
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
-      console.log('[AuthService] Supabase auth response:', { data: data.user?.id, error });
+      console.log('[AuthService] Supabase auth response:', { 
+        user: data.user?.id, 
+        session: !!data.session,
+        error: error 
+      });
 
       if (error) {
-        console.log('[AuthService] Auth error details:', error);
-        throw error;
+        console.error('[AuthService] Auth error details:', {
+          message: error.message,
+          status: error.status,
+          code: error.code || 'no_code',
+          details: error
+        });
+        
+        // Provide user-friendly error messages
+        let userFriendlyMessage = error.message;
+        if (error.message?.includes('Invalid login credentials')) {
+          userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (error.message?.includes('Email not confirmed')) {
+          userFriendlyMessage = 'Please check your email and click the confirmation link before signing in.';
+        } else if (error.message?.includes('Too many requests')) {
+          userFriendlyMessage = 'Too many login attempts. Please wait a moment and try again.';
+        }
+        
+        const enhancedError = {
+          ...error,
+          message: userFriendlyMessage
+        };
+        
+        throw enhancedError;
       }
 
       // Register device after successful login
-      const deviceId = await deviceService.registerDevice();
-      console.log('[AuthService] Device registered:', deviceId);
+      try {
+        const deviceId = await deviceService.registerDevice();
+        console.log('[AuthService] Device registered:', deviceId);
+      } catch (deviceError) {
+        console.warn('[AuthService] Device registration failed:', deviceError);
+        // Don't fail login if device registration fails
+      }
 
       return { data, error: null };
     } catch (error) {
-      console.log('[AuthService] SignIn catch error:', error);
+      console.error('[AuthService] SignIn catch error:', error);
       return { data: null, error };
     }
   }

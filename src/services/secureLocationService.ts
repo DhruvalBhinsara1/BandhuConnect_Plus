@@ -219,17 +219,20 @@ class SecureLocationService {
         return;
       }
 
-      // Use upsert to insert or update location
+      // Use upsert to insert or update location in user_locations table
       const { error } = await supabase
-        .from('locations')
+        .from('user_locations')
         .upsert({
           user_id: user.id,
           latitude: locationData.latitude,
           longitude: locationData.longitude,
           accuracy: locationData.accuracy,
           speed: locationData.speed,
-          bearing: locationData.bearing,
+          heading: locationData.bearing,
+          is_active: true,
           last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         });
 
       if (error) {
