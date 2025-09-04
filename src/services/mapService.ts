@@ -74,19 +74,28 @@ class MapService implements MapServiceInterface {
         return { data: null, error: null }; // Silently skip if not authenticated
       }
 
-      console.log('✅ MapService.updateUserLocation: User authenticated, calling RPC function');
-      const { data, error } = await supabase.rpc('update_user_location', {
-        p_latitude: location.latitude,
-        p_longitude: location.longitude,
-        p_accuracy: location.accuracy || null,
-        p_altitude: location.altitude || null,
-        p_heading: location.heading || null,
-        p_speed: location.speed || null
-      });
+      console.log('✅ MapService.updateUserLocation: User authenticated, using direct table insert only');
+      
+      // Use direct table insert only to avoid RLS recursion issues
+      const { data, error } = await supabase
+        .from('user_locations')
+        .upsert({
+          user_id: session.session.user.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy || null,
+          altitude: location.altitude || null,
+          heading: location.heading || null,
+          speed: location.speed || null,
+          is_active: true,
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
 
       if (error) {
-        console.error('❌ MapService.updateUserLocation: RPC error:', error);
-        throw error;
+        console.error('❌ MapService.updateUserLocation: Final error:', error);
+        return { data: null, error };
       }
       
       console.log('✅ MapService.updateUserLocation: Location updated successfully', data);
@@ -118,9 +127,21 @@ class MapService implements MapServiceInterface {
       const userRole = Constants.expoConfig?.extra?.appRole || 'pilgrim';
       console.log('🎯 MapService.getAssignmentLocations: Using hardcoded app role:', userRole, 'for user:', user.id);
 
+      // Always include own location first
+      const ownLocationData = await this.getOwnLocationData(user.id);
+      
+      // Check if user has active assignments before fetching counterpart locations
+      const hasActiveAssignment = await this.hasActiveAssignment(user.id);
+      
       let data;
       let error;
-      let fallbackData = [];
+      let fallbackData = ownLocationData ? [ownLocationData] : [];
+      
+      // If no active assignment, return only own location
+      if (!hasActiveAssignment) {
+        console.log('🚫 MapService.getAssignmentLocations: No active assignment - returning only own location');
+        return { data: fallbackData, error: null };
+      }
 
       if (userRole === 'volunteer') {
         // Volunteers see pilgrim locations (people they can help)
@@ -138,6 +159,9 @@ class MapService implements MapServiceInterface {
         if (error && (error.message?.includes('function') || error.code === '42883')) {
           console.log('⚠️ MapService.getAssignmentLocations: VOLUNTEER - Function not found, using fallback query');
           ({ data, error } = await this.getFallbackAssignmentLocations(user.id, userRole));
+        } else if (error) {
+          console.log('⚠️ MapService.getAssignmentLocations: VOLUNTEER - Error gracefully handled:', error.message);
+          return { data: fallbackData, error: null };
         }
         
       } else if (userRole === 'pilgrim') {
@@ -156,6 +180,9 @@ class MapService implements MapServiceInterface {
         if (error && (error.message?.includes('function') || error.code === '42883')) {
           console.log('⚠️ MapService.getAssignmentLocations: PILGRIM - Function not found, using fallback query');
           ({ data, error } = await this.getFallbackAssignmentLocations(user.id, userRole));
+        } else if (error) {
+          console.log('⚠️ MapService.getAssignmentLocations: PILGRIM - Error gracefully handled:', error.message);
+          return { data: fallbackData, error: null };
         }
         
       } else if (userRole === 'admin') {
@@ -171,6 +198,10 @@ class MapService implements MapServiceInterface {
         // If function doesn't exist, fall back to basic query
         if (error && (error.message?.includes('function') || error.code === '42883')) {
           console.log('⚠️ MapService.getAssignmentLocations: ADMIN - Function not found, using fallback query');
+          ({ data, error } = await this.getFallbackAllLocations());
+        } else if (error) {
+          console.log('⚠️ MapService.getAssignmentLocations: ADMIN - Error gracefully handled:', error.message);
+          // Admins can still see all locations even if specific functions fail
           ({ data, error } = await this.getFallbackAllLocations());
         }
       } else {
@@ -208,8 +239,14 @@ class MapService implements MapServiceInterface {
         return processed;
       });
       
-      console.log('✅ MapService.getAssignmentLocations: Returning', processedData.length, 'locations');
-      return { data: processedData, error: null };
+      // Ensure own location is always included
+      const finalData = processedData.filter(loc => loc.user_id !== user.id);
+      if (ownLocationData) {
+        finalData.unshift(ownLocationData);
+      }
+      
+      console.log('✅ MapService.getAssignmentLocations: Returning', finalData.length, 'locations (including self)');
+      return { data: finalData, error: null };
     } catch (error) {
       console.error('❌ MapService.getAssignmentLocations: Unexpected error:', {
         message: error.message,
@@ -555,6 +592,80 @@ class MapService implements MapServiceInterface {
         },
         error
       };
+    }
+  }
+
+  // Helper method to get own location data
+  private async getOwnLocationData(userId: string): Promise<UserLocationData | null> {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('name, role')
+        .eq('id', userId)
+        .single();
+        
+      if (!profile) return null;
+      
+      const { data: location } = await supabase
+        .from('user_locations')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+        
+      if (!location) {
+        // Return placeholder with user info but no location
+        return {
+          location_id: 'placeholder-' + userId,
+          user_id: userId,
+          user_name: profile.name || 'You',
+          user_role: profile.role as 'admin' | 'volunteer' | 'pilgrim',
+          latitude: 0,
+          longitude: 0,
+          accuracy: null,
+          last_updated: new Date().toISOString(),
+          assignment_info: [],
+          isPlaceholder: true
+        };
+      }
+      
+      return {
+        location_id: location.id,
+        user_id: location.user_id,
+        user_name: profile.name || 'You',
+        user_role: profile.role as 'admin' | 'volunteer' | 'pilgrim',
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        last_updated: location.last_updated,
+        assignment_info: [],
+        isPlaceholder: false
+      };
+    } catch (error) {
+      console.error('❌ MapService.getOwnLocationData: Error:', error);
+      return null;
+    }
+  }
+
+  // Helper method to check if user has active assignments
+  private async hasActiveAssignment(userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('id, status')
+        .or(`volunteer_id.eq.${userId},pilgrim_id.eq.${userId}`)
+        .in('status', ['pending', 'accepted', 'in_progress'])
+        .limit(1);
+        
+      if (error) {
+        console.error('❌ MapService.hasActiveAssignment: Error checking assignments:', error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('❌ MapService.hasActiveAssignment: Unexpected error:', error);
+      return false;
     }
   }
 }

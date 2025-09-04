@@ -17,6 +17,7 @@ import { useLocation } from '../../context/LocationContext';
 import { useMap } from '../../context/MapContext';
 import { MarkerCallout } from '../../components/MarkerCallout';
 import { DebugDrawer } from '../../components/DebugDrawer';
+import { TrackingStatus } from '../../components/TrackingStatus';
 import type { UserLocationData } from '../../services/mapService';
 import { locationService } from '../../services/locationService';
 import { APP_CONFIG, getUserRole, shouldShowMarker } from '../../constants/appConfig';
@@ -254,6 +255,7 @@ const MapScreen: React.FC = () => {
     shouldShowMarker(location.user_role, userRole) && location.user_id !== user?.id
   );
   
+  // Always show own location if available from currentLocation
   const activeUserLocations = filteredLocations;
 
   const getCurrentLocationAndCenter = async () => {
@@ -529,6 +531,9 @@ const MapScreen: React.FC = () => {
             </>
           )}
         </View>
+
+        {/* Tracking Status - replaces error messages */}
+        <TrackingStatus style={styles.trackingStatusBanner} />
 
         {/* Notification for users without location data */}
         {placeholderUsers.length > 0 && (
@@ -809,6 +814,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#2563EB',
+  },
+  trackingStatusBanner: {
+    position: 'absolute',
+    top: 100,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 

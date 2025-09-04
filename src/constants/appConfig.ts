@@ -6,10 +6,10 @@ export const APP_CONFIG = {
   // Pilgrim app → role: 'pilgrim'
   // Volunteer app → role: 'volunteer'
   // Admin app → role: 'admin'
-  ROLE: 'pilgrim' as 'pilgrim' | 'volunteer' | 'admin', // Change this per build
+  ROLE: 'admin' as 'pilgrim' | 'volunteer' | 'admin', // Change this per build
   
   // App metadata
-  APP_NAME: 'BandhuConnect+ Pilgrim',
+  APP_NAME: 'BandhuConnect+ Admin',
   VERSION: '1.0.0',
   BUILD_TYPE: 'development',
   

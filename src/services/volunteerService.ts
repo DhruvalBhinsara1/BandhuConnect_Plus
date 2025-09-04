@@ -248,11 +248,11 @@ export class VolunteerService {
 
       if (assignmentError) throw assignmentError;
 
-      // Calculate statistics
+      // Calculate statistics with correct active assignment logic
       const totalTasks = assignments?.length || 0;
       const completedTasks = assignments?.filter(a => a.status === 'completed').length || 0;
       const activeAssignments = assignments?.filter(a => 
-        ['assigned', 'accepted', 'on_duty'].includes(a.status)
+        ['pending', 'accepted', 'in_progress'].includes(a.status)
       ).length || 0;
       
       // Calculate actual hours worked based on duty time (started_at to completed_at)
@@ -285,6 +285,48 @@ export class VolunteerService {
       return { data: stats, error: null };
     } catch (error) {
       console.error('❌ Error fetching volunteer stats:', error);
+      return { data: null, error };
+    }
+  }
+
+  async refreshVolunteerStatus(volunteerId: string) {
+    try {
+      console.log('🔄 Refreshing volunteer status:', volunteerId);
+      
+      const { data, error } = await supabase
+        .rpc('update_volunteer_status_based_on_assignments', {
+          p_volunteer_id: volunteerId
+        });
+
+      if (error) {
+        console.error('❌ Error refreshing volunteer status:', error);
+        return { data: null, error };
+      }
+
+      console.log('✅ Volunteer status refreshed successfully');
+      return { data: true, error: null };
+    } catch (error) {
+      console.error('❌ Error in refreshVolunteerStatus:', error);
+      return { data: null, error };
+    }
+  }
+
+  async refreshAllVolunteerStatuses() {
+    try {
+      console.log('🔄 Refreshing all volunteer statuses...');
+      
+      const { data, error } = await supabase
+        .rpc('refresh_all_volunteer_statuses');
+
+      if (error) {
+        console.error('❌ Error refreshing all volunteer statuses:', error);
+        return { data: null, error };
+      }
+
+      console.log('✅ All volunteer statuses refreshed:', data);
+      return { data, error: null };
+    } catch (error) {
+      console.error('❌ Error in refreshAllVolunteerStatuses:', error);
       return { data: null, error };
     }
   }

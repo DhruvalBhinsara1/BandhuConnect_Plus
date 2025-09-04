@@ -76,10 +76,19 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
   const getAssignments = async (filters?: any) => {
     setLoading(true);
     try {
+      console.log('🔍 RequestContext.getAssignments: Fetching with filters:', filters);
       const { data, error } = await assignmentService.getAssignments(filters);
+      console.log('📊 RequestContext.getAssignments: Result:', { data, error });
       if (data && !error) {
         setAssignments(data);
+        console.log('✅ RequestContext.getAssignments: Set assignments:', data.length);
+      } else {
+        console.error('❌ RequestContext.getAssignments: Error or no data:', error);
+        setAssignments([]);
       }
+    } catch (err) {
+      console.error('❌ RequestContext.getAssignments: Exception:', err);
+      setAssignments([]);
     } finally {
       setLoading(false);
     }

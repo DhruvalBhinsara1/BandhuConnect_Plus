@@ -320,24 +320,126 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ANALYTICS FUNCTIONS
 -- =============================================
 
--- Get system dashboard stats
-CREATE OR REPLACE FUNCTION get_dashboard_stats()
+-- Get system dashboard-- Analytics Functions
+CREATE OR REPLACE FUNCTION get_system_analytics()
 RETURNS TABLE (
     total_users INTEGER,
-    active_volunteers INTEGER,
-    total_requests_today INTEGER,
-    completed_requests_today INTEGER,
+    total_volunteers INTEGER,
+    total_pilgrims INTEGER,
+    total_requests INTEGER,
+    completed_requests INTEGER,
     pending_requests INTEGER,
     active_assignments INTEGER
 ) AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        (SELECT COUNT(*)::INTEGER FROM profiles WHERE is_active = true) as total_users,
-        (SELECT COUNT(*)::INTEGER FROM profiles WHERE role = 'volunteer' AND volunteer_status = 'available') as active_volunteers,
-        (SELECT COUNT(*)::INTEGER FROM assistance_requests WHERE DATE(created_at) = CURRENT_DATE) as total_requests_today,
-        (SELECT COUNT(*)::INTEGER FROM assistance_requests WHERE DATE(updated_at) = CURRENT_DATE AND status = 'completed') as completed_requests_today,
+        (SELECT COUNT(*)::INTEGER FROM profiles) as total_users,
+        (SELECT COUNT(*)::INTEGER FROM profiles WHERE role = 'volunteer') as total_volunteers,
+        (SELECT COUNT(*)::INTEGER FROM profiles WHERE role = 'pilgrim') as total_pilgrims,
+        (SELECT COUNT(*)::INTEGER FROM assistance_requests) as total_requests,
+        (SELECT COUNT(*)::INTEGER FROM assistance_requests WHERE status = 'completed') as completed_requests,
         (SELECT COUNT(*)::INTEGER FROM assistance_requests WHERE status = 'pending') as pending_requests,
         (SELECT COUNT(*)::INTEGER FROM assignments WHERE status IN ('pending', 'accepted', 'in_progress')) as active_assignments;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Volunteer Status Management Functions
+CREATE OR REPLACE FUNCTION update_volunteer_status_based_on_assignments(p_volunteer_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    active_count INTEGER;
+    has_in_progress BOOLEAN;
+    new_status volunteer_status;
+BEGIN
+    -- Count active assignments
+    SELECT COUNT(*) INTO active_count
+    FROM assignments 
+    WHERE volunteer_id = p_volunteer_id 
+    AND status IN ('pending', 'accepted', 'in_progress');
+    
+    -- Check if any assignment is in progress
+    SELECT EXISTS(
+        SELECT 1 FROM assignments 
+        WHERE volunteer_id = p_volunteer_id 
+        AND status = 'in_progress'
+    ) INTO has_in_progress;
+    
+    -- Determine new status
+    IF active_count = 0 THEN
+        new_status := 'available';
+    ELSE
+        new_status := 'busy';
+    END IF;
+    
+    -- Update volunteer status
+    UPDATE profiles 
+    SET volunteer_status = new_status,
+        updated_at = NOW()
+    WHERE id = p_volunteer_id AND role = 'volunteer';
+    
+    RAISE NOTICE 'Updated volunteer % status to % (active assignments: %)', p_volunteer_id, new_status, active_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Bulk update all volunteer statuses based on their current assignments
+CREATE OR REPLACE FUNCTION refresh_all_volunteer_statuses()
+RETURNS TABLE (
+    volunteer_id UUID,
+    volunteer_name VARCHAR(255),
+    old_status volunteer_status,
+    new_status volunteer_status,
+    active_assignments INTEGER
+) AS $$
+DECLARE
+    vol_record RECORD;
+    active_count INTEGER;
+    has_in_progress BOOLEAN;
+    new_status volunteer_status;
+    old_status volunteer_status;
+BEGIN
+    -- Loop through all active volunteers
+    FOR vol_record IN 
+        SELECT id, name, volunteer_status 
+        FROM profiles 
+        WHERE role = 'volunteer' AND is_active = true
+    LOOP
+        old_status := vol_record.volunteer_status;
+        
+        -- Count active assignments for this volunteer
+        SELECT COUNT(*) INTO active_count
+        FROM assignments 
+        WHERE volunteer_id = vol_record.id 
+        AND status IN ('pending', 'accepted', 'in_progress');
+        
+        -- Check if any assignment is in progress
+        SELECT EXISTS(
+            SELECT 1 FROM assignments 
+            WHERE volunteer_id = vol_record.id 
+            AND status = 'in_progress'
+        ) INTO has_in_progress;
+        
+        -- Determine new status
+        IF active_count = 0 THEN
+            new_status := 'available';
+        ELSE
+            new_status := 'busy';
+        END IF;
+        
+        -- Update if status changed
+        IF old_status != new_status THEN
+            UPDATE profiles 
+            SET volunteer_status = new_status,
+                updated_at = NOW()
+            WHERE id = vol_record.id;
+        END IF;
+        
+        -- Return the result
+        volunteer_id := vol_record.id;
+        volunteer_name := vol_record.name;
+        active_assignments := active_count;
+        
+        RETURN NEXT;
+    END LOOP;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

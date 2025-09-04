@@ -6,18 +6,22 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
 import { secureLocationService } from '../../services/secureLocationService';
 import { APP_ROLE, getCurrentRoleConfig } from '../../constants/appRole';
+import { supabase } from '../../services/supabase';
 
 interface TrackingState {
   isActive: boolean;
   hasPermissions: boolean;
   hasAssignment: boolean;
   counterpartName?: string;
+  showCompletedStatus?: boolean;
 }
 
 export default function SecureMapScreen() {
@@ -27,9 +31,11 @@ export default function SecureMapScreen() {
     isActive: false,
     hasPermissions: false,
     hasAssignment: false,
+    showCompletedStatus: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const roleConfig = getCurrentRoleConfig();
 
@@ -40,6 +46,46 @@ export default function SecureMapScreen() {
       secureLocationService.stopTracking();
     };
   }, []);
+
+  // Check if task was recently completed and handle fade animation
+  useEffect(() => {
+    const checkTaskCompletion = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const completionKey = `task_completed_shown_${user.id}`;
+        const hasShownCompletion = await AsyncStorage.getItem(completionKey);
+        
+        // Check if we have counterpart location (active assignment)
+        const hasCounterpart = locations.length > 1;
+        const shouldShowCompleted = !hasCounterpart && trackingState.hasAssignment && !hasShownCompletion;
+        
+        if (shouldShowCompleted) {
+          setTrackingState(prev => ({ ...prev, showCompletedStatus: true }));
+          
+          // Start fade animation after 4 seconds
+          setTimeout(() => {
+            Animated.timing(fadeAnim, {
+              toValue: 0,
+              duration: 1000,
+              useNativeDriver: true,
+            }).start(() => {
+              setTrackingState(prev => ({ ...prev, showCompletedStatus: false }));
+              // Mark as shown so it doesn't appear again
+              AsyncStorage.setItem(completionKey, 'true');
+            });
+          }, 4000);
+        }
+      } catch (error) {
+        console.error('[SecureMapScreen] Error checking task completion:', error);
+      }
+    };
+
+    if (locations.length > 0) {
+      checkTaskCompletion();
+    }
+  }, [locations, trackingState.hasAssignment]);
 
   /**
    * Initialize map with location tracking and assignment check
@@ -83,7 +129,11 @@ export default function SecureMapScreen() {
 
     } catch (error) {
       console.error('[SecureMapScreen] Initialization failed:', error);
-      Alert.alert('Error', 'Failed to initialize location tracking');
+      Alert.alert(
+        'Initialization Error', 
+        'Unable to initialize location tracking. Please check your permissions and try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -103,36 +153,63 @@ export default function SecureMapScreen() {
   };
 
   /**
-   * Center map on user's own location
+   * Center map on user's own location with improved error handling
    */
   const centerOnSelf = async () => {
     try {
       const ownLocationCenter = await secureMapService.getOwnLocationCenter();
       
       if (!ownLocationCenter) {
-        Alert.alert('Location Unavailable', 'Your current location is not available');
+        Alert.alert(
+          'Location Unavailable', 
+          'Your current location is not available. Please ensure location services are enabled and try again.',
+          [{ text: 'OK', style: 'default' }]
+        );
         return;
       }
 
       mapRef.current?.animateToRegion(ownLocationCenter, 1000);
     } catch (error) {
       console.error('[SecureMapScreen] Failed to center on self:', error);
-      Alert.alert('Error', 'Failed to get your location');
+      Alert.alert(
+        'Location Error', 
+        'Unable to access your location. Please check your location permissions and try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
     }
   };
 
   /**
-   * Fit all markers in frame
+   * Fit all markers in frame with improved error handling
    */
   const fitAllMarkers = () => {
     if (locations.length === 0) {
-      Alert.alert('No Locations', 'No location data available to display');
+      Alert.alert(
+        'No Locations Available', 
+        'There are no location markers to display on the map.',
+        [{ text: 'OK', style: 'default' }]
+      );
       return;
     }
 
-    const bounds = secureMapService.calculateMapBounds(locations);
-    if (bounds) {
-      mapRef.current?.animateToRegion(bounds, 1000);
+    try {
+      const bounds = secureMapService.calculateMapBounds(locations);
+      if (bounds) {
+        mapRef.current?.animateToRegion(bounds, 1000);
+      } else {
+        Alert.alert(
+          'Map Error', 
+          'Unable to calculate map bounds. Please try refreshing the locations.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+    } catch (error) {
+      console.error('[SecureMapScreen] Failed to fit markers:', error);
+      Alert.alert(
+        'Map Error', 
+        'Unable to adjust map view. Please try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
     }
   };
 
@@ -184,12 +261,49 @@ export default function SecureMapScreen() {
       );
     }
 
+    // Check if we should show completed status with fade animation
+    const hasCounterpart = locations.length > 1;
+    if (!hasCounterpart && trackingState.showCompletedStatus) {
+      return (
+        <Animated.View style={[styles.statusChip, styles.completedChip, { opacity: fadeAnim }]}>
+          <Ionicons name="checkmark-circle" size={16} color="#059669" />
+          <Text style={styles.statusText}>Task Completed</Text>
+        </Animated.View>
+      );
+    }
+
     return (
       <View style={[styles.statusChip, styles.activeChip]}>
         <Ionicons name="radio" size={16} color="#16A34A" />
         <Text style={styles.statusText}>
           Tracking {trackingState.counterpartName}
         </Text>
+      </View>
+    );
+  };
+
+  /**
+   * Render map legend
+   */
+  const renderMapLegend = () => {
+    if (locations.length === 0) return null;
+
+    return (
+      <View style={styles.legendContainer}>
+        <Text style={styles.legendTitle}>Map Legend</Text>
+        {locations.map((location) => {
+          const isOwn = location.role === APP_ROLE;
+          const markerStyle = getMarkerStyle(location.role, location.isStale);
+          
+          return (
+            <View key={location.userId} style={styles.legendItem}>
+              <View style={[styles.legendMarker, { backgroundColor: markerStyle.color }]} />
+              <Text style={styles.legendText}>
+                {isOwn ? 'You' : `${location.name} (${location.role})`}
+              </Text>
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -255,6 +369,9 @@ export default function SecureMapScreen() {
       <View style={styles.statusContainer}>
         {renderTrackingStatus()}
       </View>
+
+      {/* Map legend */}
+      {renderMapLegend()}
 
       {/* Map */}
       <MapView
@@ -394,11 +511,51 @@ const styles = StyleSheet.create({
     borderColor: '#F59E0B',
     borderWidth: 1,
   },
+  completedChip: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
+    borderWidth: 1,
+  },
   statusText: {
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
+  },
+  legendContainer: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1,
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendMarker: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   map: {
     flex: 1,

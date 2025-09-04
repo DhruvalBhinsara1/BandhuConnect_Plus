@@ -415,7 +415,7 @@ const VolunteerManagement: React.FC = () => {
   const renderVolunteerItem = ({ item }: { item: User }) => {
     const volunteerAssignments = getVolunteerAssignments(item.id);
     const activeAssignments = volunteerAssignments.filter(a => 
-      ['assigned', 'accepted', 'on_duty'].includes(a.status)
+      ['pending', 'accepted', 'in_progress'].includes(a.status)
     );
 
     return (
@@ -465,9 +465,7 @@ const VolunteerManagement: React.FC = () => {
 
             <View style={styles.tasksRow}>
               <Ionicons name="briefcase" size={14} color="#6b7280" />
-              <Text style={styles.tasksText}>
-                {activeAssignments.length} active task{activeAssignments.length !== 1 ? 's' : ''}
-              </Text>
+              <Text style={styles.cardSubtitle}>{activeAssignments.length} active tasks</Text>
             </View>
           </View>
 

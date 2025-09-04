@@ -50,10 +50,10 @@ const TaskList: React.FC = () => {
         <View style={styles.taskHeader}>
           <View style={styles.taskContent}>
             <Text style={styles.taskTitle}>
-              {item.request?.title}
+              {item.request?.type ? `${item.request.type.charAt(0).toUpperCase() + item.request.type.slice(1)} Assistance` : 'Task'}
             </Text>
             <Text style={styles.taskDescription}>
-              {item.request?.description}
+              {item.request?.description || 'No description available'}
             </Text>
           </View>
           <View
@@ -78,7 +78,12 @@ const TaskList: React.FC = () => {
           <View style={styles.metaItem}>
             <Ionicons name="location-outline" size={16} color={COLORS.textSecondary} />
             <Text style={styles.metaText}>
-              {item.request?.location ? '0.5 km away' : 'Location pending'}
+              {item.request?.location 
+                ? (typeof item.request.location === 'string' ? item.request.location : 'Location available')
+                : (item as any).request?.user?.name 
+                ? `Pilgrim: ${(item as any).request.user.name}`
+                : 'Location pending'
+              }
             </Text>
           </View>
         </View>
@@ -90,7 +95,9 @@ const TaskList: React.FC = () => {
               size={16} 
               color={item.request.priority === 'high' ? COLORS.error : COLORS.warning} 
             />
-            <Text style={styles.priorityText}>
+            <Text style={[styles.priorityText, { 
+              color: item.request.priority === 'high' ? COLORS.error : COLORS.warning 
+            }]}>
               {item.request.priority} Priority
             </Text>
           </View>
