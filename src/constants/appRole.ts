@@ -8,7 +8,7 @@ export type AppRole = 'pilgrim' | 'volunteer' | 'admin';
 // - Set to 'pilgrim' for pilgrim app builds
 // - Set to 'volunteer' for volunteer app builds  
 // - Set to 'admin' for admin app builds
-export const APP_ROLE: AppRole = 'volunteer'; // Current build: volunteer
+export const APP_ROLE: AppRole = 'pilgrim'; // Current build: pilgrim
 
 // Role-specific configuration
 export const ROLE_CONFIG = {

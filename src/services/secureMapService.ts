@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
-import { APP_ROLE, getCurrentRoleConfig, getCounterpartRole } from '../constants/appRole';
+import { Assignment } from '../types';
+import { ACTIVE_ASSIGNMENT_STATUSES } from './assignmentService';
+import { repairAssignments } from './assignmentRepairService';
 
 export interface UserLocationData {
   userId: string;
@@ -54,6 +56,27 @@ class SecureMapService {
       if (!data || data.length === 0) {
         console.log('[SecureMapService] No assignment found by RPC function');
         
+        // Try automatic repair first
+        console.log('[SecureMapService] Attempting automatic assignment repair...');
+        const repairResult = await repairAssignments(user.id);
+        
+        if (repairResult.success && repairResult.repaired) {
+          console.log('[SecureMapService] Assignment repaired, retrying RPC...');
+          const { data: repairedData, error: retryError } = await supabase.rpc('get_my_assignment');
+          
+          if (!retryError && repairedData && repairedData.length > 0) {
+            const assignment = repairedData[0];
+            return {
+              assignmentId: assignment.assignment_id,
+              counterpartId: assignment.counterpart_id,
+              counterpartName: assignment.counterpart_name,
+              counterpartRole: assignment.counterpart_role,
+              isActive: assignment.is_active,
+              assigned: assignment.assigned || false
+            };
+          }
+        }
+        
         // Fallback: Check assignments table directly using centralized logic
         const { hasActiveAssignment } = await import('./assignmentService');
         const hasAssignment = await hasActiveAssignment(user.id);
@@ -67,7 +90,7 @@ class SecureMapService {
         // If we have an assignment but RPC didn't find it, there's a function issue
         console.warn('[SecureMapService] Assignment exists but RPC function failed - using fallback');
         
-        // Get assignment data directly
+        // Get assignment data directly with proper joins
         const { data: directAssignment, error: directError } = await supabase
           .from('assignments')
           .select(`
@@ -75,16 +98,19 @@ class SecureMapService {
             pilgrim_id,
             volunteer_id,
             status,
-            users!pilgrim_id(name),
-            profiles!volunteer_id(name, role)
+            assigned,
+            pilgrim:users!pilgrim_id(name),
+            volunteer:profiles!volunteer_id(name, role)
           `)
           .or(`volunteer_id.eq.${user.id},pilgrim_id.eq.${user.id}`)
-          .in('status', ['pending', 'accepted', 'in_progress'])
+          .in('status', ACTIVE_ASSIGNMENT_STATUSES)
+          .not('pilgrim_id', 'is', null)
+          .not('volunteer_id', 'is', null)
           .order('assigned_at', { ascending: false })
           .limit(1);
           
         if (directError || !directAssignment || directAssignment.length === 0) {
-          console.error('[SecureMapService] Fallback query also failed:', directError);
+          console.error('[SecureMapService] Fallback query failed:', directError);
           return null;
         }
         
@@ -99,12 +125,18 @@ class SecureMapService {
         let counterpartId, counterpartName, counterpartRole;
         if (profile?.role === 'volunteer') {
           counterpartId = assignment.pilgrim_id;
-          counterpartName = (assignment.users as any)?.name || 'Unknown';
+          counterpartName = (assignment.pilgrim as any)?.name || 'Unknown Pilgrim';
           counterpartRole = 'pilgrim';
         } else {
           counterpartId = assignment.volunteer_id;
-          counterpartName = (assignment.profiles as any)?.name || 'Unknown';
-          counterpartRole = (assignment.profiles as any)?.role || 'volunteer';
+          counterpartName = (assignment.volunteer as any)?.name || 'Unknown Volunteer';
+          counterpartRole = (assignment.volunteer as any)?.role || 'volunteer';
+        }
+        
+        // Validate that we have complete assignment data
+        if (!counterpartId || !assignment.id) {
+          console.error('[SecureMapService] Incomplete assignment data:', assignment);
+          return null;
         }
         
         return {
@@ -113,7 +145,7 @@ class SecureMapService {
           counterpartName,
           counterpartRole,
           isActive: true,
-          assigned: true
+          assigned: assignment.assigned || true
         };
       }
 
@@ -177,8 +209,7 @@ class SecureMapService {
         if (status === 'SUBSCRIBED') {
           console.log('[SecureMapService] Successfully subscribed to assignment updates');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('[SecureMapService] Assignment subscription failed');
-          // Attempt reconnection after delay
+          // Silently handle reconnection without error logging to prevent UI popups
           setTimeout(() => this.subscribeToAssignmentChanges(callback), 5000);
         }
       });
@@ -220,12 +251,11 @@ class SecureMapService {
         }
       )
       .subscribe((status) => {
-        console.log('[SecureMapService] Counterpart location subscription status:', status);
+        console.log(`[SecureMapService] Counterpart location subscription status:`, status);
         if (status === 'SUBSCRIBED') {
           console.log(`[SecureMapService] Successfully subscribed to counterpart ${counterpartId} location`);
         } else if (status === 'CHANNEL_ERROR') {
-          console.error(`[SecureMapService] Counterpart ${counterpartId} location subscription failed`);
-          // Attempt reconnection after delay
+          // Silently handle reconnection without error logging to prevent UI popups
           setTimeout(() => this.subscribeToCounterpartLocation(counterpartId, callback), 5000);
         }
       });
@@ -456,8 +486,7 @@ class SecureMapService {
           if (status === 'SUBSCRIBED') {
             console.log('[SecureMapService] Successfully subscribed to location updates');
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('[SecureMapService] Location subscription failed');
-            // Attempt reconnection after delay
+            // Silently handle reconnection without error logging to prevent UI popups
             setTimeout(() => this.subscribeToLocationUpdates(callback), 5000);
           }
         });
