@@ -1,6 +1,6 @@
 # Admin User Setup Instructions
 
-## Create Admin User: dhruvalbhinsara460@gmail.com
+## Create Admin User
 
 ### Step 1: Create User in Supabase Dashboard
 
@@ -8,7 +8,7 @@
 2. Navigate to **Authentication** → **Users**
 3. Click **"Add user"** or **"Invite user"**
 4. Enter:
-   - **Email**: `dhruvalbhinsara460@gmail.com`
+   - **Email**: `your_admin_email@example.com`
    - **Password**: Choose a secure password
    - **Auto Confirm User**: ✅ (check this box)
 
@@ -21,8 +21,8 @@ After creating the user, you need to add the profile data:
 3. Click **"Insert"** → **"Insert row"**
 4. Fill in:
    - **id**: Copy the user ID from the auth.users table (from Step 1)
-   - **name**: `Dhruval Bhinsara`
-   - **phone**: `9913238080`
+   - **name**: `Your Admin Name`
+   - **phone**: `Your Phone Number`
    - **role**: `admin`
    - **skills**: `["administration", "management", "coordination"]`
    - **updated_at**: Leave as default (now())
@@ -32,7 +32,7 @@ After creating the user, you need to add the profile data:
 1. Go to **SQL Editor** in Supabase Dashboard
 2. First, find the user ID:
 ```sql
-SELECT id, email FROM auth.users WHERE email = 'dhruvalbhinsara460@gmail.com';
+SELECT id, email FROM auth.users WHERE email = 'your_admin_email@example.com';
 ```
 
 3. Then insert the profile (replace `USER_ID` with the actual ID from step 2):
@@ -46,32 +46,31 @@ INSERT INTO public.profiles (
     updated_at
 ) VALUES (
     'USER_ID_FROM_PREVIOUS_QUERY',
-    'Dhruval Bhinsara',
-    '9913238080',
+    'Your Admin Name',
+    'Your Phone Number',
     'admin',
     ARRAY['administration', 'management', 'coordination'],
     now()
 );
 ```
 
-### Step 3: Test Admin Login
+### Step 3: Test Admin Access
 
-1. Go to your admin dashboard at `http://localhost:3000`
-2. Click **"Admin Login"**
-3. Enter:
-   - **Email**: `dhruvalbhinsara460@gmail.com`
+1. Open the BandhuConnect+ mobile app
+2. Login with:
+   - **Email**: `your_admin_email@example.com`
    - **Password**: (the password you set in Step 1)
 
 ### Verification
 
 After successful login, you should:
-- Be redirected to the dashboard
-- See "Welcome to the BandhuConnect+ Admin Dashboard"
-- Have access to admin features
+- Have access to admin features in the mobile app
+- See admin-specific interface elements
+- Be able to manage users and assignments
 
 ## Security Notes
 
 - The admin user will have full access to the system
 - Make sure to use a strong password
 - Consider enabling 2FA in Supabase for additional security
-- The phone number `9913238080` is stored in the profile for contact purposes
+- Store your contact phone number in the profile for administrative purposes
