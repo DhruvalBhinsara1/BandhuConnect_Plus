@@ -55,7 +55,7 @@ export default {
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       appRole: "admin", // Hardcoded role for this build
       eas: {
-        projectId: "90504708-ed95-48b8-b8a0-86d1de6303a1"
+        projectId: "369f87f8-7772-4a21-92e8-7b5427200ecb"
       }
     }
   }

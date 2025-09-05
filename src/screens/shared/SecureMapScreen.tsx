@@ -567,8 +567,8 @@ export default function SecureMapScreen() {
         </View>
       )}
 
-      {/* No assignment message */}
-      {!trackingState.hasAssignment && (
+      {/* No assignment message - only show if no assignment AND no active tracking */}
+      {!trackingState.hasAssignment && !trackingState.assigned && !currentAssignment && (
         <View style={styles.noAssignmentContainer}>
           <Ionicons name="people-outline" size={48} color="#9CA3AF" />
           <Text style={styles.noAssignmentTitle}>
