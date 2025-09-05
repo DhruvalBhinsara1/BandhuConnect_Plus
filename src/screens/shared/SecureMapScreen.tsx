@@ -75,7 +75,10 @@ export default function SecureMapScreen() {
 
   // State-driven subscription management
   useEffect(() => {
-    const hasValidAssignment = currentAssignment?.assigned && currentAssignment?.isActive;
+    const hasValidAssignment = currentAssignment?.assigned && 
+      currentAssignment?.isActive && 
+      currentAssignment?.counterpartId && 
+      currentAssignment?.assignmentId;
     
     if (hasValidAssignment) {
       console.log(`[SecureMapScreen] Subscribing to counterpart ${currentAssignment.counterpartId} location`);
@@ -90,7 +93,12 @@ export default function SecureMapScreen() {
         }
       );
     } else {
-      console.log('[SecureMapScreen] Unsubscribing from counterpart location - not assigned or not active');
+      console.log('[SecureMapScreen] Unsubscribing from counterpart location - incomplete assignment data:', {
+        assigned: currentAssignment?.assigned,
+        isActive: currentAssignment?.isActive,
+        counterpartId: currentAssignment?.counterpartId,
+        assignmentId: currentAssignment?.assignmentId
+      });
       // Unsubscribe and clear counterpart data when not assigned or not active
       secureMapService.unsubscribeFromCounterpartLocation();
       setCounterpartLocation(null);
@@ -101,7 +109,7 @@ export default function SecureMapScreen() {
     return () => {
       secureMapService.unsubscribeFromCounterpartLocation();
     };
-  }, [currentAssignment?.assigned, currentAssignment?.isActive, currentAssignment?.counterpartId]);
+  }, [currentAssignment?.assigned, currentAssignment?.isActive, currentAssignment?.counterpartId, currentAssignment?.assignmentId]);
 
   const initializeAssignmentTracking = async () => {
     try {
@@ -147,15 +155,25 @@ export default function SecureMapScreen() {
       hasValidAssignment = await hasActiveAssignment(user.id);
     }
     
+    // Validate assignment completeness
+    const isCompleteAssignment = assignment && 
+      assignment.isActive && 
+      assignment.assigned && 
+      assignment.counterpartId && 
+      assignment.assignmentId;
+    
     console.log('[SecureMapScreen] Assignment validation:', {
       hasAssignment: !!assignment,
       isActive: assignment?.isActive,
       assigned: assignment?.assigned,
       hasValidAssignment,
+      isCompleteAssignment,
+      counterpartId: assignment?.counterpartId,
+      assignmentId: assignment?.assignmentId,
       userId: user?.id
     });
     
-    if (hasValidAssignment && assignment) {
+    if (hasValidAssignment && isCompleteAssignment) {
       setTrackingState(prev => ({
         ...prev,
         hasAssignment: true,
@@ -232,11 +250,8 @@ export default function SecureMapScreen() {
 
     } catch (error) {
       console.error('[SecureMapScreen] Initialization failed:', error);
-      Alert.alert(
-        'Initialization Error', 
-        'Unable to initialize location tracking. Please check your permissions and try again.',
-        [{ text: 'OK', style: 'default' }]
-      );
+      // Silently handle initialization errors to prevent UI disruption
+      // The app will continue to function with limited features
     } finally {
       setIsLoading(false);
     }
