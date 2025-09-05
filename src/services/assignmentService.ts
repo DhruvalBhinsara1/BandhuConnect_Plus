@@ -211,6 +211,7 @@ export class AssignmentService {
           break;
         case 'completed':
           updateData.completed_at = new Date().toISOString();
+          updateData.is_active = false; // Set inactive to prevent unique constraint violations
           // Add completion location if available
           if (completionLocation) {
             updateData.completion_latitude = completionLocation.latitude;

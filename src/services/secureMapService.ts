@@ -532,8 +532,8 @@ class SecureMapService {
       return {
         latitude: locations[0].latitude,
         longitude: locations[0].longitude,
-        latitudeDelta: 0.01, // ~1km
-        longitudeDelta: 0.01
+        latitudeDelta: 0.002, // ~200m
+        longitudeDelta: 0.002
       };
     }
 
@@ -573,10 +573,10 @@ class SecureMapService {
     const ownLocation = await this.getOwnLocation();
     if (!ownLocation) return null;
 
-    // Calculate delta for 200m radius (400m total diameter)
+    // Calculate delta for 100m radius (200m total diameter)
     // 1 degree latitude ≈ 111,000 meters
-    // For 400m total view: 400/111000 ≈ 0.0036
-    const radiusDelta = 0.0036;
+    // For 200m total view: 200/111000 ≈ 0.0018
+    const radiusDelta = 0.0018;
 
     return {
       latitude: ownLocation.latitude,

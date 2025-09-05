@@ -1,69 +1,68 @@
 # BandhuConnect+
 
-A comprehensive React Native application built with Expo for managing volunteers, pilgrims, and administrators during large public events. The app provides real-time location tracking, task assignment, and communication features with robust error handling and cross-app consistency.
+A comprehensive React Native application built with Expo for connecting volunteers and pilgrims during large public events. The app provides real-time location tracking, assignment management, and secure communication with automatic error recovery and cross-app synchronization.
 
 ## 🚀 Current Status (Updated September 2025)
 
 **Production Ready Features:**
-- ✅ Multi-role authentication (Volunteer/Pilgrim/Admin)
-- ✅ Real-time location tracking with 200m zoom precision
-- ✅ Task assignment and management system
-- ✅ Interactive maps with role-based markers and legends
-- ✅ Auto-fade completion notifications
-- ✅ Cross-platform compatibility (iOS/Android/Web)
-- ✅ Comprehensive error handling and user-friendly messages
+- ✅ Multi-role authentication (Volunteer/Pilgrim/Admin) with Supabase Auth
+- ✅ Real-time location tracking with secure map integration
+- ✅ Assignment system with automatic repair and visibility management
+- ✅ Interactive maps with Google Maps integration
+- ✅ Cross-platform compatibility (iOS/Android)
+- ✅ Robust error handling with graceful subscription reconnection
+- ✅ Database consistency with automatic assignment repair system
 
 ## Features
 
 ### For Volunteers
-- Real-time location tracking with 200m precision zoom
-- Task list with proper assignment details and status
-- Interactive map with "Show Me" button (200m radius)
-- Auto-fade "Task Completed" notifications (4-second display)
-- Clear marker legends distinguishing "You" vs "Pilgrim"
-- Post-completion privacy (counterpart location hidden after task completion)
+- View and accept pending assignments with "Mark Task Done" functionality
+- Real-time location tracking with secure map integration
+- Assignment visibility with automatic repair system
+- Interactive maps showing pilgrim locations during active assignments
+- Graceful error handling with subscription reconnection
 
 ### For Pilgrims  
-- Request assistance with categories and priorities
-- Track assigned volunteer with real-time location updates
-- Symmetrical map functionality with same precision and controls
-- Task completion notifications with auto-fade
-- Privacy protection after task completion
+- Create assistance requests with location and description
+- Track assigned volunteer progress in real-time
+- View assignment status updates automatically
+- Secure location sharing during active assignments
+- Assignment completion notifications
 
 ### For Administrators
-- Comprehensive dashboard with system analytics
-- Volunteer and pilgrim management with bulk operations
-- Real-time monitoring of all assignments and locations
-- Auto-assignment capabilities with skill matching
-- System health monitoring and error tracking
+- Comprehensive dashboard for system oversight
+- User management and assignment monitoring
+- Real-time system health and error tracking
+- Database maintenance and assignment repair tools
+- Analytics and reporting capabilities
 
 ## Tech Stack
 
-- **Frontend**: React Native with Expo SDK 53
+- **Frontend**: React Native 0.79.5 with Expo SDK 53
 - **Backend**: Supabase (PostgreSQL + Real-time subscriptions)
-- **Maps**: Google Maps API with react-native-maps
-- **Authentication**: Supabase Auth with role-based access
-- **Real-time**: Supabase Realtime with intelligent filtering
-- **State Management**: React Context API with error boundaries
-- **UI**: Custom components with modern design and accessibility
+- **Maps**: Google Maps API with react-native-maps 1.20.1
+- **Authentication**: Supabase Auth with role-based access control
+- **Real-time**: Supabase Realtime with graceful error handling
+- **State Management**: React Context API with AuthContext and LocationContext
+- **Location Services**: Expo Location 18.1.6 with background tracking
+- **Database**: PostgreSQL with PostGIS for geographic data
 
-## 🗺️ Advanced Location Features
+## 🔧 Assignment System Architecture
 
-- **Precision Tracking**: Real-time updates with 200m zoom precision for "Show Me" button
-- **Smart Privacy**: Counterpart locations hidden after task completion
-- **Interactive Legends**: Clear "You" vs "Pilgrim/Volunteer" marker identification
-- **Auto-Fade Notifications**: Task completion status fades after 4 seconds, never shows again
-- **Symmetrical Experience**: Identical functionality for both pilgrims and volunteers
-- **Error Recovery**: User-friendly messages for location issues with actionable guidance
-- **Battery Optimization**: Intelligent location publishing with movement thresholds
+- **Automatic Repair**: Built-in `assignmentRepairService` handles data inconsistencies
+- **Visibility Management**: Ensures assignments appear correctly across all apps
+- **Status Synchronization**: Real-time updates with `is_active` flag management
+- **Error Recovery**: Silent reconnection for subscription failures
+- **Constraint Handling**: Prevents duplicate active assignments per pilgrim
+- **Cross-App Validation**: Changes validated across pilgrim, volunteer, and admin apps
 
 ## Error Handling & Reliability
 
-- **Location Service**: Graceful handling of permission denials and GPS issues
-- **User-Friendly Messages**: Clear error messages instead of technical jargon
+- **Subscription Management**: Graceful reconnection without UI popups
+- **Database Consistency**: Automatic repair for orphaned assignments
+- **Location Services**: Robust handling of GPS and permission issues
 - **Fallback Systems**: Alternative queries when primary functions fail
-- **Cross-App Consistency**: All changes validated across pilgrim, volunteer, and admin apps
-- **Background Task Management**: Robust handling of location tracking errors
+- **User-Friendly Messages**: Clear error communication without technical jargon
 
 ## Getting Started
 
@@ -86,9 +85,9 @@ cd BandhuConnect_Plus
 npm install
 ```
 
-3. Set up environment variables (see ENVIRONMENT_SETUP.md)
+3. Set up environment variables (see docs/setup/ENVIRONMENT_SETUP.md)
 
-4. Set up database (see database/setup-instructions.md)
+4. Set up database (see database/testing/demo-data-setup.sql)
 
 5. Start the development server
 ```bash
@@ -99,16 +98,35 @@ npx expo start
 
 ```
 src/
-├── components/          # Reusable UI components with error boundaries
-├── screens/            # Screen components
-│   ├── admin/          # Admin-specific screens with bulk operations
-│   ├── shared/         # Shared screens across all roles
-│   └── volunteer/      # Volunteer-specific screens
-├── services/           # API and business logic with error handling
-├── context/            # React Context providers with state management
+├── components/          # Reusable UI components
+│   ├── common/         # Shared components across roles
+│   ├── AuthDebugger.tsx # Authentication debugging component
+│   └── CustomSelector.tsx # Custom selection components
+├── context/            # React Context providers
+│   ├── AuthContext.tsx # Authentication state management
+│   ├── ChatContext.tsx # Chat functionality context
+│   └── LocationContext.tsx # Location tracking context
+├── services/           # API and business logic
+│   ├── assignmentService.ts # Assignment CRUD operations
+│   ├── assignmentRepairService.ts # Automatic repair system
+│   └── supabase.ts     # Supabase client configuration
 ├── constants/          # App constants and configuration
-├── types/              # TypeScript type definitions
-└── utils/              # Utility functions and helpers
+│   ├── appConfig.ts    # Application configuration
+│   └── appRole.ts      # Role-based access definitions
+└── types/              # TypeScript type definitions
+
+database/
+├── schema/             # Database schema files
+├── functions/          # SQL functions and procedures
+├── testing/            # Test data and scripts
+├── maintenance/        # Database maintenance scripts
+└── archive/            # Archived/deprecated files
+
+docs/
+├── api/                # API documentation
+├── components/         # Component documentation
+├── guides/             # User and developer guides
+└── setup/              # Installation and setup guides
 ```
 
 ## Database Schema
@@ -161,10 +179,6 @@ This project is licensed under the MIT License.
 - Android location services
 - Background location tracking
 
-### Web
-- Responsive design for desktop/tablet
-- Web-based maps (Google Maps JavaScript API)
-- Progressive Web App (PWA) capabilities
 
 ## 🔒 Security & Privacy
 
@@ -183,9 +197,9 @@ This project is licensed under the MIT License.
 ## 🎨 UI/UX Design Principles
 
 ### Design System
-- **Color Palette**: Professional blue/green theme with dark mode support
+- **Color Palette**: Professional blue/green theme
 - **Typography**: Clean, readable fonts optimized for mobile
-- **Icons**: Vector icons only (no emojis) using @expo/vector-icons
+- 
 - **Spacing**: Consistent spacing using Tailwind CSS utilities
 - **Accessibility**: WCAG compliant with screen reader support
 
@@ -257,8 +271,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📞 Support
 
 For support and questions:
-- **Email**: support@bandhuconnect.com
-- **Documentation**: [docs.bandhuconnect.com](https://docs.bandhuconnect.com)
+- **Email**: dhruvalbhinsara460@gmail.com
+- **Documentation**: This readme.md
 - **Issues**: GitHub Issues tab
 
 ---

@@ -35,8 +35,8 @@ const MapScreen: React.FC = () => {
   const [region, setRegion] = useState<Region>({
     latitude: 19.0760,
     longitude: 72.8777,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.002,
+    longitudeDelta: 0.002,
   });
   const [mapType, setMapType] = useState<MapType>('standard');
   const [showBuildingView, setShowBuildingView] = useState(true);
@@ -80,8 +80,8 @@ const MapScreen: React.FC = () => {
       mapRef.current.animateToRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.001,
-        longitudeDelta: 0.001,
+        latitudeDelta: 0.0005,
+        longitudeDelta: 0.0005,
       }, 1000);
     } else {
       console.log('Show Me: No current location available');
@@ -159,8 +159,8 @@ const MapScreen: React.FC = () => {
         mapRef.current.animateToRegion({
           latitude: centerLat,
           longitude: centerLon,
-          latitudeDelta: 0.01, // ~1km view
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.002, // ~200m view
+          longitudeDelta: 0.002,
         }, 1000);
       } else {
         // Use fitToCoordinates for distant points
@@ -223,14 +223,14 @@ const MapScreen: React.FC = () => {
         setRegion({
           latitude: firstLocation.latitude,
           longitude: firstLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
         });
         mapRef.current.animateToRegion({
           latitude: firstLocation.latitude,
           longitude: firstLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
         }, 1000);
       }
     }
@@ -282,8 +282,8 @@ const MapScreen: React.FC = () => {
       setRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
       });
       
       // Also animate the map to the new region
@@ -291,8 +291,8 @@ const MapScreen: React.FC = () => {
         mapRef.current.animateToRegion({
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
         }, 1000);
       }
     }
