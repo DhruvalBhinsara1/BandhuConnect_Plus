@@ -649,24 +649,9 @@ class MapService implements MapServiceInterface {
 
   // Helper method to check if user has active assignments
   private async hasActiveAssignment(userId: string): Promise<boolean> {
-    try {
-      const { data, error } = await supabase
-        .from('assignments')
-        .select('id, status')
-        .or(`volunteer_id.eq.${userId},pilgrim_id.eq.${userId}`)
-        .in('status', ['pending', 'accepted', 'in_progress'])
-        .limit(1);
-        
-      if (error) {
-        console.error('❌ MapService.hasActiveAssignment: Error checking assignments:', error);
-        return false;
-      }
-      
-      return data && data.length > 0;
-    } catch (error) {
-      console.error('❌ MapService.hasActiveAssignment: Unexpected error:', error);
-      return false;
-    }
+    // Use centralized assignment detection from assignmentService
+    const { hasActiveAssignment } = await import('./assignmentService');
+    return hasActiveAssignment(userId);
   }
 }
 

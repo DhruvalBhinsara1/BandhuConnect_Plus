@@ -27,6 +27,7 @@ const VolunteerDashboard: React.FC = () => {
     hoursWorked: 0,
   });
   const [isOnDuty, setIsOnDuty] = useState(false);
+  const [hasActiveAssignment, setHasActiveAssignment] = useState(false);
   const [realtimeHours, setRealtimeHours] = useState(0);
 
   useEffect(() => {
@@ -34,23 +35,31 @@ const VolunteerDashboard: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (assignments.length > 0) {
-      calculateStats();
-    }
+    console.log('📋 Assignments changed:', assignments.length, assignments.map(a => ({ id: a.id, status: a.status, assigned: a.assigned })));
+    
+    // Always calculate stats, even if assignments is empty
+    calculateStats();
+    
+    // Check if volunteer has active assignments
+    const hasActive = assignments.some(a => 
+      ['pending', 'accepted', 'in_progress'].includes(a.status)
+    );
+    setHasActiveAssignment(hasActive);
+    console.log('🔄 Has active assignment:', hasActive);
   }, [assignments, user]);
 
-  // Real-time hours tracking for active on_duty tasks
+  // Real-time hours tracking for active in_progress tasks
   useEffect(() => {
-    const activeOnDutyTasks = assignments.filter(a => a.status === 'on_duty' && a.started_at);
+    const activeInProgressTasks = assignments.filter(a => a.status === 'in_progress' && a.started_at);
     
-    if (activeOnDutyTasks.length === 0) {
+    if (activeInProgressTasks.length === 0) {
       setRealtimeHours(0);
       return;
     }
 
     const updateRealtimeHours = () => {
       const currentTime = new Date().getTime();
-      const totalActiveHours = activeOnDutyTasks.reduce((total, task) => {
+      const totalActiveHours = activeInProgressTasks.reduce((total, task) => {
         if (task.started_at) {
           const startTime = new Date(task.started_at).getTime();
           const hoursOnDuty = (currentTime - startTime) / (1000 * 60 * 60);
@@ -73,65 +82,60 @@ const VolunteerDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     if (!user) return;
     
+    console.log('🔄 Loading dashboard data...');
     // Load assignments and volunteer stats from database
     await getAssignments({ volunteerId: user.id });
-    
-    // Load real volunteer statistics
-    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
-    if (volunteerStats && !error) {
-      setStats({
-        totalTasks: volunteerStats.totalTasks,
-        completedTasks: volunteerStats.completedTasks,
-        activeAssignments: volunteerStats.activeAssignments,
-        hoursWorked: volunteerStats.hoursWorked,
-      });
-    }
+    console.log('📋 Assignments loaded, will trigger stats calculation via useEffect');
   };
 
   const calculateStats = async () => {
     if (!user) return;
     
-    // Get real statistics from database instead of calculating from local assignments
-    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
-    if (volunteerStats && !error) {
-      setStats({
-        totalTasks: volunteerStats.totalTasks,
-        completedTasks: volunteerStats.completedTasks,
-        activeAssignments: volunteerStats.activeAssignments,
-        hoursWorked: volunteerStats.hoursWorked,
-      });
-    } else {
-      // Fallback to local calculation if database query fails
-      const completed = assignments.filter(a => a.status === 'completed').length;
-      const active = assignments.filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status)).length;
-      
-      setStats({
-        totalTasks: assignments.length,
-        completedTasks: completed,
-        activeAssignments: active,
-        hoursWorked: completed * 2, // 2 hours per completed task
-      });
-    }
+    // Import centralized assignment detection
+    const { ACTIVE_ASSIGNMENT_STATUSES } = await import('../../services/assignmentService');
+    
+    // Always use local assignments for consistency with the UI display
+    const completed = assignments.filter(a => a.status === 'completed').length;
+    const active = assignments.filter(a => ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as any)).length;
+    
+    console.log('📊 Dashboard stats calculation:', {
+      totalAssignments: assignments.length,
+      completed,
+      active,
+      assignmentStatuses: assignments.map(a => ({ id: a.id, status: a.status, assigned: a.assigned }))
+    });
+    
+    setStats({
+      totalTasks: assignments.length,
+      completedTasks: completed,
+      activeAssignments: active,
+      hoursWorked: completed * 2, // 2 hours per completed task
+    });
+    
+    console.log('✅ Dashboard stats set to:', {
+      totalTasks: assignments.length,
+      completedTasks: completed,
+      activeAssignments: active,
+    });
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    console.log('🔄 Manual refresh triggered');
     await loadDashboardData();
     setRefreshing(false);
   };
 
   const toggleDutyStatus = async () => {
-    if (isOnDuty) {
+    if (isTracking) {
       stopTracking();
-      setIsOnDuty(false);
     } else {
       await startTracking();
-      setIsOnDuty(true);
     }
   };
 
   const activeAssignments = assignments.filter(a => 
-    ['assigned', 'accepted', 'on_duty'].includes(a.status)
+    ['pending', 'accepted', 'in_progress'].includes(a.status)
   );
 
   const recentAssignments = assignments.slice(0, 3);
@@ -159,16 +163,16 @@ const VolunteerDashboard: React.FC = () => {
             <View style={styles.dutyStatusRow}>
               <View>
                 <Text style={styles.dutyStatusTitle}>
-                  {isOnDuty ? 'On Duty' : 'Off Duty'}
+                  {hasActiveAssignment ? 'On Duty' : 'Off Duty'}
                 </Text>
                 <Text style={styles.dutyStatusSubtitle}>
-                  {isOnDuty ? 'Location tracking active' : 'Tap to start duty'}
+                  {hasActiveAssignment ? 'Assignment active' : isTracking ? 'Location tracking active' : 'No active assignments'}
                 </Text>
               </View>
               <Button
-                title={isOnDuty ? 'Check Out' : 'Check In'}
+                title={isTracking ? 'Check Out' : 'Check In'}
                 onPress={toggleDutyStatus}
-                variant={isOnDuty ? 'danger' : 'secondary'}
+                variant={isTracking ? 'danger' : 'secondary'}
                 size="small"
               />
             </View>

@@ -248,12 +248,24 @@ export class VolunteerService {
 
       if (assignmentError) throw assignmentError;
 
-      // Calculate statistics with correct active assignment logic
-      const totalTasks = assignments?.length || 0;
-      const completedTasks = assignments?.filter(a => a.status === 'completed').length || 0;
-      const activeAssignments = assignments?.filter(a => 
-        ['pending', 'accepted', 'in_progress'].includes(a.status)
-      ).length || 0;
+      // Import centralized assignment detection
+    const { ACTIVE_ASSIGNMENT_STATUSES } = await import('./assignmentService');
+    
+    // Calculate statistics with correct active assignment logic
+    const totalTasks = assignments?.length || 0;
+    const completedTasks = assignments?.filter(a => a.status === 'completed').length || 0;
+    // Count active assignments using centralized logic
+    const activeAssignments = assignments.filter(a => 
+      ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as any)
+    ).length;
+      
+      console.log('📊 Stats calculation:', {
+        totalAssignments: assignments?.length,
+        totalTasks,
+        completedTasks,
+        activeAssignments,
+        assignmentStatuses: assignments?.map(a => a.status)
+      });
       
       // Calculate actual hours worked based on duty time (started_at to completed_at)
       let hoursWorked = 0;
