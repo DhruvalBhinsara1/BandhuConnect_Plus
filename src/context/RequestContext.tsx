@@ -84,11 +84,15 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
         console.log('✅ RequestContext.getAssignments: Set assignments:', data.length);
       } else {
         console.error('❌ RequestContext.getAssignments: Error or no data:', error);
-        setAssignments([]);
+        // Don't clear assignments on error - keep existing ones to prevent UI flicker
+        if (!data && !error) {
+          // Only clear if we got a successful empty result
+          setAssignments([]);
+        }
       }
     } catch (err) {
       console.error('❌ RequestContext.getAssignments: Exception:', err);
-      setAssignments([]);
+      // Don't clear assignments on exception - keep existing ones
     } finally {
       setLoading(false);
     }

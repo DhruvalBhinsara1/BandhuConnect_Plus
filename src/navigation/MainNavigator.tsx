@@ -27,6 +27,7 @@ import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 import SecureMapScreen from '../screens/shared/SecureMapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
 import { DevicesScreen } from '../screens/DevicesScreen';
+import DebugScreen from '../screens/DebugScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -111,6 +112,9 @@ const MainNavigator: React.FC = () => {
       case 'Profile':
         iconName = focused ? 'person' : 'person-outline';
         break;
+      case 'Debug':
+        iconName = focused ? 'bug' : 'bug-outline';
+        break;
       default:
         iconName = 'home-outline';
     }
@@ -132,6 +136,7 @@ const MainNavigator: React.FC = () => {
         <Tab.Screen name="Home" component={VolunteerStack} />
         <Tab.Screen name="Tasks" component={TaskStack} />
         <Tab.Screen name="Map" component={SecureMapScreen} />
+        <Tab.Screen name="Debug" component={DebugScreen} />
         <Tab.Screen name="Profile" component={VolunteerProfile} />
       </Tab.Navigator>
     );
@@ -171,6 +176,7 @@ const MainNavigator: React.FC = () => {
       <Tab.Screen name="Home" component={PilgrimStack} />
       <Tab.Screen name="Requests" component={CreateRequest} />
       <Tab.Screen name="Map" component={SecureMapScreen} />
+      <Tab.Screen name="Debug" component={DebugScreen} />
       <Tab.Screen name="Profile" component={PilgrimProfile} />
     </Tab.Navigator>
   );

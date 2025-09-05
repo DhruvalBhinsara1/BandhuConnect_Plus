@@ -1,6 +1,54 @@
 import { supabase } from './supabase';
 import { Assignment, AssignmentStatus } from '../types';
 
+// Centralized assignment detection logic
+export const ACTIVE_ASSIGNMENT_STATUSES = ['pending', 'accepted', 'in_progress'] as const;
+
+export const hasActiveAssignment = async (userId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('id, status')
+      .or(`volunteer_id.eq.${userId},pilgrim_id.eq.${userId}`)
+      .in('status', ACTIVE_ASSIGNMENT_STATUSES)
+      .limit(1);
+      
+    if (error) {
+      console.error('❌ hasActiveAssignment: Error checking assignments:', error);
+      return false;
+    }
+    
+    const hasAssignment = data && data.length > 0;
+    console.log(`🔍 hasActiveAssignment for ${userId}:`, hasAssignment);
+    return hasAssignment;
+  } catch (error) {
+    console.error('❌ hasActiveAssignment: Unexpected error:', error);
+    return false;
+  }
+};
+
+export const getActiveAssignments = async (userId: string): Promise<Assignment[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('assignments')
+      .select('*')
+      .or(`volunteer_id.eq.${userId},pilgrim_id.eq.${userId}`)
+      .in('status', ACTIVE_ASSIGNMENT_STATUSES)
+      .order('assigned_at', { ascending: false });
+      
+    if (error) {
+      console.error('❌ getActiveAssignments: Error:', error);
+      return [];
+    }
+    
+    console.log(`📋 getActiveAssignments for ${userId}:`, data?.length || 0, 'assignments');
+    return data || [];
+  } catch (error) {
+    console.error('❌ getActiveAssignments: Unexpected error:', error);
+    return [];
+  }
+};
+
 export class AssignmentService {
   async createAssignment(requestId: string, volunteerId: string) {
     console.log('📝 Creating assignment:', { requestId, volunteerId });
@@ -10,7 +58,7 @@ export class AssignmentService {
       .from('assignments')
       .select('id, status')
       .eq('volunteer_id', volunteerId)
-      .in('status', ['pending', 'accepted', 'in_progress']);
+      .in('status', ACTIVE_ASSIGNMENT_STATUSES);
 
     if (checkError) {
       console.error('❌ Error checking existing assignments:', checkError);
@@ -60,8 +108,10 @@ export class AssignmentService {
       return { data: null, error: updateError };
     }
 
-    // Update volunteer status based on active assignments
-    await this.updateVolunteerStatusBasedOnAssignments(volunteerId);
+    // Update volunteer status based on active assignments (non-blocking)
+    this.updateVolunteerStatusBasedOnAssignments(volunteerId).catch(error => {
+      console.warn('⚠️ Non-critical: Failed to update volunteer status after assignment creation:', error);
+    });
 
     console.log('✅ Assignment created successfully');
     return { data, error: null };
@@ -189,9 +239,11 @@ export class AssignmentService {
           .eq('id', data.request_id);
       }
 
-      // Update volunteer status based on remaining active assignments
+      // Update volunteer status based on remaining active assignments (non-blocking)
       if (data.volunteer_id) {
-        await this.updateVolunteerStatusBasedOnAssignments(data.volunteer_id);
+        this.updateVolunteerStatusBasedOnAssignments(data.volunteer_id).catch(error => {
+          console.warn('⚠️ Non-critical: Failed to update volunteer status after assignment completion:', error);
+        });
       }
 
       return { data, error: null };
@@ -209,7 +261,7 @@ export class AssignmentService {
         .from('assignments')
         .select('id, status')
         .eq('volunteer_id', volunteerId)
-        .in('status', ['pending', 'accepted', 'in_progress']);
+        .in('status', ACTIVE_ASSIGNMENT_STATUSES);
 
       if (countError) {
         console.error('❌ Error counting active assignments:', countError);
@@ -222,9 +274,8 @@ export class AssignmentService {
       // Determine new volunteer status
       let newStatus = 'available';
       if (activeCount > 0) {
-        // Check if any assignment is in progress (on duty)
-        const hasInProgress = activeAssignments?.some(a => a.status === 'in_progress');
-        newStatus = hasInProgress ? 'on_duty' : 'busy';
+        // Set to busy if volunteer has any active assignments
+        newStatus = 'busy';
       }
 
       console.log('🔄 Setting volunteer status to:', newStatus);
@@ -240,11 +291,13 @@ export class AssignmentService {
 
       if (updateError) {
         console.error('❌ Error updating volunteer status:', updateError);
+        // Don't throw error - this is a non-critical operation
       } else {
         console.log('✅ Volunteer status updated successfully');
       }
     } catch (error) {
       console.error('❌ Error in updateVolunteerStatusBasedOnAssignments:', error);
+      // Gracefully handle error without throwing - volunteer status update is not critical
     }
   }
 

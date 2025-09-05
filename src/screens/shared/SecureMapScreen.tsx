@@ -10,12 +10,13 @@ import {
   AppState,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Circle } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
 import { secureLocationService } from '../../services/secureLocationService';
 import { APP_ROLE, getCurrentRoleConfig } from '../../constants/appRole';
 import { supabase } from '../../services/supabase';
+import { AuthDebugger } from '../../components/AuthDebugger';
 
 interface TrackingState {
   isActive: boolean;
@@ -39,6 +40,7 @@ export default function SecureMapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [userRole, setUserRole] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentAssignment, setCurrentAssignment] = useState<any>(null);
   const [counterpartLocation, setCounterpartLocation] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -48,6 +50,7 @@ export default function SecureMapScreen() {
   useEffect(() => {
     initializeMap();
     initializeAssignmentTracking();
+    fetchCurrentUserId();
     
     // Handle app state changes for reconnection
     const handleAppStateChange = (nextAppState: string) => {
@@ -72,7 +75,9 @@ export default function SecureMapScreen() {
 
   // State-driven subscription management
   useEffect(() => {
-    if (currentAssignment?.assigned && currentAssignment?.isActive) {
+    const hasValidAssignment = currentAssignment?.assigned && currentAssignment?.isActive;
+    
+    if (hasValidAssignment) {
       console.log(`[SecureMapScreen] Subscribing to counterpart ${currentAssignment.counterpartId} location`);
       // Subscribe to counterpart location when assigned and active
       secureMapService.subscribeToCounterpartLocation(
@@ -130,8 +135,27 @@ export default function SecureMapScreen() {
     }
   };
 
-  const updateTrackingStateFromAssignment = (assignment: any) => {
-    if (assignment?.assigned) {
+  const updateTrackingStateFromAssignment = async (assignment: any) => {
+    // Use centralized assignment detection logic
+    const { hasActiveAssignment } = await import('../../services/assignmentService');
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    let hasValidAssignment = false;
+    
+    if (user?.id) {
+      // Check if user has any active assignment using centralized logic
+      hasValidAssignment = await hasActiveAssignment(user.id);
+    }
+    
+    console.log('[SecureMapScreen] Assignment validation:', {
+      hasAssignment: !!assignment,
+      isActive: assignment?.isActive,
+      assigned: assignment?.assigned,
+      hasValidAssignment,
+      userId: user?.id
+    });
+    
+    if (hasValidAssignment && assignment) {
       setTrackingState(prev => ({
         ...prev,
         hasAssignment: true,
@@ -147,6 +171,18 @@ export default function SecureMapScreen() {
         counterpartName: undefined,
         showCompletedStatus: false
       }));
+    }
+  };
+
+  const fetchCurrentUserId = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        console.log('[SecureMapScreen] Current user ID:', user.id);
+      }
+    } catch (error) {
+      console.error('[SecureMapScreen] Failed to get current user ID:', error);
     }
   };
 
@@ -169,21 +205,11 @@ export default function SecureMapScreen() {
     try {
       setIsLoading(true);
 
+      // Always initialize location tracking first (for own location)
+      const trackingInitialized = await secureLocationService.initializeTracking();
+      
       // Check assignment status
       const assignmentStatus = await secureMapService.getAssignmentStatus();
-      
-      if (!assignmentStatus.hasAssignment) {
-        setTrackingState(prev => ({
-          ...prev,
-          hasAssignment: false,
-          assigned: false,
-        }));
-        setIsLoading(false);
-        return;
-      }
-
-      // Initialize location tracking
-      const trackingInitialized = await secureLocationService.initializeTracking();
       
       setTrackingState({
         isActive: trackingInitialized,
@@ -194,7 +220,7 @@ export default function SecureMapScreen() {
       });
 
       if (trackingInitialized) {
-        // Load initial locations
+        // Load initial locations (always includes own location)
         await refreshLocations();
 
         // Subscribe to real-time updates
@@ -224,6 +250,19 @@ export default function SecureMapScreen() {
       const updatedLocations = await secureMapService.refreshLocations();
       setLocations(updatedLocations);
       setLastRefresh(new Date());
+      
+      // Auto-center on user's location if this is the first load and we have locations
+      if (updatedLocations.length > 0 && mapRef.current) {
+        const ownLocation = updatedLocations.find(loc => loc.role === APP_ROLE);
+        if (ownLocation) {
+          mapRef.current.animateToRegion({
+            latitude: ownLocation.latitude,
+            longitude: ownLocation.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        }
+      }
     } catch (error) {
       console.error('[SecureMapScreen] Failed to refresh locations:', error);
     }
@@ -360,7 +399,8 @@ export default function SecureMapScreen() {
       <View style={styles.legendContainer}>
         <Text style={styles.legendTitle}>Map Legend</Text>
         {locations.map((location) => {
-          const isOwn = location.role === APP_ROLE;
+          // Check if this location belongs to the current authenticated user
+          const isOwn = location.userId === currentUserId;
           const markerStyle = getMarkerStyle(location.role, location.isStale);
           
           return (
@@ -382,7 +422,7 @@ export default function SecureMapScreen() {
   const renderMarkers = () => {
     return locations.map((location) => {
       const markerStyle = getMarkerStyle(location.role, location.isStale);
-      const isOwnLocation = location.role === APP_ROLE;
+      const isOwnLocation = location.userId === currentUserId;
 
       return (
         <React.Fragment key={location.userId}>
@@ -445,14 +485,13 @@ export default function SecureMapScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         showsUserLocation={false} // We handle our own markers
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
         initialRegion={{
-          latitude: 37.7749, // Default to San Francisco
-          longitude: -122.4194,
+          latitude: 22.2924, // Default to Vadodara, Gujarat (closer to user's location)
+          longitude: 73.3627,
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
@@ -598,6 +637,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 120,
     left: 16,
+    right: 80,
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 12,
@@ -667,7 +707,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    zIndex: 1,
+    zIndex: 2,
   },
   infoPanelTitle: {
     fontSize: 16,

@@ -52,8 +52,69 @@ class SecureMapService {
       }
 
       if (!data || data.length === 0) {
-        console.log('[SecureMapService] No assignment found');
-        return null;
+        console.log('[SecureMapService] No assignment found by RPC function');
+        
+        // Fallback: Check assignments table directly using centralized logic
+        const { hasActiveAssignment } = await import('./assignmentService');
+        const hasAssignment = await hasActiveAssignment(user.id);
+        
+        console.log('[SecureMapService] Fallback assignment check:', hasAssignment);
+        
+        if (!hasAssignment) {
+          return null;
+        }
+        
+        // If we have an assignment but RPC didn't find it, there's a function issue
+        console.warn('[SecureMapService] Assignment exists but RPC function failed - using fallback');
+        
+        // Get assignment data directly
+        const { data: directAssignment, error: directError } = await supabase
+          .from('assignments')
+          .select(`
+            id,
+            pilgrim_id,
+            volunteer_id,
+            status,
+            users!pilgrim_id(name),
+            profiles!volunteer_id(name, role)
+          `)
+          .or(`volunteer_id.eq.${user.id},pilgrim_id.eq.${user.id}`)
+          .in('status', ['pending', 'accepted', 'in_progress'])
+          .order('assigned_at', { ascending: false })
+          .limit(1);
+          
+        if (directError || !directAssignment || directAssignment.length === 0) {
+          console.error('[SecureMapService] Fallback query also failed:', directError);
+          return null;
+        }
+        
+        const assignment = directAssignment[0];
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+          
+        // Determine counterpart based on user role
+        let counterpartId, counterpartName, counterpartRole;
+        if (profile?.role === 'volunteer') {
+          counterpartId = assignment.pilgrim_id;
+          counterpartName = (assignment.users as any)?.name || 'Unknown';
+          counterpartRole = 'pilgrim';
+        } else {
+          counterpartId = assignment.volunteer_id;
+          counterpartName = (assignment.profiles as any)?.name || 'Unknown';
+          counterpartRole = (assignment.profiles as any)?.role || 'volunteer';
+        }
+        
+        return {
+          assignmentId: assignment.id,
+          counterpartId,
+          counterpartName,
+          counterpartRole,
+          isActive: true,
+          assigned: true
+        };
       }
 
       const assignment = data[0];
@@ -63,6 +124,13 @@ class SecureMapService {
         console.error('[SecureMapService] Invalid assignment data structure:', assignment);
         throw new Error('Invalid assignment data structure');
       }
+
+      console.log('[SecureMapService] Assignment data:', {
+        assignmentId: assignment.assignment_id,
+        isActive: assignment.is_active,
+        assigned: assignment.assigned,
+        counterpartName: assignment.counterpart_name
+      });
 
       return {
         assignmentId: assignment.assignment_id,
@@ -191,24 +259,37 @@ class SecureMapService {
   async getOwnLocation(): Promise<UserLocationData | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      if (!user) {
+        console.error('[SecureMapService] No authenticated user found');
+        return null;
+      }
+
+      console.log('[SecureMapService] Authenticated user ID:', user.id);
 
       // Get user profile for name
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('name, role')
         .eq('id', user.id)
         .single();
 
-      if (!profile) return null;
+      if (profileError || !profile) {
+        console.error('[SecureMapService] Profile fetch error:', profileError);
+        return null;
+      }
+
+      console.log('[SecureMapService] User profile:', profile);
 
       // Import location service here to avoid circular dependency
       const { secureLocationService } = await import('./secureLocationService');
       const currentLocation = await secureLocationService.getCurrentLocation();
 
-      if (!currentLocation) return null;
+      if (!currentLocation) {
+        console.log('[SecureMapService] No current location available');
+        return null;
+      }
 
-      return {
+      const locationData = {
         userId: user.id,
         name: profile.name,
         role: profile.role,
@@ -221,6 +302,9 @@ class SecureMapService {
         minutesAgo: 0,
         isStale: false
       };
+
+      console.log('[SecureMapService] Own location data:', locationData);
+      return locationData;
 
     } catch (error) {
       console.error('[SecureMapService] Error getting own location:', error);
