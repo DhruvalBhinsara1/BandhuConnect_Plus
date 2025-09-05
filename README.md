@@ -1,5 +1,9 @@
 # BandhuConnect+
 
+## Link of the repository :
+
+- https://github.com/DhruvalBhinsara1/BandhuConnect_Plus
+
 A comprehensive React Native application built with Expo for connecting volunteers and pilgrims during large public events. The app provides real-time location tracking, assignment management, and secure communication with automatic error recovery and cross-app synchronization.
 
 ## 🚀 Current Status (Updated September 2025)
@@ -30,11 +34,11 @@ A comprehensive React Native application built with Expo for connecting voluntee
 - Assignment completion notifications
 
 ### For Administrators
-- Comprehensive dashboard for system oversight
-- User management and assignment monitoring
+- Mobile admin interface for system oversight
+- User management and assignment monitoring through mobile app
 - Real-time system health and error tracking
 - Database maintenance and assignment repair tools
-- Analytics and reporting capabilities
+- Analytics and reporting capabilities via mobile interface
 
 ## Tech Stack
 
@@ -230,8 +234,8 @@ This project is licensed under the MIT License.
 - **App Store**: iOS App Store submission
 - **Google Play**: Android Play Store submission
 
-### Web Application
-- **Vercel**: Web deployment for admin dashboard
+### Backend Services
+- **Supabase**: Database and real-time services
 - **CDN**: Static asset delivery
 - **SSL**: HTTPS encryption
 
@@ -268,12 +272,9 @@ This project is licensed under the MIT License.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📞 Support
+## 📞 Contact at
 
-For support and questions:
 - **Email**: dhruvalbhinsara460@gmail.com
-- **Documentation**: This readme.md
-- **Issues**: GitHub Issues tab
 
 ---
 

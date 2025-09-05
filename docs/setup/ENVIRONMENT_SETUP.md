@@ -28,18 +28,8 @@ EXPO_PUBLIC_APP_NAME=BandhuConnect+
 EXPO_PUBLIC_APP_VERSION=1.0.0
 ```
 
-### Admin Dashboard (.env)
-Create `admin-dashboard/.env` file:
-
-```env
-# Supabase Configuration
-REACT_APP_SUPABASE_URL=https://ywntkafcfuugzgcduekj.supabase.co
-REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# App Configuration
-REACT_APP_NAME=BandhuConnect+ Admin
-REACT_APP_VERSION=1.0.0
-```
+### Admin Configuration
+Admin functionality is available through the main mobile app when logged in with an admin role.
 
 ## 🚀 Installation Steps
 
@@ -52,10 +42,7 @@ cd BandhuConnect_Plus
 # Install main app dependencies
 npm install
 
-# Install admin dashboard dependencies
-cd admin-dashboard
-npm install
-cd ..
+# All dependencies are in the main app - no separate admin dashboard
 ```
 
 ### 2. Database Setup
@@ -88,12 +75,8 @@ npx expo start --android  # Android Emulator
 npx expo start --web      # Web browser
 ```
 
-### Admin Dashboard (React Web App)
-```bash
-cd admin-dashboard
-npm start
-# Opens at http://localhost:3000
-```
+### Admin Interface
+Admin functionality is available through the mobile app when logged in with an admin role.
 
 ## 📱 Testing Options
 
