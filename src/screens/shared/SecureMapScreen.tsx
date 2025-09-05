@@ -273,8 +273,8 @@ export default function SecureMapScreen() {
           mapRef.current.animateToRegion({
             latitude: ownLocation.latitude,
             longitude: ownLocation.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
+            latitudeDelta: 0.002,
+            longitudeDelta: 0.002,
           }, 1000);
         }
       }
@@ -507,8 +507,8 @@ export default function SecureMapScreen() {
         initialRegion={{
           latitude: 22.2924, // Default to Vadodara, Gujarat (closer to user's location)
           longitude: 73.3627,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.002,
+          longitudeDelta: 0.002,
         }}
       >
         {renderMarkers()}
