@@ -1,0 +1,3 @@
+BandhuConnect+ - Real-Time Assistance System for Mahakumbh
+
+BandhuConnect+ connects pilgrims needing help with nearby volunteers during Mahakumbh. Pilgrims can request medical aid, directions, or general assistance through the mobile app. Volunteers receive real-time notifications and GPS tracking to locate and assist pilgrims efficiently. The system ensures rapid response times in crowded festival environments, enhancing pilgrim safety and experience during this massive religious gathering.
