@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -296,7 +296,10 @@ const VolunteerDashboard: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('Chat')}
+                onPress={() => {
+                  // TODO: Implement chat functionality
+                  Alert.alert('Coming Soon', 'Chat feature will be available in a future update.');
+                }}
                 style={styles.quickActionItem}
               >
                 <View style={[styles.quickActionIcon, { backgroundColor: '#f3e8ff' }]}>

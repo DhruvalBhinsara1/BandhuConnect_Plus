@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { supabase } from '../services/supabase';
 import { secureMapService } from '../services/secureMapService';
+import { useToast } from '../components/ui/Toast';
 
 interface DebugData {
   authUser: any;
@@ -16,6 +17,7 @@ interface DebugData {
 }
 
 export default function DebugScreen() {
+  const toast = useToast();
   const [debugData, setDebugData] = useState<DebugData>({
     authUser: null,
     profileData: null,
@@ -146,10 +148,11 @@ export default function DebugScreen() {
 
   const copyToClipboard = (data: any, label: string) => {
     const text = JSON.stringify(data, null, 2);
-    Alert.alert('Debug Data', `${label}:\n\n${text}`, [
-      { text: 'Copy All Debug Data', onPress: () => copyAllData() },
-      { text: 'OK', style: 'cancel' }
-    ]);
+    console.log(`=== ${label} ===`);
+    console.log(text);
+    console.log(`=== END ${label} ===`);
+    
+    toast.showInfo('Debug Data', `${label} logged to console. Check your development tools.`);
   };
 
   const copyAllData = () => {
@@ -167,10 +170,11 @@ export default function DebugScreen() {
     };
     
     const text = JSON.stringify(allData, null, 2);
-    Alert.alert('All Debug Data', text.substring(0, 2000) + '\n\n[Data truncated - full data logged to console]');
     console.log('=== FULL DEBUG DATA ===');
     console.log(text);
     console.log('=== END DEBUG DATA ===');
+    
+    toast.showInfo('All Debug Data', 'Complete debug data logged to console. Check your development tools.');
   };
 
   const renderSection = (title: string, data: any, key: string) => (

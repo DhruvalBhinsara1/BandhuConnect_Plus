@@ -9,6 +9,7 @@ import {
   Animated,
   AppState,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapView, { Marker, Circle } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ interface TrackingState {
 }
 
 export default function SecureMapScreen() {
+  const navigation = useNavigation();
   const mapRef = useRef<MapView>(null);
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [trackingState, setTrackingState] = useState<TrackingState>({
@@ -273,13 +275,30 @@ export default function SecureMapScreen() {
           mapRef.current.animateToRegion({
             latitude: ownLocation.latitude,
             longitude: ownLocation.longitude,
-            latitudeDelta: 0.002,
-            longitudeDelta: 0.002,
+            latitudeDelta: 0.008, // Match the initial zoom level
+            longitudeDelta: 0.008, // Match the initial zoom level
           }, 1000);
         }
       }
     } catch (error) {
       console.error('[SecureMapScreen] Failed to refresh locations:', error);
+    }
+  };
+
+  /**
+   * Handle request input tap - navigate to requests tab
+   */
+  const handleRequestTap = () => {
+    // Navigate to the requests tab based on user role
+    if (APP_ROLE === 'pilgrim') {
+      // For pilgrims, go to the requests/create request screen
+      navigation.navigate('Requests' as never);
+    } else if (APP_ROLE === 'volunteer') {
+      // For volunteers, go to tasks screen
+      navigation.navigate('Tasks' as never);
+    } else if (APP_ROLE === 'admin') {
+      // For admins, go to requests management
+      navigation.navigate('Requests' as never);
     }
   };
 
@@ -488,13 +507,46 @@ export default function SecureMapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Status chip */}
-      <View style={styles.statusContainer}>
-        {trackingState.hasAssignment && trackingState.assigned && renderTrackingStatus()}
+      {/* Clean Compact Header */}
+      <View style={styles.cleanHeader}>
+        <Text style={styles.headerTitle}>Live Map</Text>
+        <View style={styles.headerRight}>
+          <View style={styles.usersBadge}>
+            <Text style={styles.usersText}>{locations.length} online</Text>
+          </View>
+          <View style={styles.statusPill}>
+            <View style={[styles.statusDot, { 
+              backgroundColor: trackingState.isActive ? '#10B981' : '#EF4444' 
+            }]} />
+            <Text style={styles.statusText}>
+              {trackingState.isActive ? 'Active' : 'Off'}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      {/* Map legend */}
-      {renderMapLegend()}
+      {/* Request Status Input Bar */}
+      <View style={styles.requestInputBar}>
+        <TouchableOpacity 
+          style={styles.requestInputField}
+          onPress={handleRequestTap}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="search-outline" size={16} color="#3B82F6" />
+          <Text style={[
+            styles.requestInputText,
+            (!trackingState.hasAssignment || !trackingState.assigned) && styles.placeholderText
+          ]}>
+            {trackingState.hasAssignment && trackingState.assigned 
+              ? 'Active request in progress' 
+              : 'Tap to create new request'
+            }
+          </Text>
+          {!trackingState.hasAssignment && (
+            <Ionicons name="add-circle-outline" size={16} color="#10B981" />
+          )}
+        </TouchableOpacity>
+      </View>
 
       {/* Map */}
       <MapView
@@ -507,81 +559,91 @@ export default function SecureMapScreen() {
         initialRegion={{
           latitude: 22.2924, // Default to Vadodara, Gujarat (closer to user's location)
           longitude: 73.3627,
-          latitudeDelta: 0.002,
-          longitudeDelta: 0.002,
+          latitudeDelta: 0.008, // More zoomed in for better neighborhood view
+          longitudeDelta: 0.008, // More zoomed in for better neighborhood view
         }}
       >
         {renderMarkers()}
       </MapView>
 
-      {/* Control buttons */}
-      <View style={styles.controlsContainer}>
-        {/* Show Me button */}
+      {/* Subtle Legend - only show when there are multiple users */}
+      {locations.length > 1 && (
+        <View style={styles.subtleLegend}>
+          {locations.slice(0, 2).map((location) => { // Show max 2 users
+            const markerStyle = getMarkerStyle(location.role, location.isStale);
+            return (
+              <View key={location.userId} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: markerStyle.color }]} />
+                <Text style={styles.legendText} numberOfLines={1}>
+                  {location.role === APP_ROLE ? 'You' : location.name?.split(' ')[0] || 'User'}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Compact Map Controls */}
+      <View style={styles.mapControls}>
         <TouchableOpacity
-          style={[styles.controlButton, { backgroundColor: roleConfig.primaryColor }]}
+          style={styles.myLocationButton}
           onPress={centerOnSelf}
         >
-          <Ionicons name="locate" size={24} color="white" />
+          <Ionicons name="locate" size={20} color="#FFFFFF" />
         </TouchableOpacity>
 
-        {/* Fit in Frame button */}
         <TouchableOpacity
-          style={[styles.controlButton, styles.secondaryButton]}
+          style={locations.length > 0 ? styles.expandButton : styles.controlButton}
           onPress={fitAllMarkers}
           disabled={locations.length === 0}
         >
-          <Ionicons name="scan" size={24} color={locations.length > 0 ? "#374151" : "#9CA3AF"} />
+          <Ionicons name="scan" size={18} color={locations.length > 0 ? "#FFFFFF" : "#9CA3AF"} />
         </TouchableOpacity>
 
-        {/* Refresh button */}
         <TouchableOpacity
-          style={[styles.controlButton, styles.secondaryButton]}
+          style={styles.refreshButton}
           onPress={refreshLocations}
         >
-          <Ionicons name="refresh" size={24} color="#374151" />
+          <Ionicons name="refresh" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      {/* Location info panel */}
+      {/* Subtle Location Status */}
       {locations.length > 0 && (
-        <View style={styles.infoPanel}>
-          <Text style={styles.infoPanelTitle}>Location Status</Text>
-          {locations.map((location) => (
-            <View key={location.userId} style={styles.locationInfo}>
-              <Text style={styles.locationRole}>
-                {location.role === APP_ROLE ? 'You' : location.name}
-              </Text>
-              <Text style={styles.locationStatus}>
-                {location.role === APP_ROLE 
-                  ? 'Live tracking'
-                  : location.isStale 
-                    ? formatLastSeen(location.minutesAgo)
-                    : 'Live location'
-                }
-              </Text>
+        <View style={styles.subtleBottomSheet}>
+          <Text style={styles.bottomSheetTitle}>Location Status</Text>
+          {locations.slice(0, 2).map((location) => ( // Show max 2 for cleaner UI
+            <View key={location.userId} style={styles.locationDetails}>
+              <View style={styles.locationRow}>
+                <View style={styles.locationIcon}>
+                  <Ionicons 
+                    name={location.role === APP_ROLE ? "person" : "location"} 
+                    size={14} 
+                    color={location.role === APP_ROLE ? roleConfig.primaryColor : roleConfig.counterpartColor} 
+                  />
+                </View>
+                <View style={styles.locationInfo}>
+                  <Text style={styles.locationLabel}>
+                    {location.role === APP_ROLE ? 'You' : location.name}
+                  </Text>
+                  <Text style={styles.locationValue}>
+                    {location.role === APP_ROLE 
+                      ? 'Live tracking'
+                      : location.isStale 
+                        ? formatLastSeen(location.minutesAgo)
+                        : 'Live location'
+                    }
+                  </Text>
+                </View>
+              </View>
             </View>
           ))}
-          <Text style={styles.lastRefresh}>
-            Last updated: {lastRefresh.toLocaleTimeString()}
-          </Text>
+          {locations.length > 2 && (
+            <Text style={styles.moreLocationsText}>+{locations.length - 2} more users</Text>
+          )}
         </View>
       )}
 
-      {/* No assignment message - only show if no assignment AND no active tracking */}
-      {!trackingState.hasAssignment && !trackingState.assigned && !currentAssignment && (
-        <View style={styles.noAssignmentContainer}>
-          <Ionicons name="people-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.noAssignmentTitle}>
-            {userRole === 'pilgrim' ? 'No active requests' : 'No Active Assignment'}
-          </Text>
-          <Text style={styles.noAssignmentText}>
-            {userRole === 'pilgrim' 
-              ? "There aren't any requests assigned right now. New requests will appear here."
-              : `You are not currently assigned to a ${roleConfig.counterpartRole}. Contact an admin to get assigned.`
-            }
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -590,6 +652,71 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  header: {
+    position: 'absolute',
+    top: 44, // Status bar height
+    left: 16,
+    right: 16,
+    backgroundColor: '#1F2937', // Dark gray background for better contrast
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 10,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF', // White text on blue background
+    marginBottom: 0,
+    flexShrink: 1, // Allow title to shrink on smaller screens
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#34D399', // Brighter green
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  legendCard: {
+    position: 'absolute',
+    top: 140,
+    left: 16,
+    right: 80,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 5,
   },
   loadingContainer: {
     flex: 1,
@@ -643,10 +770,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    marginLeft: 6,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   legendContainer: {
     position: 'absolute',
@@ -669,20 +796,11 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
   legendMarker: {
     width: 12,
     height: 12,
     borderRadius: 6,
     marginRight: 8,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#6B7280',
   },
   map: {
     flex: 1,
@@ -693,18 +811,8 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 1,
   },
-  controlButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+  primaryButton: {
+    backgroundColor: '#2563EB',
   },
   secondaryButton: {
     backgroundColor: 'white',
@@ -753,29 +861,29 @@ const styles = StyleSheet.create({
   },
   noAssignmentContainer: {
     position: 'absolute',
-    top: '50%',
-    left: 32,
-    right: 32,
-    transform: [{ translateY: -100 }],
+    bottom: 100, // Move to bottom instead of center
+    left: 16,
+    right: 16,
     alignItems: 'center',
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 32,
+    padding: 20, // Reduced padding for smaller footprint
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    zIndex: 3, // Ensure it's above map but below controls
   },
   noAssignmentTitle: {
-    fontSize: 20,
+    fontSize: 18, // Slightly smaller
     fontWeight: '600',
     color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 12, // Reduced margin
+    marginBottom: 6, // Reduced margin
   },
   noAssignmentText: {
-    fontSize: 14,
+    fontSize: 13, // Slightly smaller
     color: '#6B7280',
     textAlign: 'center',
   },
@@ -814,5 +922,428 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     lineHeight: 20,
+  },
+  // New styles for improved layout
+  floatingControls: {
+    position: 'absolute',
+    bottom: 120,
+    right: 16,
+    zIndex: 6,
+  },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 88, // Leave space for control buttons
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 7,
+    maxHeight: 200, // Prevent it from taking too much space
+  },
+  bottomSheetHeader: {
+    marginBottom: 16,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  locationDetails: {
+    marginBottom: 12,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  locationIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  locationValue: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  lastUpdateText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  noAssignmentToast: {
+    position: 'absolute',
+    top: 110, // Just below the new compact header
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 3,
+    minWidth: 100,
+    maxWidth: 120,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastIcon: {
+    marginRight: 3,
+  },
+  toastText: {
+    fontSize: 10,
+    color: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+    flex: 1,
+  },
+  // Material Design styles
+  appBar: {
+    position: 'absolute',
+    top: 40,
+    left: 16,
+    right: 16,
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+  },
+  requestStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  trackingStatusChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  rightControlStack: {
+    position: 'absolute',
+    top: 120, // Below the compact header
+    right: 16,
+    zIndex: 8,
+  },
+  primaryLocationButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  controlSecondaryButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  requestStatusText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  statsText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  headerStatsContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  // Clean Header Styles
+  cleanHeader: {
+    backgroundColor: '#2563EB', // Blue background for better branding
+    paddingHorizontal: '5%', // Responsive horizontal padding
+    paddingVertical: 12,
+    paddingTop: 48, // Account for status bar on most devices
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1D4ED8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 10,
+    minHeight: 80, // Ensure minimum height on smaller screens
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0, // Prevent shrinking on smaller screens
+    maxWidth: '60%', // Limit width on small screens
+  },
+  usersBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 50, // Ensure minimum readable width
+  },
+  usersText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 50, // Ensure minimum readable width
+  },
+  
+  // Request Input Bar Styles
+  requestInputBar: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: '5%', // Responsive padding
+    paddingVertical: 12,
+    borderBottomWidth: 3,
+    borderBottomColor: '#E2E8F0',
+    zIndex: 9,
+    // Add subtle gradient effect with shadow
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  requestInputField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    minHeight: 44, // Ensure good touch target on all devices
+    // Add subtle interaction feedback with color accent
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  requestInputText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '400',
+    minHeight: 20, // Ensure consistent height
+  },
+  placeholderText: {
+    color: '#9CA3AF', // Lighter color for placeholder-like appearance
+    fontStyle: 'italic',
+  },
+
+  // Compact Map Controls
+  mapControls: {
+    position: 'absolute',
+    top: '25%', // Responsive positioning using percentage
+    right: 16,
+    gap: 8,
+    zIndex: 8,
+  },
+  controlButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 40, // Ensure minimum touch target
+    minHeight: 40, // Ensure minimum touch target
+  },
+  // New specific button styles for different actions
+  myLocationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3B82F6', // Blue for location
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 40,
+    minHeight: 40,
+  },
+  expandButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#10B981', // Green for expand/fullscreen
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 40,
+    minHeight: 40,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F59E0B', // Orange for refresh
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 40,
+    minHeight: 40,
+  },
+
+  // Subtle Legend
+  subtleLegend: {
+    position: 'absolute',
+    top: '20%', // Responsive positioning
+    left: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 6,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    zIndex: 6,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    maxWidth: '30%', // Responsive width
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  legendText: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '500',
+    flexShrink: 1, // Allow text to shrink on very small screens
+  },
+
+  // Subtle Bottom Sheet
+  subtleBottomSheet: {
+    position: 'absolute',
+    bottom: '3%', // Responsive bottom positioning
+    left: '4%', // Responsive left margin
+    right: '18%', // Leave space for controls (responsive)
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 7,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    maxHeight: '20%', // Responsive max height
+    minHeight: 60, // Ensure minimum usable height
+  },
+  moreLocationsText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    marginTop: 6,
+    textAlign: 'center',
+    flexShrink: 1, // Allow text to shrink on small screens
   },
 });

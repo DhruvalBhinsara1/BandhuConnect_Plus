@@ -54,7 +54,24 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
   const requestPermissions = async () => {
     try {
-      console.log('LocationContext: Requesting permissions...');
+      console.log('📍 Requesting location permissions...');
+      
+      // Quick permission check first
+      const { status: foregroundStatus } = await Location.getForegroundPermissionsAsync();
+      
+      if (foregroundStatus === 'granted') {
+        console.log('📍 Foreground permission already granted');
+        const perms = {
+          foreground: true,
+          background: false,
+          highestAvailable: true,
+          dontAskAgain: false
+        };
+        setPermissions(perms);
+        return perms;
+      }
+      
+      // If not granted, request permissions
       const result = await locationService.requestPermissions();
       
       if ('error' in result && result.error) {
@@ -127,7 +144,12 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       
       // Only show user-friendly errors for permission issues, not GPS unavailability
       if (locationError.type !== LocationErrorType.GPS_UNAVAILABLE) {
-        LocationErrorHandler.showUserFriendlyError(locationError);
+        // Add placeholder toast handler - in real app this would use the actual toast
+        const dummyToast = {
+          showError: (title: string, message: string) => console.log(`Toast: ${title} - ${message}`),
+          showWarning: (title: string, message: string) => console.log(`Toast: ${title} - ${message}`),
+        };
+        LocationErrorHandler.showUserFriendlyError(locationError, dummyToast);
       }
     }
   };
@@ -216,47 +238,31 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     }
   };
 
-  // Initial setup - silent permission request
+  // Single initialization effect - optimized for speed
   useEffect(() => {
-    const silentPermissionRequest = async () => {
+    const fastInitialization = async () => {
+      if (!user) return;
+      
+      console.log('LocationContext: Fast initialization for user:', user.id);
+      
       try {
-        await requestPermissions();
-      } catch (error) {
-        // Silently handle permission request errors
-        console.log('Permission request failed silently:', error);
-      }
-    };
-    
-    silentPermissionRequest();
-  }, []);
-
-  // Initialize permissions and location on mount
-  useEffect(() => {
-    if (user) {
-      console.log('LocationContext: Initializing for user:', user.id);
-      requestPermissions().then(perms => {
-        console.log('LocationContext: Permissions result:', perms);
+        // Quick permission check first
+        const perms = await requestPermissions();
+        
         if (perms.foreground) {
-          getCurrentLocation();
+          // Start location tracking immediately without waiting
+          startTracking();
         } else {
-          console.log('LocationContext: No foreground permission, cannot get location');
+          console.log('LocationContext: No foreground permission, skipping location');
         }
-      });
-    }
-  }, [user]);
-
-  // Auto-start tracking for logged in users
-  useEffect(() => {
-    const autoStartTracking = async () => {
-      if (user && permissions?.foreground && !isTracking) {
-        console.log('[LocationContext] Auto-starting location tracking for logged-in user');
-        // Silent auto-start - no error handling needed since startTracking is now graceful
-        await startTracking();
+      } catch (error) {
+        console.log('LocationContext: Fast initialization failed:', error);
+        // Continue silently - don't block the app
       }
     };
 
-    autoStartTracking();
-  }, [user, permissions, isTracking]);
+    fastInitialization();
+  }, [user]);
 
   return (
     <LocationContext.Provider

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Image } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, TextInput, Image } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { CustomSelector } from '../../components/CustomSelector';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
 import { useLocation } from '../../context/LocationContext';
+import { useToast } from '../../components/ui/Toast';
 import { storageService } from '../../services/storageService';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -20,6 +21,7 @@ const CreateRequest: React.FC = () => {
   const { user } = useAuth();
   const { createRequest } = useRequest();
   const { currentLocation, getCurrentLocation } = useLocation();
+  const toast = useToast();
   
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
@@ -67,7 +69,7 @@ const CreateRequest: React.FC = () => {
         );
         
         if (uploadResult.error) {
-          Alert.alert('Error', 'Failed to upload photo. Please try again.');
+          toast.showError('Error', 'Failed to upload photo. Please try again.');
           return;
         }
         
@@ -86,13 +88,10 @@ const CreateRequest: React.FC = () => {
       });
 
       if (error) {
-        Alert.alert('Error', 'Failed to create request. Please try again.');
+        toast.showError('Error', 'Failed to create request. Please try again.');
       } else {
-        Alert.alert(
-          'Success',
-          'Your request has been submitted successfully!',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        toast.showSuccess('Success', 'Your request has been submitted successfully!');
+        navigation.goBack();
       }
     } finally {
       setLoading(false);
@@ -119,31 +118,22 @@ const CreateRequest: React.FC = () => {
     const permissions = await storageService.requestPermissions();
     
     if (!permissions.camera && !permissions.mediaLibrary) {
-      Alert.alert(
+      toast.showWarning(
         'Permissions Required',
-        'Please enable camera and photo library permissions to add photos.',
-        [{ text: 'OK' }]
+        'Please enable camera and photo library permissions to add photos.'
       );
       return;
     }
 
-    Alert.alert(
-      'Add Photo',
-      'Choose an option',
-      [
-        { 
-          text: 'Camera', 
-          onPress: handleTakePhoto,
-          style: permissions.camera ? 'default' : 'destructive'
-        },
-        { 
-          text: 'Gallery', 
-          onPress: handlePickImage,
-          style: permissions.mediaLibrary ? 'default' : 'destructive'
-        },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
+    // For now, let's provide both options with clear toast guidance
+    // In a production app, you might want to implement a custom action sheet
+    if (permissions.camera && permissions.mediaLibrary) {
+      toast.showInfo('Photo Options', 'Tap Camera icon to take photo, or Gallery icon to choose from library');
+    } else if (permissions.camera) {
+      handleTakePhoto();
+    } else if (permissions.mediaLibrary) {
+      handlePickImage();
+    }
   };
 
   const getRequestTypeLabel = (type: RequestType) => {

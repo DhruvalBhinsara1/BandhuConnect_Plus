@@ -5,19 +5,22 @@ import {
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { AuthService } from '../services/authService';
 import { deviceService, UserDevice } from '../services/deviceService';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useToast } from '../components/ui/Toast';
+import { useConfirmationDialog } from '../components/ui/ConfirmationDialog';
 
 export const DevicesScreen = () => {
   const [devices, setDevices] = useState<UserDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
+  const toast = useToast();
+  const { confirm, ConfirmationDialog } = useConfirmationDialog();
   const currentDeviceToken = deviceService.getDeviceToken();
 
   const loadDevices = async () => {
@@ -26,7 +29,7 @@ export const DevicesScreen = () => {
       const devices = await authService.getActiveDevices();
       setDevices(devices);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load devices');
+      toast.showError('Error', 'Failed to load devices');
       console.error('Error loading devices:', error);
     } finally {
       setLoading(false);
@@ -45,53 +48,53 @@ export const DevicesScreen = () => {
 
   const handleDeactivateDevice = async (device: UserDevice) => {
     if (device.device_token === currentDeviceToken) {
-      Alert.alert(
-        'Warning',
-        'This is your current device. Deactivating it will sign you out.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign Out',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const authService = new AuthService();
-                await authService.signOut();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Login' as never }],
-                });
-              } catch (error) {
-                Alert.alert('Error', 'Failed to sign out');
-                console.error('Error signing out:', error);
-              }
-            },
-          },
-        ]
-      );
-      return;
-    }
-
-    Alert.alert(
-      'Confirm',
-      'Are you sure you want to deactivate this device?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+      const confirmed = await confirm(
+        'Sign Out Current Device',
+        'This is your current device. Deactivating it will sign you out of the app. Are you sure you want to continue?',
         {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deviceService.deactivateDevice(device.device_id);
-              await loadDevices();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to deactivate device');
-              console.error('Error deactivating device:', error);
-            }
-          },
-        },
-      ]
-    );
+          confirmLabel: 'Sign Out',
+          cancelLabel: 'Cancel',
+          variant: 'warning',
+          icon: 'log-out'
+        }
+      );
+
+      if (confirmed) {
+        try {
+          const authService = new AuthService();
+          await authService.signOut();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' as never }],
+          });
+        } catch (error) {
+          toast.showError('Error', 'Failed to sign out');
+          console.error('Error signing out:', error);
+        }
+      }
+    } else {
+      const confirmed = await confirm(
+        'Deactivate Device',
+        `Are you sure you want to deactivate "${device.device_name}"? This will sign out the device immediately.`,
+        {
+          confirmLabel: 'Deactivate',
+          cancelLabel: 'Cancel',
+          variant: 'danger',
+          icon: 'trash'
+        }
+      );
+
+      if (confirmed) {
+        try {
+          await deviceService.deactivateDevice(device.device_id);
+          await loadDevices();
+          toast.showSuccess('Success', 'Device deactivated successfully');
+        } catch (error) {
+          toast.showError('Error', 'Failed to deactivate device');
+          console.error('Error deactivating device:', error);
+        }
+      }
+    }
   };
 
   const renderDevice = ({ item }: { item: UserDevice }) => (
@@ -139,6 +142,7 @@ export const DevicesScreen = () => {
           <Text style={styles.emptyText}>No active devices found</Text>
         }
       />
+      <ConfirmationDialog />
     </SafeAreaView>
   );
 };

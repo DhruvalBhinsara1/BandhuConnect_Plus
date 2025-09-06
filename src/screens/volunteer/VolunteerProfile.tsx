@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
+import { useTheme } from '../../theme/ThemeContext';
+import { safeNavigate } from '../../utils/navigationErrorHandler';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -14,6 +16,7 @@ const VolunteerProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
   const { assignments } = useRequest();
+  const { theme, toggleTheme, themeMode } = useTheme();
 
   // Type for the navigation
   type RootStackParamList = {
@@ -292,6 +295,51 @@ const VolunteerProfile: React.FC = () => {
           </View>
         </Card>
 
+        {/* Theme Settings */}
+        <Card style={styles.statsCard}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          
+          <View style={styles.statRow}>
+            <View style={styles.statLabel}>
+              <Ionicons 
+                name={themeMode === 'dark' ? "moon" : themeMode === 'light' ? "sunny" : "contrast"} 
+                size={20} 
+                color={COLORS.primary} 
+              />
+              <Text style={styles.statLabelText}>Theme</Text>
+            </View>
+            <TouchableOpacity
+              onPress={toggleTheme}
+              style={[
+                styles.themeToggle,
+                { backgroundColor: COLORS.primary + '20', borderColor: COLORS.primary }
+              ]}
+            >
+              <Text style={[styles.themeToggleText, { color: COLORS.primary }]}>
+                {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.statRow}>
+            <View style={styles.statLabel}>
+              <Ionicons name="settings" size={20} color={COLORS.primary} />
+              <Text style={styles.statLabelText}>Theme Demo</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => safeNavigate(navigation, 'ThemeDemo')}
+              style={[
+                styles.themeToggle,
+                { backgroundColor: COLORS.secondary + '20', borderColor: COLORS.secondary }
+              ]}
+            >
+              <Text style={[styles.themeToggleText, { color: COLORS.secondary }]}>
+                View Demo
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+
         {/* Actions */}
         {editing ? (
           <View style={styles.editActions}>
@@ -543,6 +591,16 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginBottom: 12,
+  },
+  themeToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  themeToggleText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

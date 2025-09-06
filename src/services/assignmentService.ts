@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 import { Assignment, AssignmentStatus } from '../types';
-import { repairAssignments } from './assignmentRepairService';
 
 // Centralized assignment detection logic
 export const ACTIVE_ASSIGNMENT_STATUSES = ['pending', 'accepted', 'in_progress'] as const;
@@ -24,11 +23,17 @@ export const hasActiveAssignment = async (userId: string): Promise<boolean> => {
     // If no assignment found, try automatic repair
     if (!hasAssignment) {
       console.log(`🔧 No active assignment found for ${userId}, attempting repair...`);
-      const repairResult = await repairAssignments(userId);
-      
-      if (repairResult.success && repairResult.repaired) {
-        console.log(`✅ Assignment repaired for ${userId}:`, repairResult.message);
-        return true;
+      try {
+        // Dynamic import to avoid circular dependency
+        const { repairAssignments } = await import('./assignmentRepairService');
+        const repairResult = await repairAssignments(userId);
+        
+        if (repairResult.success && repairResult.repaired) {
+          console.log(`✅ Assignment repaired for ${userId}:`, repairResult.message);
+          return true;
+        }
+      } catch (importError) {
+        console.error('❌ Failed to import repair service:', importError);
       }
     }
     

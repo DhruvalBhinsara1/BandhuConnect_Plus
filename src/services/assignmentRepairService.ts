@@ -13,15 +13,111 @@ export interface AssignmentRepairResult {
   assignmentId?: string;
 }
 
+interface VolunteerProfile {
+  id: string;
+  name: string;
+  workload?: number;
+  rating?: number;
+  lastActive?: string;
+}
+
+/**
+ * Repair configuration options
+ */
+interface RepairConfig {
+  maxVolunteersToCheck?: number;
+  preferredSelectionStrategy?: 'workload' | 'random' | 'alphabetical';
+  enableWorkloadBalancing?: boolean;
+  maxRetryAttempts?: number;
+}
+
+const DEFAULT_REPAIR_CONFIG: RepairConfig = {
+  maxVolunteersToCheck: 10,
+  preferredSelectionStrategy: 'workload',
+  enableWorkloadBalancing: true,
+  maxRetryAttempts: 3
+};
+
+/**
+ * Intelligent volunteer selection algorithm
+ * Prioritizes based on workload, availability, and performance
+ */
+const selectOptimalVolunteer = async (
+  volunteers: VolunteerProfile[], 
+  userId: string, 
+  config: RepairConfig = DEFAULT_REPAIR_CONFIG
+): Promise<VolunteerProfile> => {
+  // If no volunteers available, throw error
+  if (!volunteers || volunteers.length === 0) {
+    throw new Error('No volunteers available for assignment');
+  }
+
+  // Single volunteer - return immediately
+  if (volunteers.length === 1) {
+    return volunteers[0];
+  }
+
+  // Apply selection strategy
+  switch (config.preferredSelectionStrategy) {
+    case 'workload':
+      return await selectByWorkload(volunteers, userId);
+    case 'random':
+      return volunteers[Math.floor(Math.random() * volunteers.length)];
+    case 'alphabetical':
+      return volunteers.sort((a, b) => a.name.localeCompare(b.name))[0];
+    default:
+      return await selectByWorkload(volunteers, userId);
+  }
+};
+
+/**
+ * Select volunteer based on current workload (most fair distribution)
+ */
+const selectByWorkload = async (volunteers: VolunteerProfile[], userId: string): Promise<VolunteerProfile> => {
+  // Get current workload for each volunteer
+  const volunteersWithWorkload = await Promise.all(
+    volunteers.map(async (volunteer) => {
+      const { data: activeAssignments } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('volunteer_id', volunteer.id)
+        .in('status', ACTIVE_ASSIGNMENT_STATUSES);
+
+      return {
+        ...volunteer,
+        workload: activeAssignments?.length || 0
+      };
+    })
+  );
+
+  // Sort by workload (ascending) then by name for consistency
+  volunteersWithWorkload.sort((a, b) => {
+    if (a.workload !== b.workload) {
+      return a.workload - b.workload; // Lower workload first
+    }
+    return a.name.localeCompare(b.name); // Alphabetical for tie-breaking
+  });
+
+  console.log(`🎯 Volunteer selection for user ${userId}:`);
+  volunteersWithWorkload.forEach(v => 
+    console.log(`   - ${v.name}: ${v.workload} active assignments`)
+  );
+
+  return volunteersWithWorkload[0];
+};
+
 /**
  * Automatically repairs missing assignments by linking assistance requests to assignments
  */
-export const repairMissingAssignments = async (userId: string): Promise<AssignmentRepairResult> => {
+export const repairMissingAssignments = async (
+  userId: string, 
+  config: RepairConfig = DEFAULT_REPAIR_CONFIG
+): Promise<AssignmentRepairResult> => {
   try {
     console.log(`🔧 Starting assignment repair for user: ${userId}`);
 
     // 1. First, clean up any broken assignments for this user
-    await repairDuplicateAssignments(userId);
+    await repairDuplicateAssignments(userId, config);
 
     // 2. Check if user has any active assignments after cleanup
     const { data: existingAssignments, error: assignmentError } = await supabase
@@ -61,13 +157,13 @@ export const repairMissingAssignments = async (userId: string): Promise<Assignme
       return { success: true, message: 'No repair needed - no orphaned requests' };
     }
 
-    // 3. Find available volunteers for assignment (prioritize Dr. Raj Patel)
+    // 3. Find available volunteers using configurable selection
     const { data: availableVolunteers, error: volunteerError } = await supabase
       .from('profiles')
       .select('id, name')
       .eq('role', 'volunteer')
       .order('name')
-      .limit(5);
+      .limit(config.maxVolunteersToCheck || 10);
 
     if (volunteerError || !availableVolunteers || availableVolunteers.length === 0) {
       console.error('❌ No available volunteers found:', volunteerError);
@@ -98,8 +194,9 @@ export const repairMissingAssignments = async (userId: string): Promise<Assignme
 
     // Generalized constraint handling using smart upsert strategy
     const requestToLink = orphanedRequests[0];
-    // Find Dr. Raj Patel specifically, or fall back to first available
-    const volunteerToAssign = availableVolunteers.find(v => v.name.includes('Raj')) || availableVolunteers[0];
+    
+    // Use intelligent volunteer selection algorithm
+    const volunteerToAssign = await selectOptimalVolunteer(availableVolunteers, userId);
     
     console.log(`🔄 Using generalized upsert strategy for any constraint scenario...`);
     console.log(`📋 Linking request "${requestToLink.title}" to volunteer "${volunteerToAssign.name}"`);
@@ -178,7 +275,10 @@ export const repairMissingAssignments = async (userId: string): Promise<Assignme
 /**
  * Repairs duplicate assignments by completing older ones
  */
-export const repairDuplicateAssignments = async (userId: string): Promise<AssignmentRepairResult> => {
+export const repairDuplicateAssignments = async (
+  userId: string, 
+  config: RepairConfig = DEFAULT_REPAIR_CONFIG
+): Promise<AssignmentRepairResult> => {
   try {
     console.log(`🔧 Checking for duplicate assignments for user: ${userId}`);
 
@@ -281,17 +381,21 @@ export const repairDuplicateAssignments = async (userId: string): Promise<Assign
 /**
  * Comprehensive assignment repair - runs all repair functions
  */
-export const repairAssignments = async (userId: string): Promise<AssignmentRepairResult> => {
+export const repairAssignments = async (
+  userId: string, 
+  config: RepairConfig = DEFAULT_REPAIR_CONFIG
+): Promise<AssignmentRepairResult> => {
   console.log(`🔧 Starting comprehensive assignment repair for: ${userId}`);
+  console.log(`⚙️ Using repair config:`, config);
 
   // First, handle duplicates
-  const duplicateResult = await repairDuplicateAssignments(userId);
+  const duplicateResult = await repairDuplicateAssignments(userId, config);
   if (!duplicateResult.success) {
     return duplicateResult;
   }
 
   // Then, handle missing assignments
-  const missingResult = await repairMissingAssignments(userId);
+  const missingResult = await repairMissingAssignments(userId, config);
   
   return {
     success: missingResult.success,
@@ -300,3 +404,26 @@ export const repairAssignments = async (userId: string): Promise<AssignmentRepai
     assignmentId: missingResult.assignmentId || duplicateResult.assignmentId
   };
 };
+
+/**
+ * Convenience function for quick repairs with default settings
+ */
+export const quickRepair = async (userId: string): Promise<AssignmentRepairResult> => {
+  return repairAssignments(userId);
+};
+
+/**
+ * Advanced repair with custom configuration
+ */
+export const advancedRepair = async (
+  userId: string,
+  customConfig: Partial<RepairConfig>
+): Promise<AssignmentRepairResult> => {
+  const config = { ...DEFAULT_REPAIR_CONFIG, ...customConfig };
+  return repairAssignments(userId, config);
+};
+
+/**
+ * Export repair configuration for external customization
+ */
+export { RepairConfig, DEFAULT_REPAIR_CONFIG };

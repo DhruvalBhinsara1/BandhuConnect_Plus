@@ -4,6 +4,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
+import { useTheme } from '../../theme/ThemeContext';
+import { safeNavigate } from '../../utils/navigationErrorHandler';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -13,6 +15,7 @@ const PilgrimProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut, selectedRole } = useAuth();
   const { requests, getRequests } = useRequest();
+  const { theme, toggleTheme, themeMode } = useTheme();
   
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -331,6 +334,75 @@ const PilgrimProfile: React.FC = () => {
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>Find Nearby Help</Text>
               <Text style={{ fontSize: 12, color: '#6b7280' }}>Locate volunteers and services</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+          </TouchableOpacity>
+        </Card>
+
+        {/* Theme Settings */}
+        <Card style={{ marginBottom: 16, backgroundColor: '#ffffff', borderRadius: 16, padding: 20 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 20 }}>Appearance</Text>
+          
+          <TouchableOpacity
+            onPress={toggleTheme}
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              paddingVertical: 16, 
+              paddingHorizontal: 12,
+              backgroundColor: '#f8fafc',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#e2e8f0'
+            }}
+          >
+            <View style={{ backgroundColor: '#f1f5f9', padding: 12, borderRadius: 50, marginRight: 16 }}>
+              <Ionicons 
+                name={themeMode === 'dark' ? "moon" : themeMode === 'light' ? "sunny" : "contrast"} 
+                size={24} 
+                color={COLORS.primary} 
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>Theme</Text>
+              <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                Currently using {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'} theme
+              </Text>
+            </View>
+            <View style={{ 
+              backgroundColor: COLORS.primary + '20', 
+              paddingHorizontal: 12, 
+              paddingVertical: 6, 
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: COLORS.primary
+            }}>
+              <Text style={{ color: COLORS.primary, fontSize: 14, fontWeight: '500' }}>
+                {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={() => safeNavigate(navigation, 'ThemeDemo')}
+            style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              paddingVertical: 16, 
+              paddingHorizontal: 12,
+              backgroundColor: '#fef3c7',
+              borderRadius: 12,
+              marginTop: 12,
+              borderWidth: 1,
+              borderColor: '#fbbf24'
+            }}
+          >
+            <View style={{ backgroundColor: '#fed7aa', padding: 12, borderRadius: 50, marginRight: 16 }}>
+              <Ionicons name="color-palette" size={24} color="#ea580c" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827', marginBottom: 2 }}>Theme Demo</Text>
+              <Text style={{ fontSize: 12, color: '#6b7280' }}>View complete design system</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#6b7280" />
           </TouchableOpacity>

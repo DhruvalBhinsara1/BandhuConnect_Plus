@@ -3,10 +3,14 @@ import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleShe
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../theme/ThemeContext';
+import { safeNavigate } from '../../utils/navigationErrorHandler';
+import { COLORS } from '../../constants';
 
 const AdminProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
+  const { theme, toggleTheme, themeMode } = useTheme();
   
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -169,6 +173,55 @@ const AdminProfile: React.FC = () => {
               {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
             </Text>
           </View>
+        </View>
+
+        {/* Theme Settings */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Appearance</Text>
+          
+          <TouchableOpacity onPress={toggleTheme} style={styles.themeRow}>
+            <View style={styles.themeInfo}>
+              <Ionicons 
+                name={themeMode === 'dark' ? "moon" : themeMode === 'light' ? "sunny" : "contrast"} 
+                size={20} 
+                color={COLORS.primary} 
+                style={styles.themeIcon}
+              />
+              <View>
+                <Text style={styles.themeLabel}>Theme</Text>
+                <Text style={styles.themeDescription}>
+                  Currently using {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'} theme
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.themeToggle, { backgroundColor: COLORS.primary + '20', borderColor: COLORS.primary }]}>
+              <Text style={[styles.themeToggleText, { color: COLORS.primary }]}>
+                {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => safeNavigate(navigation, 'ThemeDemo')} style={styles.themeRow}>
+            <View style={styles.themeInfo}>
+              <Ionicons 
+                name="color-palette" 
+                size={20} 
+                color="#ea580c" 
+                style={styles.themeIcon}
+              />
+              <View>
+                <Text style={styles.themeLabel}>Theme Demo</Text>
+                <Text style={styles.themeDescription}>
+                  View complete design system showcase
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.themeToggle, { backgroundColor: '#ea580c' + '20', borderColor: '#ea580c' }]}>
+              <Text style={[styles.themeToggleText, { color: '#ea580c' }]}>
+                View Demo
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Actions */}
@@ -395,6 +448,40 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: 'white',
+    fontWeight: '500',
+  },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  themeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  themeIcon: {
+    marginRight: 12,
+  },
+  themeLabel: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  themeDescription: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  themeToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  themeToggleText: {
+    fontSize: 14,
     fontWeight: '500',
   },
 });
