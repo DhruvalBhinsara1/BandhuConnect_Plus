@@ -131,7 +131,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signUp = async (email: string, password: string, userData: any) => {
-    setLoading(true);
     try {
       console.log('[AuthContext] SignUp called with:', { email, userData });
       const result = await authService.signUp(email, password, userData);
@@ -153,13 +152,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('[AuthContext] SignUp failed:', result.error);
       }
       return result;
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('[AuthContext] Unexpected signUp error:', error);
+      return { data: null, error };
     }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    setLoading(true);
     try {
       const result = await authService.signInWithEmail(email, password);
       if (result.data && !result.error) {
@@ -167,9 +166,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(currentUser);
         return { ...result, user: currentUser };
       }
+      // Pass through the error as-is (it already has userFriendlyError from authService)
       return result;
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      // If an unexpected error occurs here, return it
+      console.error('[AuthContext] Unexpected signIn error:', error);
+      return { data: null, error };
     }
   };
 

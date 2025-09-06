@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, SafeAreaView, Alert, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { ErrorDisplay, InlineError } from '../../components/common/ErrorDisplay';
+import { ErrorHandlingService, UserFriendlyError } from '../../services/errorHandlingService';
 
 const VolunteerLoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -11,23 +13,19 @@ const VolunteerLoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [mainError, setMainError] = useState<UserFriendlyError | null>(null);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
     
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
+    const emailError = ErrorHandlingService.handleValidationError('email', email);
+    const passwordError = ErrorHandlingService.handleValidationError('password', password);
     
-    if (!password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
+    if (emailError) newErrors.email = emailError;
+    if (passwordError) newErrors.password = passwordError;
     
     setErrors(newErrors);
+    setMainError(null); // Clear main error when validating
     return Object.keys(newErrors).length === 0;
   };
 
@@ -35,31 +33,42 @@ const VolunteerLoginScreen: React.FC = () => {
     if (!validateForm()) return;
 
     setLoading(true);
+    setMainError(null);
+    
     try {
       const result = await signInWithEmail(email.trim(), password);
       
       if (result.error) {
-        Alert.alert('Login Failed', result.error.message || 'Please check your credentials and try again.');
+        // Check if the error has a user-friendly version
+        if (result.error.userFriendlyError) {
+          setMainError(result.error.userFriendlyError);
+        } else {
+          // Fallback to processing the error
+          const userFriendlyError = ErrorHandlingService.handleAuthError(result.error);
+          setMainError(userFriendlyError);
+        }
         return;
       }
 
       // Verify user has volunteer role
       if (!result.user || result.user.role !== 'volunteer') {
         console.log('[VolunteerLogin] Access denied - user role:', result.user?.role);
-        Alert.alert('Access Denied', 'This account is not authorized for volunteer access. Please use the correct login portal for your account type.', [
-          { 
-            text: 'OK', 
-            onPress: async () => {
-              const { signOut } = useAuth();
-              await signOut();
-              console.log('[VolunteerLogin] User signed out after access denied');
-            }
-          }
-        ]);
+        setMainError({
+          title: 'Access Denied',
+          message: 'This account is not authorized for volunteer access. Please use the correct login portal for your account type.',
+          action: 'Check account type',
+          severity: 'error'
+        });
+        
+        // Sign out the user
+        const { signOut } = useAuth();
+        await signOut();
         return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } catch (error: any) {
+      console.error('[VolunteerLogin] Unexpected error:', error);
+      const userFriendlyError = ErrorHandlingService.handleAuthError(error);
+      setMainError(userFriendlyError);
     } finally {
       setLoading(false);
     }
@@ -78,6 +87,11 @@ const VolunteerLoginScreen: React.FC = () => {
             <Text style={styles.subtitle}>Help others in need</Text>
           </View>
 
+          <ErrorDisplay 
+            error={mainError} 
+            onDismiss={() => setMainError(null)} 
+          />
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -89,7 +103,7 @@ const VolunteerLoginScreen: React.FC = () => {
               autoCapitalize="none"
               placeholderTextColor="#9CA3AF"
             />
-            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+            <InlineError error={errors.email} />
           </View>
 
           <View style={styles.inputContainer}>
@@ -102,7 +116,7 @@ const VolunteerLoginScreen: React.FC = () => {
               secureTextEntry
               placeholderTextColor="#9CA3AF"
             />
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            <InlineError error={errors.password} />
           </View>
 
           <TouchableOpacity

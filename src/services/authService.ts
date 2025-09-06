@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { User, UserRole } from '../types';
 import { deviceService } from './deviceService';
+import { ErrorHandlingService } from './errorHandlingService';
 
 export class AuthService {
   async signUp(email: string, password: string, userData: any) {
@@ -17,7 +18,8 @@ export class AuthService {
 
       if (authError) {
         console.log('[AuthService] Auth error:', authError);
-        throw authError;
+        const userFriendlyError = ErrorHandlingService.handleAuthError(authError);
+        throw { ...authError, userFriendlyError };
       }
 
       if (!authData.user) {
@@ -136,22 +138,16 @@ export class AuthService {
           details: error
         });
         
-        // Provide user-friendly error messages
-        let userFriendlyMessage = error.message;
-        if (error.message?.includes('Invalid login credentials')) {
-          userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (error.message?.includes('Email not confirmed')) {
-          userFriendlyMessage = 'Please check your email and click the confirmation link before signing in.';
-        } else if (error.message?.includes('Too many requests')) {
-          userFriendlyMessage = 'Too many login attempts. Please wait a moment and try again.';
-        }
+        const userFriendlyError = ErrorHandlingService.handleAuthError(error);
         
-        const enhancedError = {
-          ...error,
-          message: userFriendlyMessage
+        // Return error instead of throwing it
+        return {
+          data: null,
+          error: {
+            ...error,
+            userFriendlyError
+          }
         };
-        
-        throw enhancedError;
       }
 
       // Register device after successful login
@@ -164,9 +160,18 @@ export class AuthService {
       }
 
       return { data, error: null };
-    } catch (error) {
-      console.error('[AuthService] SignIn catch error:', error);
-      return { data: null, error };
+    } catch (error: any) {
+      console.error('[AuthService] SignIn unexpected error:', error);
+      
+      // Process unexpected errors
+      const userFriendlyError = ErrorHandlingService.handleAuthError(error);
+      return { 
+        data: null, 
+        error: {
+          ...error,
+          userFriendlyError
+        }
+      };
     }
   }
 
@@ -206,7 +211,7 @@ export class AuthService {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to avoid PGRST116
 
       if (error) {
         console.error('Error getting current user profile:', error);

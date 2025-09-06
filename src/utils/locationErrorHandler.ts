@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { AppError, toAppError } from '../lib/errors';
 
 export enum LocationErrorType {
   PERMISSION_DENIED = 'PERMISSION_DENIED',
@@ -13,6 +13,11 @@ export interface LocationError {
   type: LocationErrorType;
   message: string;
   originalError?: any;
+}
+
+export interface ToastHandler {
+  showError: (title: string, message?: string) => void;
+  showWarning: (title: string, message?: string) => void;
 }
 
 export class LocationErrorHandler {
@@ -93,8 +98,12 @@ export class LocationErrorHandler {
     }
   }
 
-  static showUserFriendlyError(error: LocationError, onRetry?: () => void) {
-    // Don't show alerts for Expo Go limitations or GPS unavailability
+  static showUserFriendlyError(
+    error: LocationError, 
+    toast: ToastHandler,
+    onRetry?: () => void
+  ) {
+    // Don't show notifications for Expo Go limitations or GPS unavailability
     if (error.message.includes('Expo Go') || 
         error.message.includes('NSLocation') ||
         error.type === LocationErrorType.GPS_UNAVAILABLE) {
@@ -102,17 +111,20 @@ export class LocationErrorHandler {
       return;
     }
 
-    const buttons: any[] = [{ text: 'OK', style: 'cancel' }];
+    const message = this.getUserFriendlyMessage(error);
     
-    if (onRetry) {
-      buttons.unshift({ text: 'Retry', onPress: onRetry });
+    if (error.type === LocationErrorType.PERMISSION_DENIED) {
+      toast.showError('Location Permission Required', message);
+    } else {
+      toast.showWarning('Location Error', message);
     }
 
-    Alert.alert(
-      'Location Error',
-      this.getUserFriendlyMessage(error),
-      buttons
-    );
+    // If retry is provided, show info about retry
+    if (onRetry) {
+      setTimeout(() => {
+        toast.showWarning('Retry Available', 'Tap the location button to try again');
+      }, 2000);
+    }
   }
 
   static logError(error: LocationError, context: string) {

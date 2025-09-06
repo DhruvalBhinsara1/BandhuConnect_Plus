@@ -27,6 +27,7 @@ import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 import SecureMapScreen from '../screens/shared/SecureMapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
 import { DevicesScreen } from '../screens/DevicesScreen';
+import { ThemeDemoScreen } from '../screens/ThemeDemoScreen';
 // Debug screen removed for production
 
 const Tab = createBottomTabNavigator();
@@ -36,6 +37,7 @@ const VolunteerProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={VolunteerProfile} options={{ headerShown: false }} />
     <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Active Devices' }} />
+    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 
@@ -59,6 +61,7 @@ const AdminStack = () => (
     <Stack.Screen name="Dashboard" component={AdminDashboard} />
     <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
     <Stack.Screen name="Profile" component={AdminProfile} />
+    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 
@@ -81,6 +84,7 @@ const PilgrimStack = () => (
     <Stack.Screen name="CreateRequest" component={CreateRequest} />
     <Stack.Screen name="RequestStatus" component={RequestStatus} />
     <Stack.Screen name="Profile" component={PilgrimProfile} />
+    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 

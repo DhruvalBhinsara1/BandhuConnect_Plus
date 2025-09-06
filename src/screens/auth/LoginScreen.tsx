@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, Alert, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { signInWithEmail } = useAuth();
+  const toast = useToast();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,10 +41,10 @@ const LoginScreen: React.FC = () => {
       const { error } = await signInWithEmail(email.trim(), password);
       
       if (error) {
-        Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
+        toast.showError('Login Failed', error.message || 'Please check your credentials and try again.');
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      toast.showError('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

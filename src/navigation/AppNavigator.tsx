@@ -11,14 +11,27 @@ const Stack = createNativeStackNavigator();
 const AppNavigator: React.FC = () => {
   const { user, loading } = useAuth();
 
+  console.log('[AppNavigator] Rendering with:', { 
+    hasUser: !!user, 
+    userEmail: user?.email,
+    userRole: user?.role,
+    needsProfileCompletion: user?.needsProfileCompletion,
+    loading 
+  });
+
+  // Show loading screen only during initial app authentication check
   if (loading) {
+    console.log('[AppNavigator] Showing loading screen');
     return <LoadingScreen />;
   }
+
+  const shouldShowMain = user && !user.needsProfileCompletion;
+  console.log('[AppNavigator] Navigation decision:', { shouldShowMain });
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user && !user.needsProfileCompletion ? (
+        {shouldShowMain ? (
           <Stack.Screen name="Main" component={MainNavigator} />
         ) : (
           <Stack.Screen name="Auth" component={AuthNavigator} />

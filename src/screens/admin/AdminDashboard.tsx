@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -100,10 +100,31 @@ const AdminDashboard: React.FC = () => {
         return;
       }
 
-      // Calculate success rate (auto-assigned vs total processed requests)
-      const successRate = completedRequests?.length > 0 
-        ? Math.round((autoAssigned.length / completedRequests.length) * 100)
+      // Calculate auto-assignment success rate properly
+      // Since we don't have assignment_method column, we'll use a different approach:
+      // Track success rate based on completed vs pending requests over time
+      
+      // Get requests that are still pending (potential auto-assign failures)
+      const { data: pendingRequests, error: pendingError } = await supabase
+        .from('assistance_requests')
+        .select('id, created_at')
+        .eq('status', 'pending')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
+
+      // For now, use a simplified success rate calculation
+      // In the future, we should add an assignment_method column to track this properly
+      const totalRecentRequests = autoAssigned.length + (pendingRequests?.length || 0);
+      const successRate = totalRecentRequests > 0 
+        ? Math.round((autoAssigned.length / totalRecentRequests) * 100)
         : 0;
+
+      console.log(`📊 Auto-assignment success rate calculation (simplified):`, {
+        autoAssignedCount: autoAssigned.length,
+        pendingRequestsCount: pendingRequests?.length || 0,
+        totalRecentRequests,
+        successRate: `${successRate}%`,
+        note: 'Consider adding assignment_method column for accurate tracking'
+      });
 
       // Mock average match score (since we don't have the actual column)
       // In a real scenario, this would be calculated from the auto-assignment algorithm

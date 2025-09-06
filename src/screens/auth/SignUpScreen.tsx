@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, Alert, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../components/ui/Toast';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Card from '../../components/common/Card';
@@ -14,6 +15,7 @@ import { COLORS } from '../../constants';
 const SignUpScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { signUp } = useAuth();
+  const toast = useToast();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -82,12 +84,12 @@ const SignUpScreen: React.FC = () => {
       const { error } = await signUp(formData.email.trim(), formData.password, userData);
       
       if (error) {
-        Alert.alert('Sign Up Failed', error.message || 'Please try again.');
+        toast.showError('Sign Up Failed', error.message || 'Please try again.');
       } else {
-        Alert.alert('Success', 'Account created successfully!');
+        toast.showSuccess('Success', 'Account created successfully!');
       }
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      toast.showError('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

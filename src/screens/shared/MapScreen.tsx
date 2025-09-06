@@ -4,7 +4,6 @@ import {
   Text, 
   StyleSheet, 
   TouchableOpacity, 
-  Alert, 
   SafeAreaView, 
   Dimensions, 
   Platform,
@@ -15,6 +14,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, Region, MapType } from 'react-native-
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
 import { useMap } from '../../context/MapContext';
+import { useToast } from '../../components/ui/Toast';
 import { MarkerCallout } from '../../components/MarkerCallout';
 import { DebugDrawer } from '../../components/DebugDrawer';
 import { TrackingStatus } from '../../components/TrackingStatus';
@@ -28,6 +28,7 @@ const MapScreen: React.FC = () => {
   const { user } = useAuth();
   const { userLocations, loading, refreshLocations } = useMap();
   const { currentLocation, isTracking, isBackgroundTracking, permissions, getCurrentLocation } = useLocation();
+  const toast = useToast();
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<UserLocationData | null>(null);
   const [showLocationNotice, setShowLocationNotice] = useState(true);
@@ -85,10 +86,9 @@ const MapScreen: React.FC = () => {
       }, 1000);
     } else {
       console.log('Show Me: No current location available');
-      Alert.alert(
+      toast.showWarning(
         'Location Unavailable',
-        'Your location is not available. Please enable location services and try again.',
-        [{ text: 'OK' }]
+        'Your location is not available. Please enable location services and try again.'
       );
     }
   };
@@ -267,10 +267,9 @@ const MapScreen: React.FC = () => {
       // We'll center the map in the useEffect that watches currentLocation
     } catch (error) {
       console.error('MapScreen: Could not get current location:', error);
-      Alert.alert(
+      toast.showError(
         'Location Error',
-        'Please check your GPS settings and location permissions.',
-        [{ text: 'OK' }]
+        'Please check your GPS settings and location permissions.'
       );
     }
   };
@@ -300,11 +299,22 @@ const MapScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleDebugTap} style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Location Tracking</Text>
-          <Text style={styles.versionText}>v{APP_CONFIG.VERSION}</Text>
-        </TouchableOpacity>
+      {/* Material-style App Bar Header */}
+      <View style={styles.appBar}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={handleDebugTap} style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Live Map</Text>
+            <Text style={styles.headerSubtitle}>Your Location</Text>
+          </TouchableOpacity>
+          
+          {/* Request Status Pill */}
+          <View style={styles.requestStatusPill}>
+            <Ionicons name="notifications-outline" size={16} color="#6B7280" />
+            <Text style={styles.requestStatusText}>No requests</Text>
+          </View>
+        </View>
+        
+        {/* Stats and Status Row */}
         <View style={styles.headerStats}>
           <Text style={styles.statsText}>{userLocations.length} users online</Text>
           <View style={styles.trackingStatus}>
@@ -358,15 +368,15 @@ const MapScreen: React.FC = () => {
             >
               {user?.role === 'admin' ? (
                 <View style={[styles.userMarker, styles.adminMarker]}>
-                  <Ionicons name="star" size={16} color="#fff" />
+                  <Ionicons name="star" size={20} color="#fff" />
                 </View>
               ) : user?.role === 'volunteer' ? (
                 <View style={[styles.userMarker, styles.volunteerMarker]}>
-                  <Ionicons name="shield" size={16} color="#fff" />
+                  <Ionicons name="shield" size={20} color="#fff" />
                 </View>
               ) : (
                 <View style={[styles.userMarker, styles.pilgrimMarker]}>
-                  <Ionicons name="person" size={16} color="#fff" />
+                  <Ionicons name="person" size={20} color="#fff" />
                 </View>
               )}
             </Marker>
@@ -400,7 +410,7 @@ const MapScreen: React.FC = () => {
                       location.user_role === 'admin' ? 'star' :
                       location.user_role === 'volunteer' ? 'shield' : 'person'
                     } 
-                    size={16} 
+                    size={20} 
                     color={isStale ? '#999' : '#fff'} 
                   />
                 </View>
@@ -421,7 +431,9 @@ const MapScreen: React.FC = () => {
           </Animated.View>
         )}
 
-        <View style={styles.mapControls}>
+        {/* Right Side Control Stack */}
+        <View style={styles.rightControlStack}>
+          {/* Map Type Controls */}
           <View style={styles.mapTypeControls}>
             <TouchableOpacity
               style={[styles.mapButton, mapType === 'standard' && styles.activeMapButton]}
@@ -435,30 +447,23 @@ const MapScreen: React.FC = () => {
             >
               <Text style={[styles.mapButtonText, mapType === 'satellite' && styles.activeButtonText]}>Satellite</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.mapButton, showBuildingView && styles.activeMapButton]}
-              onPress={() => setShowBuildingView(!showBuildingView)}
-            >
-              <Text style={[styles.mapButtonText, showBuildingView && styles.activeButtonText]}>Buildings</Text>
-            </TouchableOpacity>
           </View>
-          
-          <View style={styles.navigationControls}>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={handleShowMe}
-            >
-              <Ionicons name="locate" size={20} color="#2563EB" />
-              <Text style={styles.navButtonText}>Show Me</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={handleFitInFrame}
-            >
- 
-              <Text style={styles.navButtonText}>Fit in Frame</Text>
-            </TouchableOpacity>
-          </View>
+
+          {/* Primary Location Button */}
+          <TouchableOpacity
+            style={styles.primaryLocationButton}
+            onPress={handleShowMe}
+          >
+            <Ionicons name="locate" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Secondary Action Buttons */}
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleFitInFrame}
+          >
+            <Ionicons name="scan" size={20} color="#2563EB" />
+          </TouchableOpacity>
         </View>
 
         {/* Legend */}
@@ -467,13 +472,13 @@ const MapScreen: React.FC = () => {
             <>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.pilgrimMarker]}>
-                  <Ionicons name="person" size={12} color="#fff" />
+                  <Ionicons name="person" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Pilgrim (You)</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.volunteerMarker]}>
-                  <Ionicons name="shield" size={12} color="#fff" />
+                  <Ionicons name="shield" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Assigned Volunteer</Text>
               </View>
@@ -482,13 +487,13 @@ const MapScreen: React.FC = () => {
             <>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.volunteerMarker]}>
-                  <Ionicons name="shield" size={12} color="#fff" />
+                  <Ionicons name="shield" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Volunteer (You)</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.pilgrimMarker]}>
-                  <Ionicons name="person" size={12} color="#fff" />
+                  <Ionicons name="person" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Assigned Pilgrims</Text>
               </View>
@@ -497,19 +502,19 @@ const MapScreen: React.FC = () => {
             <>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.adminMarker]}>
-                  <Ionicons name="star" size={12} color="#fff" />
+                  <Ionicons name="star" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Admin (You)</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.volunteerMarker]}>
-                  <Ionicons name="shield" size={12} color="#fff" />
+                  <Ionicons name="shield" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>All Volunteers</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.pilgrimMarker]}>
-                  <Ionicons name="person" size={12} color="#fff" />
+                  <Ionicons name="person" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>All Pilgrims</Text>
               </View>
@@ -518,13 +523,13 @@ const MapScreen: React.FC = () => {
             <>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.volunteerMarker]}>
-                  <Ionicons name="shield" size={12} color="#fff" />
+                  <Ionicons name="shield" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Volunteers</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendMarker, styles.pilgrimMarker]}>
-                  <Ionicons name="person" size={12} color="#fff" />
+                  <Ionicons name="person" size={14} color="#fff" />
                 </View>
                 <Text style={styles.legendText}>Pilgrims</Text>
               </View>
@@ -532,13 +537,10 @@ const MapScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Tracking Status - replaces error messages */}
-        <TrackingStatus style={styles.trackingStatusBanner} />
-
         {/* Notification for users without location data */}
         {placeholderUsers.length > 0 && (
           <View style={styles.noLocationBanner}>
-            <Ionicons name="information-circle" size={16} color="#F59E0B" />
+            <Ionicons name="information-circle" size={20} color="#F59E0B" />
             <Text style={styles.noLocationText}>
               {APP_CONFIG.ROLE === 'pilgrim' 
                 ? `Your volunteer's location is not available`
@@ -561,6 +563,40 @@ const MapScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* Bottom Sheet for Location Status */}
+      <View style={styles.bottomSheetContainer}>
+        <TouchableOpacity 
+          style={styles.bottomSheetHandle}
+          onPress={() => {/* Could add expand/collapse functionality */}}
+        >
+          <View style={styles.handleBar} />
+        </TouchableOpacity>
+        
+        <View style={styles.bottomSheetContent}>
+          <Text style={styles.bottomSheetTitle}>Location Status</Text>
+          <View style={styles.statusRow}>
+            <View style={styles.statusIcon}>
+              <Ionicons 
+                name="person" 
+                size={20} 
+                color="#FFFFFF" 
+              />
+            </View>
+            <View style={styles.statusInfo}>
+              <Text style={styles.statusLabel}>You</Text>
+              <Text style={styles.statusValue}>
+                {isTracking ? 'Live tracking' : 'Location off'}
+              </Text>
+            </View>
+          </View>
+          {currentLocation && (
+            <Text style={styles.lastUpdateText}>
+              Last updated: {new Date().toLocaleTimeString()}
+            </Text>
+          )}
+        </View>
+      </View>
     </View>
   );
 };
@@ -570,38 +606,81 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+  // Material-style App Bar
+  appBar: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 50 : 24,
+    paddingBottom: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    zIndex: 1000,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   headerTitleContainer: {
-    alignItems: 'flex-start',
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#BFDBFE',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  requestStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  requestStatusText: {
+    fontSize: 12,
+    color: '#E5E7EB',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   versionText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+    fontWeight: '500',
   },
   headerStats: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
   },
   statsText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#E5E7EB',
+    fontWeight: '500',
   },
   trackingStatus: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statusDot: {
     width: 8,
@@ -610,8 +689,9 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 14,
-    color: '#4B5563',
+    fontSize: 12,
+    color: '#E5E7EB',
+    fontWeight: '500',
   },
   mapContainer: {
     flex: 1,
@@ -620,99 +700,157 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
+  // Right Side Control Stack
+  rightControlStack: {
+    position: 'absolute',
+    top: 20,
+    right: 16,
+    alignItems: 'center',
+    gap: 12,
+  },
   mapControls: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
+    top: 20,
+    left: 20,
+    right: 20,
     flexDirection: 'column',
     gap: 16,
   },
   mapTypeControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: 'column',
     gap: 8,
+    marginBottom: 8,
   },
   mapButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minWidth: 80,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
-
   activeMapButton: {
     backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
   },
   mapButtonText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
+    fontWeight: '600',
+    color: '#374151',
   },
   activeButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
+  },
+  // Primary Red Location Button
+  primaryLocationButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  // Secondary Action Buttons
+  secondaryButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
   noLocationBanner: {
     position: 'absolute',
-    top: 140,
-    left: 16,
-    right: 16,
+    top: 160,
+    left: 20,
+    right: 20,
     backgroundColor: '#FEF3C7',
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  noLocationText: {
-    fontSize: 14,
-    color: '#92400E',
-    marginLeft: 8,
-    flex: 1,
-  },
-  warningOverlay: {
-    position: 'absolute',
-    bottom: 80,
-    left: 16,
-    right: 16,
-    backgroundColor: '#FEF3C7',
-    padding: 12,
-    borderRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
+  noLocationText: {
+    fontSize: 16,
+    color: '#92400E',
+    marginLeft: 12,
+    flex: 1,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  warningOverlay: {
+    position: 'absolute',
+    bottom: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
   warningText: {
     color: '#92400E',
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 22,
   },
   locationNotice: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
+    top: 20,
+    left: 20,
+    right: 20,
     backgroundColor: '#0891B2',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   locationNoticeText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   currentLocationMarker: {
     alignItems: 'center',
@@ -736,18 +874,18 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   userMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
   },
   volunteerMarker: {
     backgroundColor: '#16A34A',
@@ -760,73 +898,162 @@ const styles = StyleSheet.create({
   },
   legend: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 160, // Moved up to avoid bottom sheet
     left: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.1)',
+    maxWidth: 180,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   legendMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
-    borderWidth: 1,
+    marginRight: 12,
+    borderWidth: 2,
     borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   legendText: {
-    fontSize: 12,
-    color: '#374151',
-    fontWeight: '500',
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600',
+    flex: 1,
   },
   navigationControls: {
     flexDirection: 'row',
-    marginTop: 8,
-    gap: 8,
+    marginTop: 12,
+    gap: 12,
   },
   navButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    gap: 6,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    gap: 8,
+    minHeight: 44, // Minimum touch target size
   },
   navButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#2563EB',
   },
   trackingStatusBanner: {
     position: 'absolute',
-    top: 100,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 8,
+    top: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  // Bottom Sheet Styles
+  bottomSheetContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16, // Account for safe area
+  },
+  bottomSheetHandle: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+  },
+  bottomSheetContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 4,
+  },
+  statusInfo: {
+    flex: 1,
+  },
+  statusLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  statusValue: {
+    fontSize: 16,
+    color: '#16A34A',
+    fontWeight: '500',
+  },
+  lastUpdateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '400',
   },
 });
 
