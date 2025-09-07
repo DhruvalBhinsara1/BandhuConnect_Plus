@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Image, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#16a34a',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#ffffff',
   },
   cardMargin: {
     marginHorizontal: 16,
@@ -774,22 +774,63 @@ const TaskDetails: React.FC = () => {
                     <View style={[styles.minimapLocationDot, styles.volunteerDot]} />
                   </View>
                   
-                  {/* Information overlay */}
+                  {/* Information overlay - Horizontal layout like pilgrim app */}
                   <View style={styles.minimapInfoContainer}>
-                    <Text style={styles.minimapDistance}>
-                      📏 {formatDistance(calculatedDistance)}
-                    </Text>
-                    <Text style={styles.minimapCoordinates}>
-                      📍 {formatCoordinates(pilgrimLocation.latitude, pilgrimLocation.longitude)}
-                    </Text>
-                    {pilgrimLocation.accuracy && (
-                      <Text style={styles.minimapAccuracy}>
-                        GPS: ±{pilgrimLocation.accuracy.toFixed(0)}m
-                        {pilgrimLocation.accuracy < 10 ? ' (Excellent)' : 
-                         pilgrimLocation.accuracy < 30 ? ' (Good)' : 
-                         pilgrimLocation.accuracy < 100 ? ' (Fair)' : ' (Poor)'}
-                      </Text>
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      {/* Left side: Distance and location info */}
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Ionicons name="location-outline" size={16} color="#4B5563" style={{ marginRight: 6 }} />
+                          <Text style={styles.minimapDistance}>
+                            {formatDistance(calculatedDistance)}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="navigate-outline" size={16} color="#4B5563" style={{ marginRight: 6 }} />
+                          <Text style={styles.minimapCoordinates}>
+                            {formatCoordinates(pilgrimLocation.latitude, pilgrimLocation.longitude)}
+                          </Text>
+                        </View>
+                        {pilgrimLocation.accuracy && (
+                          <Text style={styles.minimapAccuracy}>
+                            GPS: ±{pilgrimLocation.accuracy.toFixed(0)}m
+                            {pilgrimLocation.accuracy < 10 ? ' (Excellent)' : 
+                             pilgrimLocation.accuracy < 30 ? ' (Good)' : 
+                             pilgrimLocation.accuracy < 100 ? ' (Fair)' : ' (Poor)'}
+                          </Text>
+                        )}
+                      </View>
+                      
+                      {/* Right side: View Map button */}
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#16a34a',
+                          paddingHorizontal: 16,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          elevation: 2,
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 3,
+                        }}
+                        onPress={() => {
+                          // Navigate to full map view
+                          console.log('View Map pressed');
+                        }}
+                      >
+                        <Ionicons name="map-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={{
+                          color: '#FFFFFF',
+                          fontSize: 14,
+                          fontWeight: '600',
+                        }}>
+                          View Map
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>

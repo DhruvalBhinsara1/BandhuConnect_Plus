@@ -143,6 +143,7 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
                 ]}
                 strokeColor="#3b82f6"
                 strokeWidth={3}
+                lineDashPattern={[10, 5]}
               />
             )}
             

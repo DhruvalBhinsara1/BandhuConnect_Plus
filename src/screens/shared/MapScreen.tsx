@@ -38,8 +38,8 @@ const MapScreen: React.FC = () => {
   const [region, setRegion] = useState<Region>({
     latitude: 19.0760,
     longitude: 72.8777,
-    latitudeDelta: 0.001, // ~100m view instead of 0.002
-    longitudeDelta: 0.001, // ~100m view instead of 0.002
+    latitudeDelta: 0.005, // ~500m view for wider coverage
+    longitudeDelta: 0.005, // ~500m view for wider coverage
   });
   const [mapType, setMapType] = useState<MapType>('standard');
   const [showBuildingView, setShowBuildingView] = useState(true);

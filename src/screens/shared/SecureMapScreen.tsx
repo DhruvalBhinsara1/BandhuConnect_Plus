@@ -35,7 +35,7 @@ export default function SecureMapScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { requests } = useRequest();
+  const { requests, assignments, getAssignments } = useRequest();
   const mapRef = useRef<MapView>(null);
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [trackingState, setTrackingState] = useState<TrackingState>({
@@ -80,10 +80,33 @@ export default function SecureMapScreen() {
   // Get current user location from locations array
   const currentUserLocation = locations.find(loc => loc.userId === currentUserId);
   
-  // Get counterpart location from locations array using assignment data
-  const counterpartLocationFromArray = currentAssignment?.counterpartId 
-    ? locations.find(loc => loc.userId === currentAssignment.counterpartId)
-    : null;
+  // Get counterpart location - different logic for volunteers vs pilgrims
+  const getCounterpartLocation = () => {
+    const userRole = user?.role || APP_ROLE;
+    
+    if (userRole === 'volunteer') {
+      // For volunteers: Find their assignment and get the pilgrim's location
+      const myAssignments = requests
+        .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
+        .filter(Boolean);
+      
+      if (myAssignments.length > 0 && myAssignments[0]) {
+        const assignedRequest = requests.find(r => r.id === myAssignments[0]?.request_id);
+        if (assignedRequest) {
+          // Find the pilgrim's location in the locations array
+          return locations.find(loc => loc.userId === assignedRequest.user_id);
+        }
+      }
+      return null;
+    } else {
+      // For pilgrims: Use the original logic
+      return currentAssignment?.counterpartId 
+        ? locations.find(loc => loc.userId === currentAssignment.counterpartId)
+        : null;
+    }
+  };
+  
+  const counterpartLocationFromArray = getCounterpartLocation();
   
   // Use counterpart location from array if available, otherwise fall back to counterpartLocation state
   const effectiveCounterpartLocation = counterpartLocationFromArray || counterpartLocation;
@@ -126,6 +149,21 @@ export default function SecureMapScreen() {
     initializeMap();
     initializeAssignmentTracking();
     fetchCurrentUserId();
+    
+    // Fetch latest assignments from request context
+    if (user?.id) {
+      // For volunteers, get assignments filtered by volunteer_id
+      if ((user?.role || APP_ROLE) === 'volunteer') {
+        getAssignments?.({ volunteerId: user.id });
+        console.log('[SecureMapScreen] Fetching assignments for volunteer:', user.id);
+      } else {
+        getAssignments?.();
+        console.log('[SecureMapScreen] Fetching all assignments for role:', user?.role || APP_ROLE);
+      }
+    } else {
+      getAssignments?.();
+      console.log('[SecureMapScreen] Fetching assignments without user ID');
+    }
     
     // Handle app state changes for reconnection
     const handleAppStateChange = (nextAppState: string) => {
@@ -337,7 +375,7 @@ export default function SecureMapScreen() {
       
       // Auto-center on user's location if this is the first load and we have locations
       if (updatedLocations.length > 0 && mapRef.current) {
-        const ownLocation = updatedLocations.find(loc => loc.role === APP_ROLE);
+        const ownLocation = updatedLocations.find(loc => loc.role === (user?.role || APP_ROLE));
         if (ownLocation) {
           mapRef.current.animateToRegion({
             latitude: ownLocation.latitude,
@@ -357,13 +395,15 @@ export default function SecureMapScreen() {
    */
   const handleRequestTap = () => {
     // Navigate to the requests tab based on user role
-    if (APP_ROLE === 'pilgrim') {
+    const userRole = user?.role || APP_ROLE;
+    
+    if (userRole === 'pilgrim') {
       // For pilgrims, go to the requests/create request screen
       navigation.navigate('Requests' as never);
-    } else if (APP_ROLE === 'volunteer') {
+    } else if (userRole === 'volunteer') {
       // For volunteers, go to tasks screen
       navigation.navigate('Tasks' as never);
-    } else if (APP_ROLE === 'admin') {
+    } else if (userRole === 'admin') {
       // For admins, go to requests management
       navigation.navigate('Requests' as never);
     }
@@ -606,30 +646,67 @@ export default function SecureMapScreen() {
             (!trackingState.hasAssignment || !trackingState.assigned) && { color: theme.textSecondary }
           ]}>
             {(() => {
-              // Check for active requests from request context
+              // Use dynamic role from user context instead of hardcoded APP_ROLE
+              const userRole = user?.role || APP_ROLE;
+              
+              if (userRole === 'volunteer') {
+                // For volunteers, check assignments assigned to them
+                const myAssignments = requests
+                  .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
+                  .filter(Boolean);
+                
+                if (myAssignments.length > 0) {
+                  const assignment = myAssignments[0];
+                  // Get the pilgrim's name from the request
+                  const assignedRequest = requests.find(r => r.id === assignment?.request_id);
+                  const pilgrimName = assignedRequest?.user?.name || effectiveCounterpartLocation?.name || 'Unknown pilgrim';
+                  
+                  if (assignment?.status === 'pending') return 'Assignment received, go to the destination.';
+                  if (assignment?.status === 'accepted') return `You are helping ${pilgrimName}`;
+                  if (assignment?.status === 'in_progress') return `Helping ${pilgrimName} - in progress`;
+                  if (assignment?.status === 'completed') return 'Assignment completed';
+                }
+                
+                // Fallback: Check if we have assignment data from context
+                if (currentAssignment?.assigned && effectiveCounterpartLocation) {
+                  return `You are helping ${effectiveCounterpartLocation.name || 'pilgrim'}`;
+                }
+                
+                return 'No active assignments';
+              } else {
+                // For pilgrims, check requests created by them
+                const myRequests = requests.filter(r => r.user_id === user?.id);
+                const activeRequests = myRequests.filter(r => 
+                  ['pending', 'assigned', 'in_progress'].includes(r.status)
+                );
+                
+                if (activeRequests.length > 0) {
+                  const status = activeRequests[0].status;
+                  if (status === 'pending') return 'Request submitted, waiting for volunteer';
+                  if (status === 'assigned') return 'Volunteer assigned, help is coming';
+                  if (status === 'in_progress') return 'Help is in progress';
+                }
+                
+                return 'Tap to create new request';
+              }
+            })()}
+          </Text>
+          {(() => {
+            const userRole = user?.role || APP_ROLE;
+            
+            if (userRole === 'volunteer') {
+              // Volunteers don't create requests, so no plus icon
+              return null;
+            } else {
+              // For pilgrims, only show plus icon if no active requests
               const myRequests = requests.filter(r => r.user_id === user?.id);
               const activeRequests = myRequests.filter(r => 
                 ['pending', 'assigned', 'in_progress'].includes(r.status)
               );
-              
-              if (activeRequests.length > 0) {
-                const status = activeRequests[0].status;
-                if (status === 'pending') return 'Request submitted, waiting for volunteer';
-                if (status === 'assigned') return 'Volunteer assigned, help is coming';
-                if (status === 'in_progress') return 'Help is in progress';
-              }
-              
-              return 'Tap to create new request';
-            })()}
-          </Text>
-          {(() => {
-            const myRequests = requests.filter(r => r.user_id === user?.id);
-            const activeRequests = myRequests.filter(r => 
-              ['pending', 'assigned', 'in_progress'].includes(r.status)
-            );
-            return activeRequests.length === 0 && (
-              <Ionicons name="add-circle-outline" size={16} color={theme.success} />
-            );
+              return activeRequests.length === 0 && (
+                <Ionicons name="add-circle-outline" size={16} color={theme.success} />
+              );
+            }
           })()}
         </TouchableOpacity>
       </View>
@@ -645,56 +722,136 @@ export default function SecureMapScreen() {
         initialRegion={{
           latitude: 22.2924, // Default to Vadodara, Gujarat (closer to user's location)
           longitude: 73.3627,
-          latitudeDelta: 0.001, // ~100m view for better user focus
-          longitudeDelta: 0.001, // ~100m view for better user focus
+          latitudeDelta: 0.005, // ~500m view for wider coverage
+          longitudeDelta: 0.005, // ~500m view for wider coverage
         }}
       >
         {renderMarkers()}
         
         {/* Polyline between user and volunteer */}
-        {effectiveCounterpartLocation && currentUserLocation && trackingState.assigned && (
-          <Polyline
-            coordinates={[
-              {
-                latitude: currentUserLocation.latitude,
-                longitude: currentUserLocation.longitude,
-              },
-              {
+        {(() => {
+          const hasCounterpart = !!(effectiveCounterpartLocation && currentUserLocation);
+          const userRole = user?.role || APP_ROLE;
+          
+          // Debug logging for volunteer assignments
+          if (userRole === 'volunteer') {
+            console.log('[SecureMapScreen] COMPLETE VOLUNTEER DEBUG:', {
+              userId: user?.id,
+              userRole: userRole,
+              requestsCount: requests.length,
+              assignmentsCount: assignments.length,
+              requests: requests.map(r => ({ 
+                id: r.id, 
+                user_id: r.user_id, 
+                status: r.status,
+                title: r.title
+              })),
+              assignments: assignments.map(a => ({
+                id: a.id,
+                volunteer_id: a.volunteer_id,
+                request_id: a.request_id,
+                status: a.status,
+                assigned: a.assigned,
+                isUserAssignment: a.volunteer_id === user?.id
+              })),
+              hasCounterpart,
+              effectiveCounterpartLocation: effectiveCounterpartLocation ? {
+                name: effectiveCounterpartLocation.name,
                 latitude: effectiveCounterpartLocation.latitude,
-                longitude: effectiveCounterpartLocation.longitude,
-              },
-            ]}
-            strokeColor="#10b981"
-            strokeWidth={3}
-            lineDashPattern={[10, 5]}
-          />
-        )}
+                longitude: effectiveCounterpartLocation.longitude
+              } : null,
+              currentUserLocation: currentUserLocation ? {
+                latitude: currentUserLocation.latitude,
+                longitude: currentUserLocation.longitude
+              } : null
+            });
+          }
+          
+          // Different logic for volunteers vs pilgrims
+          let finalShow = false;
+          
+          if (userRole === 'volunteer') {
+            // For volunteers: Use the EXACT same logic as the working status text
+            const myAssignments = requests
+              .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
+              .filter(Boolean);
+            
+            const volunteerHasAssignment = myAssignments.length > 0 && 
+              myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
+            
+            finalShow = volunteerHasAssignment && hasCounterpart;
+            
+            console.log('[SecureMapScreen] VOLUNTEER POLYLINE CHECK:', {
+              myAssignments: myAssignments.map(a => ({ id: a?.id, status: a?.status })),
+              volunteerHasAssignment,
+              hasCounterpart,
+              finalShow
+            });
+          } else {
+            // For pilgrims: Use the original logic that works perfectly
+            const primaryShow = trackingState.assigned && hasCounterpart;
+            const fallbackShow = currentAssignment?.assigned && hasCounterpart;
+            finalShow = primaryShow || fallbackShow;
+          }
+          
+          return finalShow ? (
+            <Polyline
+              coordinates={[
+                {
+                  latitude: currentUserLocation.latitude,
+                  longitude: currentUserLocation.longitude,
+                },
+                {
+                  latitude: effectiveCounterpartLocation.latitude,
+                  longitude: effectiveCounterpartLocation.longitude,
+                },
+              ]}
+              strokeColor="#10b981"
+              strokeWidth={3}
+              lineDashPattern={[10, 5]}
+            />
+          ) : null;
+        })()}
       </MapView>
 
       {/* Distance & ETA Display - show when tracking counterpart */}
       {(() => {
-        // More lenient condition for testing - show if we have any counterpart location
-        const hasCounterpart = effectiveCounterpartLocation && currentUserLocation;
-        const shouldShow = trackingState.assigned && hasCounterpart && calculatedDistance > 0;
+        const hasCounterpart = !!(effectiveCounterpartLocation && currentUserLocation);
+        const userRole = user?.role || APP_ROLE;
         
-        // FALLBACK: Show distance card if we have assignment data and locations (for debugging)
-        const fallbackShow = currentAssignment?.assigned && hasCounterpart && calculatedDistance > 0;
+        // Different logic for volunteers vs pilgrims
+        let finalShow = false;
         
-        const finalShow = shouldShow || fallbackShow;
+        if (userRole === 'volunteer') {
+          // For volunteers: Use the EXACT same logic as the working status text
+          const myAssignments = requests
+            .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
+            .filter(Boolean);
+          
+          const volunteerHasAssignment = myAssignments.length > 0 && 
+            myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
+          
+          finalShow = volunteerHasAssignment && hasCounterpart && calculatedDistance > 0;
+        } else {
+          // For pilgrims: Use the original logic that works perfectly
+          const primaryShow = trackingState.assigned && hasCounterpart && calculatedDistance > 0;
+          const fallbackShow = currentAssignment?.assigned && hasCounterpart && calculatedDistance > 0;
+          finalShow = primaryShow || fallbackShow;
+        }
         
         console.log('[SecureMapScreen] Distance card visibility check:', {
           assigned: trackingState.assigned,
           hasCounterpartLocation: !!effectiveCounterpartLocation,
           hasCurrentUserLocation: !!currentUserLocation,
           calculatedDistance,
-          shouldShow,
-          fallbackShow,
+          userRole,
           finalShow,
           assignmentData: currentAssignment,
           trackingState: trackingState,
           counterpartFromArray: !!counterpartLocationFromArray,
           counterpartFromState: !!counterpartLocation,
-          locationsCount: locations.length
+          locationsCount: locations.length,
+          assignmentsCount: assignments.length
         });
         
         return finalShow ? (
@@ -702,10 +859,10 @@ export default function SecureMapScreen() {
             <View style={styles.distanceHeader}>
               <Ionicons name="navigate" size={20} color="#10b981" />
               <Text style={styles.distanceTitle}>
-                {APP_ROLE === 'pilgrim' 
+                {(user?.role || APP_ROLE) === 'pilgrim' 
                   ? 'Help is on the way' 
-                  : APP_ROLE === 'volunteer' 
-                    ? 'Heading to help pilgrim'
+                  : (user?.role || APP_ROLE) === 'volunteer' 
+                    ? `Heading to help ${effectiveCounterpartLocation?.name || 'pilgrim'}`
                     : 'Tracking in progress'
                 }
               </Text>
@@ -714,16 +871,16 @@ export default function SecureMapScreen() {
               <View style={styles.distanceItem}>
                 <Text style={styles.distanceValue}>{formatDistance(calculatedDistance)}</Text>
                 <Text style={styles.distanceLabel}>
-                  {APP_ROLE === 'pilgrim' ? 'away' : 'to destination'}
+                  {(user?.role || APP_ROLE) === 'pilgrim' ? 'away' : 'to destination'}
                 </Text>
               </View>
               {estimatedArrival && (
                 <View style={styles.etaContainer}>
                   <Text style={styles.etaValue}>{estimatedArrival}</Text>
                   <Text style={styles.etaLabel}>
-                    {APP_ROLE === 'pilgrim' 
+                    {(user?.role || APP_ROLE) === 'pilgrim' 
                       ? 'mins' 
-                      : APP_ROLE === 'volunteer' 
+                      : (user?.role || APP_ROLE) === 'volunteer' 
                         ? 'min ETA'
                         : 'minutes'
                     }
@@ -1462,7 +1619,7 @@ const styles = StyleSheet.create({
   // Distance & ETA Card - Delivery tracking style
   distanceCard: {
     position: 'absolute',
-    bottom: '8%', // Lowered from 15% to 8%
+    bottom: '4%', // Lowered from 8% to 4% for more space from bottom
     left: 16,
     right: 16,
     backgroundColor: '#ffffff',

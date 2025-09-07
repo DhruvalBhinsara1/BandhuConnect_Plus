@@ -191,6 +191,21 @@ export const RequestProvider: React.FC<RequestProviderProps> = ({ children }) =>
 
   useEffect(() => {
     if (user) {
+      // Initial data fetch when user loads
+      console.log('[RequestContext] User loaded, fetching initial data for role:', user.role);
+      
+      // Fetch requests
+      getRequests();
+      
+      // Fetch assignments with appropriate filters
+      if (user.role === 'volunteer') {
+        console.log('[RequestContext] Fetching assignments for volunteer:', user.id);
+        getAssignments({ volunteerId: user.id });
+      } else {
+        console.log('[RequestContext] Fetching all assignments for role:', user.role);
+        getAssignments();
+      }
+      
       // Subscribe to real-time updates
       const requestSubscription = requestService.subscribeToRequests((payload) => {
         if (payload.eventType === 'INSERT') {
