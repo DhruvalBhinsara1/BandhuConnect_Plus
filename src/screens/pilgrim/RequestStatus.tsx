@@ -40,7 +40,7 @@ const RequestStatus: React.FC = () => {
   const handleCancelRequest = async (requestId: string) => {
     Alert.alert(
       'Cancel Request',
-      'Are you sure you want to cancel this request? This will mark it as cancelled but keep it in your history.',
+      'Are you sure you want to cancel this request? This will notify any assigned volunteer and mark the request as cancelled.',
       [
         {
           text: 'No, Keep Request',
@@ -208,7 +208,7 @@ const RequestStatus: React.FC = () => {
           style={{ flex: 1, marginRight: 8 }}
         />
         
-        {item.status === 'pending' && (
+        {(item.status === 'pending' || item.status === 'assigned') && (
           <Button
             title="Cancel Request"
             onPress={() => handleCancelRequest(item.id)}

@@ -99,10 +99,42 @@ export default function SecureMapScreen() {
       }
       return null;
     } else {
-      // For pilgrims: Use the original logic
-      return currentAssignment?.counterpartId 
+      // For pilgrims: Find their assigned requests and get the volunteer's location
+      const myRequests = requests.filter(r => r.user_id === user?.id);
+      const activeRequests = myRequests.filter(r => 
+        ['assigned', 'in_progress'].includes(r.status)
+      );
+      
+      if (activeRequests.length > 0) {
+        const activeRequest = activeRequests[0];
+        // Find the assignment for this request to get the volunteer ID
+        const assignment = assignments.find(a => a.request_id === activeRequest.id);
+        if (assignment?.volunteer_id) {
+          // Find the volunteer's location in the locations array
+          const volunteerLocation = locations.find(loc => loc.userId === assignment.volunteer_id);
+          
+          console.log('[SecureMapScreen] PILGRIM COUNTERPART LOCATION:', {
+            activeRequest: { id: activeRequest.id, status: activeRequest.status, title: activeRequest.title },
+            assignment: assignment ? { id: assignment.id, volunteer_id: assignment.volunteer_id, status: assignment.status } : null,
+            volunteerLocation: volunteerLocation ? { name: volunteerLocation.name, userId: volunteerLocation.userId } : null,
+            totalLocations: locations.length
+          });
+          
+          return volunteerLocation;
+        }
+      }
+      
+      // Fallback to the original logic
+      const fallbackLocation = currentAssignment?.counterpartId 
         ? locations.find(loc => loc.userId === currentAssignment.counterpartId)
         : null;
+        
+      console.log('[SecureMapScreen] PILGRIM FALLBACK LOCATION:', {
+        currentAssignment: currentAssignment ? { counterpartId: currentAssignment.counterpartId, assigned: currentAssignment.assigned } : null,
+        fallbackLocation: fallbackLocation ? { name: fallbackLocation.name, userId: fallbackLocation.userId } : null
+      });
+      
+      return fallbackLocation;
     }
   };
   
@@ -614,19 +646,31 @@ export default function SecureMapScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Clean Compact Header */}
-      <View style={[styles.cleanHeader, { backgroundColor: theme.primary }]}>
-        <Text style={[styles.headerTitle, { color: theme.textInverse }]}>Live Map</Text>
+      {/* Pilgrim App Style Header */}
+      <View style={styles.pilgrimHeader}>
+        <View style={styles.headerLeft}>
+          <Ionicons 
+            name={user?.role === 'volunteer' ? 'shield-checkmark' : 'location'} 
+            size={22} 
+            color="#ffffff" 
+            style={{ marginRight: 10 }} 
+          />
+          <Text style={styles.pilgrimHeaderTitle}>
+            {user?.role === 'volunteer' ? 'Volunteer Map' : 'Live Map'}
+          </Text>
+        </View>
         <View style={styles.headerRight}>
-          <View style={[styles.usersBadge, { backgroundColor: 'white' }]}>
-            <Text style={[styles.usersText, { color: theme.primary }]}>{locations.length} online</Text>
+          <View style={[styles.usersBadge, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+            <Text style={styles.usersText}>{locations.length} online</Text>
           </View>
-          <View style={[styles.statusPill, { backgroundColor: 'white', borderColor: 'rgba(255, 255, 255, 0.3)' }]}>
-            <View style={[styles.statusDot, { 
-              backgroundColor: trackingState.isActive ? theme.success : theme.error 
-            }]} />
-            <Text style={[styles.statusText, { color: theme.textPrimary }]}>
-              {trackingState.isActive ? 'Active' : 'Off'}
+          <View style={[styles.statusPill, { 
+            backgroundColor: trackingState.isActive ? '#10b981' : '#ef4444',
+          }]}>
+            <Text style={styles.statusText}>
+              {user?.role === 'volunteer' 
+                ? (trackingState.isActive ? 'ON DUTY' : 'OFF DUTY')
+                : (trackingState.isActive ? 'LIVE' : 'OFFLINE')
+              }
             </Text>
           </View>
         </View>
@@ -788,10 +832,19 @@ export default function SecureMapScreen() {
               finalShow
             });
           } else {
-            // For pilgrims: Use the original logic that works perfectly
-            const primaryShow = trackingState.assigned && hasCounterpart;
-            const fallbackShow = currentAssignment?.assigned && hasCounterpart;
-            finalShow = primaryShow || fallbackShow;
+            // For pilgrims: Check if they have requests with assigned status
+            const myRequests = requests.filter(r => r.user_id === user?.id);
+            const activeRequests = myRequests.filter(r => 
+              ['assigned', 'in_progress'].includes(r.status)
+            );
+            finalShow = activeRequests.length > 0 && hasCounterpart;
+            
+            console.log('[SecureMapScreen] PILGRIM POLYLINE CHECK:', {
+              myRequests: myRequests.map(r => ({ id: r.id, status: r.status, title: r.title })),
+              activeRequests: activeRequests.map(r => ({ id: r.id, status: r.status, title: r.title })),
+              hasCounterpart,
+              finalShow
+            });
           }
           
           return finalShow ? (
@@ -833,10 +886,20 @@ export default function SecureMapScreen() {
           
           finalShow = volunteerHasAssignment && hasCounterpart && calculatedDistance > 0;
         } else {
-          // For pilgrims: Use the original logic that works perfectly
-          const primaryShow = trackingState.assigned && hasCounterpart && calculatedDistance > 0;
-          const fallbackShow = currentAssignment?.assigned && hasCounterpart && calculatedDistance > 0;
-          finalShow = primaryShow || fallbackShow;
+          // For pilgrims: Check if they have requests with assigned status
+          const myRequests = requests.filter(r => r.user_id === user?.id);
+          const activeRequests = myRequests.filter(r => 
+            ['assigned', 'in_progress'].includes(r.status)
+          );
+          finalShow = activeRequests.length > 0 && hasCounterpart && calculatedDistance > 0;
+          
+          console.log('[SecureMapScreen] PILGRIM ETA CHECK:', {
+            myRequests: myRequests.map(r => ({ id: r.id, status: r.status, title: r.title })),
+            activeRequests: activeRequests.map(r => ({ id: r.id, status: r.status, title: r.title })),
+            hasCounterpart,
+            calculatedDistance,
+            finalShow
+          });
         }
         
         console.log('[SecureMapScreen] Distance card visibility check:', {
@@ -981,9 +1044,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerLeft: {
-    flex: 1,
-  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -1073,37 +1133,44 @@ const styles = StyleSheet.create({
     borderColor: '#059669',
     borderWidth: 1,
   },
-  statusText: {
-    marginLeft: 6,
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
   legendContainer: {
     position: 'absolute',
-    top: 120,
-    left: 16,
-    right: 80,
+    top: 130, // Better positioning after header improvements
+    left: '4%', // Responsive positioning
+    right: '20%', // Better proportional spacing
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 16, // More rounded for modern look
+    padding: 16, // Better padding
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
     zIndex: 1,
   },
   legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15, // Better size for readability
+    fontWeight: '700', // Bolder for better hierarchy
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 10,
+    letterSpacing: 0.3,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8, // Better spacing
+  },
+  legendText: {
+    fontSize: 13, // Better readability
+    color: '#6B7280',
+    marginLeft: 10,
+    fontWeight: '500',
+    letterSpacing: 0.2,
   },
   legendMarker: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 14, // Slightly larger markers
+    height: 14,
+    borderRadius: 7,
     marginRight: 8,
   },
   map: {
@@ -1111,30 +1178,40 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     position: 'absolute',
-    bottom: 120,
-    right: 16,
+    bottom: 130, // Better positioning
+    right: '4%', // Responsive positioning
     zIndex: 1,
   },
   primaryButton: {
     backgroundColor: '#2563EB',
+    borderRadius: 12, // More rounded
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 48, // Better touch target
   },
   secondaryButton: {
     backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   infoPanel: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 80,
+    bottom: 20, // Better positioning
+    left: '4%', // Responsive positioning
+    right: '25%', // Better proportional spacing
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16, // More rounded
+    padding: 16, // Better padding
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 1,
   },
   infoPanelTitle: {
     fontSize: 16,
@@ -1435,72 +1512,112 @@ const styles = StyleSheet.create({
     zIndex: 10,
     minHeight: 80, // Ensure minimum height on smaller screens
   },
+  // Pilgrim App Style Header
+  pilgrimHeader: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: '4%', // Responsive padding
+    paddingVertical: 14,
+    paddingTop: 50, // Better status bar accounting
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+    zIndex: 10,
+    minHeight: 88, // Better minimum height for readability
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    maxWidth: '65%', // Prevent overflow on small screens
+  },
+  pilgrimHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18, // Larger, more readable
+    fontWeight: '700', // Bolder for better visibility
+    letterSpacing: 0.3, // Better character spacing
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexShrink: 0, // Prevent shrinking on smaller screens
-    maxWidth: '60%', // Limit width on small screens
+    gap: 10, // Better spacing
+    flexShrink: 0,
+    maxWidth: '35%', // Better proportion for small screens
   },
   usersBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 50, // Ensure minimum readable width
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    minWidth: 60, // Better minimum width for readability
   },
   usersText: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12, // Slightly larger for better readability
+    fontWeight: '600', // Bolder for better visibility
     textAlign: 'center',
+    color: '#ffffff',
+    letterSpacing: 0.2,
   },
   statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    minWidth: 50, // Ensure minimum readable width
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    minWidth: 75, // Better minimum width for status text
+  },
+  statusText: {
+    fontSize: 11, // Better size for status text
+    fontWeight: '700', // Bold for better visibility
+    color: '#ffffff',
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   
   // Request Input Bar Styles
   requestInputBar: {
-    paddingHorizontal: '5%', // Responsive padding
-    paddingVertical: 12,
-    borderBottomWidth: 3,
+    paddingHorizontal: '4%', // Better responsive padding
+    paddingVertical: 14,
+    borderBottomWidth: 2,
     borderBottomColor: '#E2E8F0',
     zIndex: 9,
+    backgroundColor: '#ffffff',
     // Add subtle gradient effect with shadow
     shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   requestInputField: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 8,
-    minHeight: 44, // Ensure good touch target on all devices
+    borderRadius: 12, // More rounded for modern look
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+    minHeight: 50, // Better touch target size
     // Add subtle interaction feedback with color accent
     shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
     elevation: 2,
   },
   requestInputText: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '400',
-    minHeight: 20, // Ensure consistent height
+    fontSize: 15, // Better readability
+    fontWeight: '500', // Slightly bolder
+    letterSpacing: 0.2,
+    minHeight: 22, // Better consistent height
   },
   placeholderText: {
     fontStyle: 'italic',
+    opacity: 0.7, // Better placeholder visibility
   },
 
   // Compact Map Controls

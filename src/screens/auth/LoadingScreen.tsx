@@ -16,8 +16,9 @@ const LoadingScreen: React.FC = () => {
   const theme = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
   const textFadeAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Logo animation sequence
@@ -43,24 +44,48 @@ const LoadingScreen: React.FC = () => {
       }),
     ]).start();
 
-    // Continuous subtle rotation for loading effect
-    const rotateAnimation = Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 3000,
-        useNativeDriver: true,
-      })
+    // Progress bar animation
+    const progressAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progressAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(progressAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: false,
+        }),
+      ])
     );
     
-    setTimeout(() => rotateAnimation.start(), 1000);
+    // Subtle pulse animation for logo
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
 
-    return () => rotateAnimation.stop();
+    setTimeout(() => {
+      progressAnimation.start();
+      pulseAnimation.start();
+    }, 1000);
+
+    return () => {
+      progressAnimation.stop();
+      pulseAnimation.stop();
+    };
   }, []);
-
-  const rotateInterpolate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
 
   return (
     <View style={[styles.container, { backgroundColor: theme.theme.background }]}>
@@ -79,7 +104,7 @@ const LoadingScreen: React.FC = () => {
               opacity: fadeAnim,
               transform: [
                 { scale: scaleAnim },
-                { rotate: rotateInterpolate }
+                { scale: pulseAnim }
               ]
             }
           ]}
@@ -110,10 +135,59 @@ const LoadingScreen: React.FC = () => {
         <Animated.View 
           style={[styles.loadingContainer, { opacity: textFadeAnim }]}
         >
-          <View style={styles.loadingDots}>
-            <Animated.View style={[styles.dot, { backgroundColor: theme.theme.primary }]} />
-            <Animated.View style={[styles.dot, { backgroundColor: theme.theme.primary }]} />
-            <Animated.View style={[styles.dot, { backgroundColor: theme.theme.primary }]} />
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBarBackground, { backgroundColor: theme.theme.borderLight }]}>
+              <Animated.View 
+                style={[
+                  styles.progressBar, 
+                  { 
+                    backgroundColor: theme.theme.primary,
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    })
+                  }
+                ]} 
+              />
+            </View>
+            <View style={styles.progressDots}>
+              <Animated.View 
+                style={[
+                  styles.progressDot, 
+                  { 
+                    backgroundColor: theme.theme.primary,
+                    opacity: progressAnim.interpolate({
+                      inputRange: [0, 0.33, 0.66, 1],
+                      outputRange: [0.3, 1, 0.3, 0.3],
+                    })
+                  }
+                ]} 
+              />
+              <Animated.View 
+                style={[
+                  styles.progressDot, 
+                  { 
+                    backgroundColor: theme.theme.primary,
+                    opacity: progressAnim.interpolate({
+                      inputRange: [0, 0.33, 0.66, 1],
+                      outputRange: [0.3, 0.3, 1, 0.3],
+                    })
+                  }
+                ]} 
+              />
+              <Animated.View 
+                style={[
+                  styles.progressDot, 
+                  { 
+                    backgroundColor: theme.theme.primary,
+                    opacity: progressAnim.interpolate({
+                      inputRange: [0, 0.33, 0.66, 1],
+                      outputRange: [0.3, 0.3, 0.3, 1],
+                    })
+                  }
+                ]} 
+              />
+            </View>
           </View>
           <Text style={[styles.loadingText, { color: theme.theme.textSecondary }]}>
             Initializing...
@@ -194,6 +268,32 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     alignItems: 'center',
+  },
+  progressBarContainer: {
+    width: 200,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 6,
   },
   loadingDots: {
     flexDirection: 'row',

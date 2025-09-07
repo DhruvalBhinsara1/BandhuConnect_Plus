@@ -18,6 +18,7 @@ interface VolunteerTrackingMinimapProps {
   estimatedArrival: string | null;
   formatDistance: (distance: number) => string;
   variant?: 'dashboard' | 'request'; 
+  role?: 'pilgrim' | 'volunteer'; // Add role prop
 }
 
 const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
@@ -26,7 +27,8 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
   calculatedDistance,
   estimatedArrival,
   formatDistance,
-  variant = 'request'
+  variant = 'request',
+  role = 'pilgrim' // Default to pilgrim for backward compatibility
 }) => {
   const navigation = useNavigation<any>();
 
@@ -82,7 +84,7 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
     <View style={{ marginBottom: 16 }}>
       {/* Clean Header like the dashboard */}
       <View style={{ 
-        backgroundColor: '#16a34a',
+        backgroundColor: role === 'volunteer' ? '#16a34a' : '#16a34a',
         paddingHorizontal: 16,
         paddingVertical: 10,
         flexDirection: 'row',
@@ -96,7 +98,7 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
           fontWeight: '600', 
           fontSize: 14,
         }}>
-          🗺️ Volunteer Tracking
+          🗺️ {role === 'volunteer' ? 'Pilgrim Tracking' : 'Volunteer Tracking'}
         </Text>
         <Text style={{ 
           color: '#ffffff', 
@@ -128,7 +130,7 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
             pitchEnabled={false}
             mapType="standard"
           >
-            {/* Route Line (only if volunteer location exists) */}
+            {/* Route Line (only if other person's location exists) */}
             {volunteerLocation && (
               <Polyline
                 coordinates={[
@@ -141,13 +143,13 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
                     longitude: currentLocation.longitude,
                   }
                 ]}
-                strokeColor="#3b82f6"
+                strokeColor={role === 'volunteer' ? "#16a34a" : "#3b82f6"}
                 strokeWidth={3}
                 lineDashPattern={[10, 5]}
               />
             )}
             
-            {/* Pilgrim Marker (You) */}
+            {/* Current User Marker */}
             <Marker
               coordinate={{
                 latitude: currentLocation.latitude,
@@ -155,19 +157,19 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
               }}
               title="You"
               description="Your current location"
-              pinColor="#ef4444"
+              pinColor={role === 'volunteer' ? "#3b82f6" : "#ef4444"}
             />
             
-            {/* Volunteer Marker (only if volunteer location exists) */}
+            {/* Other Person Marker (only if their location exists) */}
             {volunteerLocation && (
               <Marker
                 coordinate={{
                   latitude: volunteerLocation.latitude,
                   longitude: volunteerLocation.longitude,
                 }}
-                title="Volunteer"
-                description="Volunteer location"
-                pinColor="#16a34a"
+                title={role === 'volunteer' ? 'Pilgrim' : 'Volunteer'}
+                description={role === 'volunteer' ? 'Pilgrim location' : 'Volunteer location'}
+                pinColor={role === 'volunteer' ? "#ef4444" : "#16a34a"}
               />
             )}
           </MapView>
@@ -252,7 +254,7 @@ const VolunteerTrackingMinimap: React.FC<VolunteerTrackingMinimapProps> = ({
         <TouchableOpacity 
           onPress={() => navigation.navigate('Map')}
           style={{
-            backgroundColor: '#3b82f6',
+            backgroundColor: role === 'volunteer' ? '#16a34a' : '#3b82f6',
             paddingHorizontal: 16,
             paddingVertical: 8,
             borderRadius: 8,

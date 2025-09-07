@@ -13,6 +13,7 @@ import { Assignment } from '../../types';
 import { NotificationService } from '../../services/notificationService';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
 import { locationService } from '../../services/locationService';
+import VolunteerTrackingMinimap from '../../components/common/VolunteerTrackingMinimap';
 
 // Styles definition moved before component
 const styles = StyleSheet.create({
@@ -229,116 +230,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 4,
-  },
-  // Minimap styles for clean location display
-  minimapContainer: {
-    marginTop: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  minimapHeader: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  minimapTitle: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  minimapContent: {
-    position: 'relative',
-    padding: 20,
-    minHeight: 140,
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  minimapVisualization: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    bottom: 60,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    borderStyle: 'dashed',
-  },
-  minimapLocationDot: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  pilgrimDot: {
-    backgroundColor: '#ef4444',
-    top: 35,
-    left: '35%',
-  },
-  volunteerDot: {
-    backgroundColor: '#3b82f6',
-    top: 70,
-    right: '35%',
-  },
-  minimapInfoContainer: {
-    position: 'absolute',
-    bottom: 10,
-    left: 20,
-    right: 20,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  minimapDistance: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  minimapCoordinates: {
-    fontSize: 11,
-    color: '#64748b',
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
-  minimapAccuracy: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 4,
-    textAlign: 'center',
   },
 });
 
@@ -594,6 +485,86 @@ const TaskDetails: React.FC = () => {
         </View>
       </View>
 
+      {/* Live Location Map - Using VolunteerTrackingMinimap component */}
+      {pilgrimLocation && (
+        <Card style={styles.cardMargin}>
+          {/* Status Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <View style={{
+              backgroundColor: '#16a34a', // Volunteer theme color
+              borderRadius: 20,
+              padding: 8,
+              marginRight: 12,
+            }}>
+              <Ionicons 
+                name="people-outline"
+                size={28} 
+                color="white" 
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ 
+                fontSize: 18, 
+                fontWeight: 'bold', 
+                color: '#15803d',
+                marginBottom: 4,
+              }}>
+                Assisting Pilgrim
+              </Text>
+              <Text style={{ 
+                fontSize: 14, 
+                color: '#166534',
+              }}>
+                Tracking pilgrim location for assistance
+              </Text>
+            </View>
+          </View>
+
+          {/* Minimap */}
+          <VolunteerTrackingMinimap
+            currentLocation={currentLocation} // Volunteer's location (shown as "You" - blue pin)
+            volunteerLocation={pilgrimLocation} // Pilgrim's location (shown as "Pilgrim" - red pin)
+            calculatedDistance={calculatedDistance || 0}
+            estimatedArrival={calculatedDistance && calculatedDistance > 0 ? `${Math.max(1, Math.round((calculatedDistance / 1000) / 4 * 60))} min` : null}
+            formatDistance={formatDistance}
+            variant="dashboard" // Use same variant as pilgrim app
+            role="volunteer" // This makes it show volunteer perspective
+          />
+
+          {/* Legend for volunteer app */}
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            paddingTop: 12,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 24 }}>
+              <View style={{
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: '#3b82f6',
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                marginRight: 6,
+              }} />
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>You</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: '#ef4444',
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                marginRight: 6,
+              }} />
+              <Text style={{ fontSize: 12, color: '#64748b', fontWeight: '500' }}>Pilgrim</Text>
+            </View>
+          </View>
+        </Card>
+      )}
+
       <ScrollView style={styles.scrollView}>
         {/* Status Card */}
         <Card style={styles.cardMargin}>
@@ -731,171 +702,6 @@ const TaskDetails: React.FC = () => {
           </View>
         </Card>
 
-
-      {/* Location */}
-      <Card style={styles.cardMargin}>
-        <View style={styles.locationHeader}>
-          <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.sectionTitle}>Pilgrim Location</Text>
-          {assignment.request?.location?.latitude && assignment.request?.location?.longitude && (
-            <Button
-              title="View on Map"
-              onPress={() => navigation.navigate('Map', {
-                initialLocation: {
-                  latitude: assignment.request.location.latitude,
-                  longitude: assignment.request.location.longitude
-                }
-              })}
-              variant="outline"
-              size="small"
-            />
-          )}
-        </View>
-        <View style={styles.locationInfo}>
-          {locationLoading ? (
-            <Text style={styles.locationText}>
-              🔄 Loading pilgrim location...
-            </Text>
-          ) : pilgrimLocation ? (
-            <>
-              {/* Enhanced Minimap View */}
-              <View style={styles.minimapContainer}>
-                <View style={styles.minimapHeader}>
-                  <Text style={styles.minimapTitle}>📍 Live Location Map</Text>
-                  <Text style={[styles.minimapTitle, { fontSize: 12 }]}>
-                    {pilgrimLocation.isStale ? `${pilgrimLocation.minutesAgo}m ago` : 'LIVE'}
-                  </Text>
-                </View>
-                <View style={styles.minimapContent}>
-                  {/* Map visualization area */}
-                  <View style={styles.minimapVisualization}>
-                    {/* Location dots */}
-                    <View style={[styles.minimapLocationDot, styles.pilgrimDot]} />
-                    <View style={[styles.minimapLocationDot, styles.volunteerDot]} />
-                  </View>
-                  
-                  {/* Information overlay - Horizontal layout like pilgrim app */}
-                  <View style={styles.minimapInfoContainer}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      {/* Left side: Distance and location info */}
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                          <Ionicons name="location-outline" size={16} color="#4B5563" style={{ marginRight: 6 }} />
-                          <Text style={styles.minimapDistance}>
-                            {formatDistance(calculatedDistance)}
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <Ionicons name="navigate-outline" size={16} color="#4B5563" style={{ marginRight: 6 }} />
-                          <Text style={styles.minimapCoordinates}>
-                            {formatCoordinates(pilgrimLocation.latitude, pilgrimLocation.longitude)}
-                          </Text>
-                        </View>
-                        {pilgrimLocation.accuracy && (
-                          <Text style={styles.minimapAccuracy}>
-                            GPS: ±{pilgrimLocation.accuracy.toFixed(0)}m
-                            {pilgrimLocation.accuracy < 10 ? ' (Excellent)' : 
-                             pilgrimLocation.accuracy < 30 ? ' (Good)' : 
-                             pilgrimLocation.accuracy < 100 ? ' (Fair)' : ' (Poor)'}
-                          </Text>
-                        )}
-                      </View>
-                      
-                      {/* Right side: View Map button */}
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#16a34a',
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          elevation: 2,
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.1,
-                          shadowRadius: 3,
-                        }}
-                        onPress={() => {
-                          // Navigate to full map view
-                          console.log('View Map pressed');
-                        }}
-                      >
-                        <Ionicons name="map-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={{
-                          color: '#FFFFFF',
-                          fontSize: 14,
-                          fontWeight: '600',
-                        }}>
-                          View Map
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </View>
-              
-              {/* Enhanced Legend */}
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'center',
-                marginTop: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-                backgroundColor: '#f8fafc',
-                borderRadius: 12,
-                marginHorizontal: 4,
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 24 }}>
-                  <View style={[
-                    styles.minimapLocationDot,
-                    styles.pilgrimDot,
-                    { position: 'relative', top: 0, left: 0, right: 'auto', marginRight: 8, width: 12, height: 12, borderWidth: 2 }
-                  ]} />
-                  <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>Pilgrim</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={[
-                    styles.minimapLocationDot,
-                    styles.volunteerDot,
-                    { position: 'relative', top: 0, left: 0, right: 'auto', marginRight: 8, width: 12, height: 12, borderWidth: 2 }
-                  ]} />
-                  <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>You</Text>
-                </View>
-              </View>
-            </>
-          ) : assignment?.assigned ? (
-            <Text style={styles.locationText}>
-              ⚠️ Pilgrim location not available
-            </Text>
-          ) : (
-            <Text style={styles.locationText}>
-              ℹ️ Location will be available when assignment is active
-            </Text>
-          )}
-          
-          {!currentLocation && pilgrimLocation && (
-            <Text style={[styles.locationText, { fontSize: 12, color: '#f59e0b', marginTop: 12, textAlign: 'center' }]}>
-              ⚠️ Enable your location to calculate accurate distance
-            </Text>
-          )}
-        </View>
-          
-        {assignment.status === 'completed' && (assignment as any).completion_latitude && (
-          <View style={styles.completionLocationContainer}>
-            <Text style={styles.completionLocationTitle}>Task Completed At:</Text>
-            <Text style={styles.completionLocationText}>
-              Lat: {(assignment as any).completion_latitude?.toFixed(6) || 'N/A'}, Lng: {(assignment as any).completion_longitude?.toFixed(6) || 'N/A'}
-            </Text>
-            {(assignment as any).completion_address && (
-              <Text style={styles.completionAddressText}>
-                {(assignment as any).completion_address}
-              </Text>
-            )}
-          </View>
-        )}
-      </Card>
-
       {/* Action Button */}
       <View style={styles.actionContainer}>
         {getActionButton()}
@@ -903,6 +709,4 @@ const TaskDetails: React.FC = () => {
     </ScrollView>
   </SafeAreaView>
 );
-};
-
-export default TaskDetails;
+};export default TaskDetails;
