@@ -13,6 +13,10 @@ Get BandhuConnect+ running on your development machine in under 5 minutes.
 git clone https://github.com/DhruvalBhinsara1/BandhuConnect_Plus.git
 cd BandhuConnect_Plus
 
+# Setup environment variables
+cp .env.example .env
+# Edit .env with your Supabase and Google Maps credentials
+
 # Install dependencies
 npm install
 
@@ -20,7 +24,7 @@ npm install
 npm start
 ```
 
-That's it! The Expo development server will start and show a QR code.
+**⚠️ Important**: You'll need to add your Supabase and Google Maps API credentials to the `.env` file before the app will work properly.
 
 ## 📱 **Running on Your Device**
 
