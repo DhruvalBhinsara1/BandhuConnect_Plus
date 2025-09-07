@@ -1,50 +1,27 @@
 /**
- * Theme System Index for BandhuConnect+
- * Centralized exports for theme system with light/dark support
+ * Simple Theme System Index for BandhuConnect+
+ * Clean, straightforward theme exports - back to the sweet spot
  */
 
-// Core theme tokens
+// Simple theme tokens
 export {
   TYPOGRAPHY,
   SPACING,
   BORDER_RADIUS,
   SHADOWS,
   ANIMATION,
-  LIGHT_THEME,
-  DARK_THEME,
-  THEMES,
+  THEME,
   DEFAULT_THEME,
-} from './tokens';
+  getTheme,
+} from './simpleTheme';
 
 export type {
-  ThemeMode,
   Theme,
-} from './tokens';
+  ThemeMode,
+} from './simpleTheme';
 
-// Theme context and hooks
+// Simple theme context
 export {
   ThemeProvider,
   useTheme,
-  useThemeMode,
-  useThemeColors,
-  useDesignTokens,
-} from './ThemeContext';
-
-// Theme utilities
-export {
-  createThemedStyles,
-  createTextStyle,
-  createLayoutStyle,
-  getTextStyles,
-  getLayoutStyles,
-  getButtonStyles,
-  getInputStyles,
-  getSafeAreaStyles,
-  createThemedAnimation,
-  getAccessibilityColors,
-  isDarkTheme,
-} from './utils';
-
-export type {
-  ThemedStyleFunction,
-} from './utils';
+} from './SimpleThemeContext';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, TextInputProps, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../constants';
+import { useTheme } from '../../theme';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -22,6 +22,7 @@ const Input: React.FC<InputProps> = ({
   secureTextEntry,
   ...props
 }) => {
+  const { theme } = useTheme();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -34,26 +35,28 @@ const Input: React.FC<InputProps> = ({
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text style={styles.label}>
+        <Text style={[styles.label, { color: theme.textPrimary }]}>
           {label}
         </Text>
       )}
       
       <View style={[
         styles.inputContainer,
-        error ? styles.inputError : isFocused ? styles.inputFocused : styles.inputDefault
+        { backgroundColor: theme.surface, borderColor: theme.borderLight },
+        error ? { borderColor: theme.error } : isFocused ? { borderColor: theme.primary, shadowColor: theme.primary } : {}
       ]}>
         {leftIcon && (
           <Ionicons
             name={leftIcon}
             size={20}
-            color={isFocused ? COLORS.primary : COLORS.textSecondary}
+            color={isFocused ? theme.primary : theme.textSecondary}
             style={styles.leftIcon}
           />
         )}
         
         <TextInput
-          style={styles.textInput}
+          style={[styles.textInput, { color: theme.textPrimary }]}
+          placeholderTextColor={theme.textSecondary}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={secureTextEntry && !isPasswordVisible}
@@ -73,7 +76,7 @@ const Input: React.FC<InputProps> = ({
             <Ionicons
               name={isPasswordVisible ? 'eye-off' : 'eye'}
               size={20}
-              color={COLORS.textSecondary}
+              color={theme.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -83,14 +86,14 @@ const Input: React.FC<InputProps> = ({
             <Ionicons
               name={rightIcon}
               size={20}
-              color={COLORS.textSecondary}
+              color={theme.textSecondary}
             />
           </TouchableOpacity>
         )}
       </View>
       
       {error && (
-        <Text style={styles.errorText}>
+        <Text style={[styles.errorText, { color: theme.error }]}>
           {error}
         </Text>
       )}
@@ -105,7 +108,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
     marginBottom: 8,
   },
   inputContainer: {
@@ -115,25 +117,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1.5,
-    backgroundColor: '#ffffff',
     minHeight: 48,
-  },
-  inputDefault: {
-    borderColor: '#d1d5db',
-    backgroundColor: '#ffffff',
-  },
-  inputFocused: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#ffffff',
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-  },
-  inputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
   },
   leftIcon: {
     marginRight: 8,
@@ -141,12 +129,10 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
     paddingVertical: 0,
   },
   errorText: {
     fontSize: 12,
-    color: '#ef4444',
     marginTop: 4,
   },
 });

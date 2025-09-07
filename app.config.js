@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "BandhuConnect+",
     slug: "bandhuconnect-plus",
-    version: "1.0.0",
+    version: "2.2.0",
     orientation: "portrait",
     userInterfaceStyle: "light",
     main: "./index.ts",

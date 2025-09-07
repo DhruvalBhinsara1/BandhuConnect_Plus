@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { COLORS } from '../../constants';
+import { useTheme } from '../../theme';
 
 interface ButtonProps {
   title: string;
@@ -23,6 +23,8 @@ const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { theme } = useTheme();
+  
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderRadius: 8,
@@ -52,18 +54,18 @@ const Button: React.FC<ButtonProps> = ({
     // Variant styles
     switch (variant) {
       case 'secondary':
-        baseStyle.backgroundColor = COLORS.secondary;
+        baseStyle.backgroundColor = theme.secondary;
         break;
       case 'outline':
         baseStyle.backgroundColor = 'transparent';
         baseStyle.borderWidth = 1;
-        baseStyle.borderColor = COLORS.primary;
+        baseStyle.borderColor = theme.primary;
         break;
       case 'danger':
-        baseStyle.backgroundColor = COLORS.error;
+        baseStyle.backgroundColor = theme.error;
         break;
       default:
-        baseStyle.backgroundColor = COLORS.primary;
+        baseStyle.backgroundColor = theme.primary;
     }
 
     // Disabled state
@@ -95,7 +97,7 @@ const Button: React.FC<ButtonProps> = ({
     // Variant styles
     switch (variant) {
       case 'outline':
-        baseTextStyle.color = COLORS.primary;
+        baseTextStyle.color = theme.primary;
         break;
       default:
         baseTextStyle.color = '#ffffff';
@@ -110,12 +112,11 @@ const Button: React.FC<ButtonProps> = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
-      className="shadow-sm"
     >
       {loading && (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' ? COLORS.primary : '#ffffff'}
+          color={variant === 'outline' ? theme.primary : '#ffffff'}
           style={{ marginRight: 8 }}
         />
       )}

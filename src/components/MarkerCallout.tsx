@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Callout } from 'react-native-maps';
 import { LocationPreview } from './LocationPreview';
 import { UserLocationData } from '../services/mapService';
+import { useTheme } from '../theme';
 
 interface MarkerCalloutProps {
   location: UserLocationData;
@@ -11,12 +12,14 @@ interface MarkerCalloutProps {
 }
 
 export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location, isStale, minutesAgo }) => {
+  const { theme } = useTheme();
+  
   return (
     <Callout tooltip>
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.surface }]}>
         <View style={styles.header}>
-          <Text style={styles.name}>{location.user_name}</Text>
-          <Text style={styles.role}>{location.user_role}</Text>
+          <Text style={[styles.name, { color: theme.textPrimary }]}>{location.user_name}</Text>
+          <Text style={[styles.role, { color: theme.primary }]}>{location.user_role}</Text>
         </View>
         
         <LocationPreview
@@ -25,8 +28,14 @@ export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location, isStale,
         />
         
         {location.assignment_info?.length > 0 && (
-          <View style={styles.assignmentInfo}>
-            <Text style={styles.assignmentText}>
+          <View style={[
+            styles.assignmentInfo, 
+            { 
+              backgroundColor: theme.primary + '10',
+              borderTopColor: theme.borderLight 
+            }
+          ]}>
+            <Text style={[styles.assignmentText, { color: theme.textPrimary }]}>
               {location.user_role === 'volunteer' 
                 ? `Helping: ${location.assignment_info[0].pilgrim_name}`
                 : `Assigned: ${location.assignment_info[0].volunteer_name}`
@@ -35,7 +44,7 @@ export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location, isStale,
           </View>
         )}
         
-        <Text style={[styles.timestamp, isStale && styles.staleText]}>
+        <Text style={[styles.timestamp, { color: theme.textSecondary }, isStale && styles.staleText]}>
           {isStale && minutesAgo ? `Last seen ${minutesAgo} min ago` : `Last updated: ${new Date(location.last_updated).toLocaleTimeString()}`}
         </Text>
       </View>
@@ -45,7 +54,6 @@ export const MarkerCallout: React.FC<MarkerCalloutProps> = ({ location, isStale,
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     minWidth: 200,
@@ -62,27 +70,22 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
     marginBottom: 2,
   },
   role: {
     fontSize: 14,
-    color: '#6B7280',
     textTransform: 'capitalize',
   },
   assignmentInfo: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
   },
   assignmentText: {
     fontSize: 14,
-    color: '#4B5563',
   },
   timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
     marginTop: 8,
   },
   staleText: {

@@ -11,7 +11,8 @@ import { NotificationService } from './src/services/notificationService';
 import { LocationWrapper } from './src/components/LocationWrapper';
 import { ErrorBoundaryWrapper } from './src/components/ui/EnhancedErrorBoundary';
 import { ToastProvider } from './src/components/ui/Toast';
-import { ThemeProvider } from './src/theme/ThemeContext';
+// Simple theme system - back to the sweet spot
+import { ThemeProvider } from './src/theme';
 
 // Temporarily disable error overlays to see our custom error UI
 if (__DEV__) {

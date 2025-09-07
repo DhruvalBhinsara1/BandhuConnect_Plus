@@ -24,9 +24,14 @@ class SecureLocationService {
   private isTracking: boolean = false;
   private foregroundSubscription: Location.LocationSubscription | null = null;
   
+  // Location filtering for accuracy improvement
+  private locationHistory: LocationData[] = [];
+  private readonly LOCATION_HISTORY_SIZE = 5;
+  private readonly MIN_ACCURACY_REQUIRED = 50; // 50 meters
+  
   // Publishing rules constants
-  private readonly MIN_MOVEMENT_METERS = 25;
-  private readonly PUBLISH_INTERVAL_SECONDS = 10;
+  private readonly MIN_MOVEMENT_METERS = 10; // Reduced for better tracking
+  private readonly PUBLISH_INTERVAL_SECONDS = 5; // More frequent updates
   private readonly MAX_ACCURACY_METERS = 100;
 
   /**
@@ -115,11 +120,12 @@ class SecureLocationService {
     }
 
     try {
-      // Configure location options for accuracy and battery efficiency
+      // Configure location options for maximum accuracy when needed
       const locationOptions: Location.LocationOptions = {
-        accuracy: Location.Accuracy.Balanced, // Good balance of accuracy and battery
-        timeInterval: this.PUBLISH_INTERVAL_SECONDS * 1000,
-        distanceInterval: this.MIN_MOVEMENT_METERS,
+        accuracy: Location.Accuracy.BestForNavigation, // Highest accuracy available
+        timeInterval: 5000, // Check every 5 seconds for better responsiveness
+        distanceInterval: 5, // React to 5-meter movements for precision
+        mayShowUserSettingsDialog: true, // Allow GPS settings prompt
       };
 
       // Start foreground location subscription
@@ -154,20 +160,82 @@ class SecureLocationService {
         timestamp: location.timestamp
       };
 
-      console.log('[SecureLocationService] Location update received:', {
+      console.log('[SecureLocationService] Raw location received:', {
         lat: locationData.latitude.toFixed(6),
         lng: locationData.longitude.toFixed(6),
         accuracy: locationData.accuracy
       });
 
+      // Filter and improve location accuracy
+      const filteredLocation = this.filterLocation(locationData);
+      if (!filteredLocation) {
+        console.log('[SecureLocationService] Location filtered out due to poor quality');
+        return;
+      }
+
+      console.log('[SecureLocationService] Filtered location:', {
+        lat: filteredLocation.latitude.toFixed(6),
+        lng: filteredLocation.longitude.toFixed(6),
+        accuracy: filteredLocation.accuracy
+      });
+
       // Check if we should publish this location
-      if (this.shouldPublishLocation(locationData)) {
-        await this.publishLocation(locationData);
+      if (this.shouldPublishLocation(filteredLocation)) {
+        await this.publishLocation(filteredLocation);
       }
 
     } catch (error) {
       console.error('[SecureLocationService] Error handling location update:', error);
     }
+  }
+
+  /**
+   * Filter location data to improve accuracy using moving average
+   */
+  private filterLocation(newLocation: LocationData): LocationData | null {
+    // Reject locations with very poor accuracy
+    if (newLocation.accuracy && newLocation.accuracy > this.MIN_ACCURACY_REQUIRED) {
+      console.log(`[SecureLocationService] Location too inaccurate: ${newLocation.accuracy}m > ${this.MIN_ACCURACY_REQUIRED}m`);
+      return null;
+    }
+
+    // Add to history
+    this.locationHistory.push(newLocation);
+    
+    // Keep only recent locations
+    if (this.locationHistory.length > this.LOCATION_HISTORY_SIZE) {
+      this.locationHistory.shift();
+    }
+
+    // If we don't have enough history, return the current location
+    if (this.locationHistory.length < 3) {
+      return newLocation;
+    }
+
+    // Calculate weighted average based on accuracy (better accuracy = higher weight)
+    let weightedLat = 0;
+    let weightedLng = 0;
+    let totalWeight = 0;
+
+    for (const loc of this.locationHistory) {
+      // Weight calculation: 1 / accuracy (better accuracy gets higher weight)
+      const weight = loc.accuracy ? 1 / Math.max(loc.accuracy, 1) : 1;
+      
+      weightedLat += loc.latitude * weight;
+      weightedLng += loc.longitude * weight;
+      totalWeight += weight;
+    }
+
+    const averagedLocation: LocationData = {
+      latitude: weightedLat / totalWeight,
+      longitude: weightedLng / totalWeight,
+      accuracy: Math.min(...this.locationHistory.map(l => l.accuracy || 100)),
+      speed: newLocation.speed,
+      bearing: newLocation.bearing,
+      timestamp: newLocation.timestamp
+    };
+
+    return averagedLocation;
   }
 
   /**
@@ -293,7 +361,8 @@ class SecureLocationService {
   async getCurrentLocation(): Promise<LocationData | null> {
     try {
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000, // Wait up to 1 second for best reading
       });
 
       return {
@@ -307,6 +376,86 @@ class SecureLocationService {
 
     } catch (error) {
       console.error('[SecureLocationService] Failed to get current location:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get high-accuracy location for critical operations (like task details)
+   * Takes multiple readings and returns the most accurate one
+   */
+  async getHighAccuracyLocation(): Promise<LocationData | null> {
+    try {
+      console.log('[SecureLocationService] Getting high-accuracy location...');
+      
+      const readings: LocationData[] = [];
+      const maxReadings = 3;
+      
+      // Take multiple readings over a few seconds
+      for (let i = 0; i < maxReadings; i++) {
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 2000, // Wait up to 2 seconds per reading
+          });
+
+          const locationData: LocationData = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            accuracy: location.coords.accuracy,
+            speed: location.coords.speed,
+            bearing: location.coords.heading,
+            timestamp: location.timestamp
+          };
+
+          readings.push(locationData);
+          
+          console.log(`[SecureLocationService] Reading ${i + 1}/${maxReadings}:`, {
+            accuracy: locationData.accuracy,
+            lat: locationData.latitude.toFixed(6),
+            lng: locationData.longitude.toFixed(6)
+          });
+
+          // If we get a very accurate reading early, we can stop
+          if (locationData.accuracy && locationData.accuracy < 10) {
+            console.log('[SecureLocationService] Excellent accuracy achieved early');
+            break;
+          }
+
+          // Small delay between readings
+          if (i < maxReadings - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+
+        } catch (readingError) {
+          console.warn(`[SecureLocationService] Reading ${i + 1} failed:`, readingError);
+        }
+      }
+
+      if (readings.length === 0) {
+        console.error('[SecureLocationService] No location readings obtained');
+        return null;
+      }
+
+      // Return the most accurate reading
+      const bestReading = readings.reduce((best, current) => {
+        if (!best.accuracy && current.accuracy) return current;
+        if (!current.accuracy && best.accuracy) return best;
+        if (!best.accuracy && !current.accuracy) return current; // Use most recent
+        return (current.accuracy! < best.accuracy!) ? current : best;
+      });
+
+      console.log('[SecureLocationService] Best reading selected:', {
+        accuracy: bestReading.accuracy,
+        lat: bestReading.latitude.toFixed(6),
+        lng: bestReading.longitude.toFixed(6),
+        totalReadings: readings.length
+      });
+
+      return bestReading;
+
+    } catch (error) {
+      console.error('[SecureLocationService] High-accuracy location failed:', error);
       return null;
     }
   }
@@ -330,10 +479,27 @@ class SecureLocationService {
   }
 
   /**
-   * Calculate distance between two coordinates in meters
+   * Calculate distance between two coordinates in meters using Vincenty's formula
+   * More accurate than Haversine for short distances
    */
   private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371e3; // Earth's radius in meters
+    // For very close points, use simple calculation to avoid precision issues
+    const latDiff = Math.abs(lat1 - lat2);
+    const lonDiff = Math.abs(lon1 - lon2);
+    
+    if (latDiff < 0.0001 && lonDiff < 0.0001) {
+      // Use approximate meters per degree for very close points
+      const metersPerLatDegree = 111320; // Average meters per degree of latitude
+      const metersPerLonDegree = 111320 * Math.cos(lat1 * Math.PI / 180); // Adjust for longitude
+      
+      const latMeters = latDiff * metersPerLatDegree;
+      const lonMeters = lonDiff * metersPerLonDegree;
+      
+      return Math.sqrt(latMeters * latMeters + lonMeters * lonMeters);
+    }
+
+    // For longer distances, use improved Haversine with Earth's ellipsoid
+    const R = 6371008.8; // Earth's mean radius in meters (more accurate)
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;

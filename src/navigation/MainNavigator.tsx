@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../theme';
 
 // Volunteer Screens
 import VolunteerDashboard from '../screens/volunteer/VolunteerDashboard';
@@ -27,7 +28,6 @@ import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 import SecureMapScreen from '../screens/shared/SecureMapScreen';
 import NotificationScreen from '../screens/shared/NotificationScreen';
 import { DevicesScreen } from '../screens/DevicesScreen';
-import { ThemeDemoScreen } from '../screens/ThemeDemoScreen';
 // Debug screen removed for production
 
 const Tab = createBottomTabNavigator();
@@ -37,7 +37,6 @@ const VolunteerProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={VolunteerProfile} options={{ headerShown: false }} />
     <Stack.Screen name="Devices" component={DevicesScreen} options={{ title: 'Active Devices' }} />
-    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 
@@ -61,7 +60,6 @@ const AdminStack = () => (
     <Stack.Screen name="Dashboard" component={AdminDashboard} />
     <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
     <Stack.Screen name="Profile" component={AdminProfile} />
-    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 
@@ -84,12 +82,12 @@ const PilgrimStack = () => (
     <Stack.Screen name="CreateRequest" component={CreateRequest} />
     <Stack.Screen name="RequestStatus" component={RequestStatus} />
     <Stack.Screen name="Profile" component={PilgrimProfile} />
-    <Stack.Screen name="ThemeDemo" component={ThemeDemoScreen} options={{ title: 'Theme Demo' }} />
   </Stack.Navigator>
 );
 
 const MainNavigator: React.FC = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   const getTabBarIcon = (routeName: string, focused: boolean, color: string, size: number) => {
     let iconName: keyof typeof Ionicons.glyphMap;
@@ -129,8 +127,12 @@ const MainNavigator: React.FC = () => {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) =>
             getTabBarIcon(route.name, focused, color, size),
-          tabBarActiveTintColor: '#3b82f6',
-          tabBarInactiveTintColor: '#6b7280',
+          tabBarActiveTintColor: theme.primary,
+          tabBarInactiveTintColor: theme.textSecondary,
+          tabBarStyle: {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.borderLight,
+          },
           headerShown: false,
         })}
       >
@@ -148,8 +150,12 @@ const MainNavigator: React.FC = () => {
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) =>
             getTabBarIcon(route.name, focused, color, size),
-          tabBarActiveTintColor: '#3b82f6',
-          tabBarInactiveTintColor: '#6b7280',
+          tabBarActiveTintColor: theme.primary,
+          tabBarInactiveTintColor: theme.textSecondary,
+          tabBarStyle: {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.borderLight,
+          },
           headerShown: false,
         })}
       >
@@ -168,8 +174,12 @@ const MainNavigator: React.FC = () => {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) =>
           getTabBarIcon(route.name, focused, color, size),
-        tabBarActiveTintColor: '#3b82f6',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarStyle: {
+          backgroundColor: theme.surface,
+          borderTopColor: theme.borderLight,
+        },
         headerShown: false,
       })}
     >

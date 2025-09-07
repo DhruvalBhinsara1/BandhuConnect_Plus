@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
-import { COLORS, STATUS_COLORS } from '../../constants';
+import { useTheme } from '../../theme';
+import { STATUS_COLORS } from '../../constants';
 import { AssistanceRequest } from '../../types';
 
 const RequestStatus: React.FC = () => {
@@ -14,6 +15,7 @@ const RequestStatus: React.FC = () => {
   const route = useRoute<any>();
   const { user } = useAuth();
   const { requests, getRequests, deleteRequest, cancelRequest } = useRequest();
+  const { theme } = useTheme();
   
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -167,15 +169,15 @@ const RequestStatus: React.FC = () => {
         {/* Request Details */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="flag" size={14} color={COLORS.textSecondary} />
-            <Text style={{ color: '#6b7280', fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
+            <Ionicons name="flag" size={14} color={theme.textSecondary} />
+            <Text style={{ color: theme.textSecondary, fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
               {item.priority} Priority
             </Text>
           </View>
           
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="pricetag" size={14} color={COLORS.textSecondary} />
-            <Text style={{ color: '#6b7280', fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
+            <Ionicons name="pricetag" size={14} color={theme.textSecondary} />
+            <Text style={{ color: theme.textSecondary, fontSize: 14, marginLeft: 4, textTransform: 'capitalize' }}>
               {item.type.replace('_', ' ')}
             </Text>
           </View>
@@ -238,15 +240,15 @@ const RequestStatus: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {specificRequestId && (
               <TouchableOpacity onPress={() => navigation.goBack()}>
-                <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
+                <Ionicons name="arrow-back" size={24} color={theme.primary} />
               </TouchableOpacity>
             )}
-            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#111827', marginLeft: 8 }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.textPrimary, marginLeft: 8 }}>
               {specificRequestId ? 'Request Details' : 'My Requests'}
             </Text>
           </View>
           <TouchableOpacity onPress={handleRefresh}>
-            <Ionicons name="refresh" size={24} color={COLORS.primary} />
+            <Ionicons name="refresh" size={24} color={theme.primary} />
           </TouchableOpacity>
         </View>
 
@@ -291,9 +293,9 @@ const RequestStatus: React.FC = () => {
         }
         ListEmptyComponent={
           <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
-            <Ionicons name="document-text-outline" size={64} color={COLORS.textSecondary} />
-            <Text style={{ color: '#6b7280', fontSize: 18, marginTop: 16 }}>No requests found</Text>
-            <Text style={{ color: '#9ca3af', textAlign: 'center', marginTop: 8 }}>
+            <Ionicons name="document-text-outline" size={64} color={theme.textSecondary} />
+            <Text style={{ color: theme.textSecondary, fontSize: 18, marginTop: 16 }}>No requests found</Text>
+            <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: 8 }}>
               {filter === 'active' 
                 ? 'You have no active requests'
                 : filter === 'completed'

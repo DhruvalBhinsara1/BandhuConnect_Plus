@@ -452,18 +452,226 @@ interface ErrorBoundaryWrapperProps {
   customFallback?: (error: Error, retry: () => void) => ReactNode;
 }
 
+// Safe fallback theme for error scenarios
+const FALLBACK_THEME = {
+  background: '#FFFFFF',
+  surface: '#F9FAFB', 
+  primary: '#059669',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textInverse: '#FFFFFF',
+  danger: '#EF4444',
+  border: '#E5E7EB',
+};
+
+// ThemeProvider error-specific fallback
+const ThemeProviderErrorFallback = (error: Error, retry: () => void) => {
+  const isThemeError = error.message.includes('useTheme must be used within a ThemeProvider') ||
+                      error.message.includes('ThemeProvider') ||
+                      error.stack?.includes('ThemeContext') ||
+                      error.stack?.includes('useTheme');
+
+  if (!isThemeError) {
+    // Not a theme error, use default error UI
+    return null;
+  }
+
+  return (
+    <SafeAreaView style={{ 
+      flex: 1, 
+      backgroundColor: FALLBACK_THEME.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24 
+    }}>
+      <View style={{
+        backgroundColor: FALLBACK_THEME.surface,
+        padding: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        maxWidth: '90%',
+        borderWidth: 1,
+        borderColor: FALLBACK_THEME.border
+      }}>
+        {/* Error Icon */}
+        <View style={{ marginBottom: 24 }}>
+          <Ionicons
+            name="color-palette-outline"
+            size={64}
+            color={FALLBACK_THEME.danger}
+          />
+        </View>
+
+        {/* Title */}
+        <Text style={{
+          fontSize: 24,
+          fontWeight: '700',
+          color: FALLBACK_THEME.textPrimary,
+          textAlign: 'center',
+          marginBottom: 16
+        }}>
+          🎨 Theme System Error
+        </Text>
+
+        {/* Message */}
+        <Text style={{
+          fontSize: 16,
+          color: FALLBACK_THEME.textSecondary,
+          textAlign: 'center',
+          lineHeight: 24,
+          marginBottom: 24
+        }}>
+          There's an issue with the theme system. The app is trying to use theme colors before the ThemeProvider is ready. Don't worry, this can be fixed quickly!
+        </Text>
+
+        {/* Error Details */}
+        <View style={{
+          backgroundColor: '#FEF2F2',
+          padding: 16,
+          borderRadius: 8,
+          marginBottom: 24,
+          width: '100%',
+          borderWidth: 1,
+          borderColor: '#FECACA'
+        }}>
+          <Text style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: FALLBACK_THEME.danger,
+            marginBottom: 8
+          }}>
+            Technical Details:
+          </Text>
+          <Text style={{
+            fontSize: 14,
+            color: FALLBACK_THEME.danger,
+            fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+          }}>
+            {error.message}
+          </Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={{ width: '100%', gap: 12 }}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: FALLBACK_THEME.primary,
+              paddingVertical: 16,
+              paddingHorizontal: 24,
+              borderRadius: 12,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 8
+            }}
+            onPress={retry}
+          >
+            <Ionicons name="refresh" size={20} color={FALLBACK_THEME.textInverse} />
+            <Text style={{
+              color: FALLBACK_THEME.textInverse,
+              fontSize: 16,
+              fontWeight: '600'
+            }}>
+              Reload App
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: 'transparent',
+              borderWidth: 1,
+              borderColor: FALLBACK_THEME.border,
+              paddingVertical: 16,
+              paddingHorizontal: 24,
+              borderRadius: 12,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 8
+            }}
+            onPress={() => {
+              // Reset to default theme and retry
+              retry();
+            }}
+          >
+            <Ionicons name="settings-outline" size={20} color={FALLBACK_THEME.textPrimary} />
+            <Text style={{
+              color: FALLBACK_THEME.textPrimary,
+              fontSize: 16,
+              fontWeight: '600'
+            }}>
+              Reset Theme Settings
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Development Hint */}
+        {__DEV__ && (
+          <View style={{
+            marginTop: 24,
+            padding: 16,
+            backgroundColor: '#F0F9FF',
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#BAE6FD',
+            width: '100%'
+          }}>
+            <Text style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: '#0369A1',
+              marginBottom: 8
+            }}>
+              💡 Developer Hint:
+            </Text>
+            <Text style={{
+              fontSize: 14,
+              color: '#0369A1',
+              lineHeight: 20
+            }}>
+              Check that all components using useTheme() are wrapped by ThemeProvider. This error usually happens when a component tries to access theme before the provider is mounted.
+            </Text>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+};
+
 export const ErrorBoundaryWrapper: React.FC<ErrorBoundaryWrapperProps> = ({
   children,
   customFallback,
 }) => {
   return (
     <EnhancedErrorBoundary
-      fallback={customFallback}
+      fallback={(error, retry) => {
+        // Try theme-specific fallback first
+        const themeErrorFallback = ThemeProviderErrorFallback(error, retry);
+        if (themeErrorFallback) {
+          return themeErrorFallback;
+        }
+        
+        // Use custom fallback if provided
+        if (customFallback) {
+          return customFallback(error, retry);
+        }
+        
+        // Use default fallback
+        return null; // This will trigger the default error UI
+      }}
       enableReporting={!__DEV__} // Only report in production
       onError={(error, errorInfo) => {
-        // Custom error logging
+        // Custom error logging with theme error detection
+        const isThemeError = error.message.includes('useTheme must be used within a ThemeProvider');
+        
         console.error('App Error:', error);
         console.error('Error Info:', errorInfo);
+        console.error('Is Theme Error:', isThemeError);
+        
+        if (isThemeError) {
+          console.error('🎨 THEME SYSTEM ERROR: Component tried to use theme before ThemeProvider was ready');
+          console.error('📍 Check provider order in App.tsx and component imports');
+        }
       }}
     >
       {children}

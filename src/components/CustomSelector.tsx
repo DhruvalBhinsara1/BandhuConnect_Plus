@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme';
 
 interface Option {
   label: string;
@@ -34,6 +35,7 @@ export const CustomSelector: React.FC<CustomSelectorProps> = ({
   placeholder = 'Select an option',
   label,
 }) => {
+  const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [animation] = useState(new Animated.Value(0));
 
@@ -69,16 +71,23 @@ export const CustomSelector: React.FC<CustomSelectorProps> = ({
 
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, { color: theme.textPrimary }]}>{label}</Text>}
       <TouchableOpacity
-        style={styles.selector}
+        style={[styles.selector, { 
+          backgroundColor: theme.surface, 
+          borderColor: theme.border 
+        }]}
         onPress={openModal}
         activeOpacity={0.7}
       >
-        <Text style={[styles.selectorText, !selectedOption && styles.placeholder]}>
+        <Text style={[
+          styles.selectorText, 
+          { color: theme.textPrimary },
+          !selectedOption && { color: theme.textSecondary }
+        ]}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#6B7280" />
+        <Ionicons name="chevron-down" size={20} color={theme.textSecondary} />
       </TouchableOpacity>
 
       <Modal
@@ -95,15 +104,16 @@ export const CustomSelector: React.FC<CustomSelectorProps> = ({
           <Animated.View
             style={[
               styles.modalContent,
+              { backgroundColor: theme.surface },
               {
                 transform: [{ translateY }],
               },
             ]}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{label || 'Select Option'}</Text>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.borderLight }]}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>{label || 'Select Option'}</Text>
               <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close" size={24} color="#111827" />
+                <Ionicons name="close" size={24} color={theme.textPrimary} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.optionsList}>
@@ -112,7 +122,8 @@ export const CustomSelector: React.FC<CustomSelectorProps> = ({
                   key={option.value}
                   style={[
                     styles.option,
-                    value === option.value && styles.selectedOption,
+                    { backgroundColor: theme.surface },
+                    value === option.value && { backgroundColor: theme.primary + '20' },
                     index === options.length - 1 && styles.lastOption,
                   ]}
                   onPress={() => handleSelect(option.value)}
@@ -120,13 +131,14 @@ export const CustomSelector: React.FC<CustomSelectorProps> = ({
                   <Text
                     style={[
                       styles.optionText,
-                      value === option.value && styles.selectedOptionText,
+                      { color: theme.textPrimary },
+                      value === option.value && { color: theme.primary },
                     ]}
                   >
                     {option.label}
                   </Text>
                   {value === option.value && (
-                    <Ionicons name="checkmark" size={20} color="#2563EB" />
+                    <Ionicons name="checkmark" size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -145,14 +157,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#111827',
     marginBottom: 8,
   },
   selector: {
-    backgroundColor: '#fff',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 2,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -161,19 +170,14 @@ const styles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 16,
-    color: '#111827',
     flex: 1,
-  },
-  placeholder: {
-    color: '#9CA3AF',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: SCREEN_HEIGHT * 0.7,
@@ -195,12 +199,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
   },
   optionsList: {
     padding: 8,
@@ -210,22 +212,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#fff',
     borderRadius: 8,
     marginVertical: 4,
-  },
-  selectedOption: {
-    backgroundColor: '#EFF6FF',
   },
   lastOption: {
     marginBottom: Platform.OS === 'ios' ? 34 : 16,
   },
   optionText: {
     fontSize: 16,
-    color: '#111827',
-  },
-  selectedOptionText: {
-    color: '#2563EB',
-    fontWeight: '500',
   },
 });

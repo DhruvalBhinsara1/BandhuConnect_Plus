@@ -4,6 +4,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
+import { useLocation } from '../../context/LocationContext';
 import { useToast } from '../../components/ui/Toast';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -11,6 +12,7 @@ import { COLORS, STATUS_COLORS } from '../../constants';
 import { Assignment } from '../../types';
 import { NotificationService } from '../../services/notificationService';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
+import { locationService } from '../../services/locationService';
 
 // Styles definition moved before component
 const styles = StyleSheet.create({
@@ -228,6 +230,116 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
+  // Minimap styles for clean location display
+  minimapContainer: {
+    marginTop: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  minimapHeader: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  minimapTitle: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  minimapContent: {
+    position: 'relative',
+    padding: 20,
+    minHeight: 140,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  minimapVisualization: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    bottom: 60,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    borderStyle: 'dashed',
+  },
+  minimapLocationDot: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+  },
+  pilgrimDot: {
+    backgroundColor: '#ef4444',
+    top: 35,
+    left: '35%',
+  },
+  volunteerDot: {
+    backgroundColor: '#3b82f6',
+    top: 70,
+    right: '35%',
+  },
+  minimapInfoContainer: {
+    position: 'absolute',
+    bottom: 10,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  minimapDistance: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  minimapCoordinates: {
+    fontSize: 11,
+    color: '#64748b',
+    textAlign: 'center',
+    fontFamily: 'monospace',
+  },
+  minimapAccuracy: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 4,
+    textAlign: 'center',
+  },
 });
 
 const TaskDetails: React.FC = () => {
@@ -235,12 +347,14 @@ const TaskDetails: React.FC = () => {
   const route = useRoute<any>();
   const { user } = useAuth();
   const { assignments, acceptAssignment, startTask, completeTask } = useRequest();
+  const { currentLocation } = useLocation();
   const toast = useToast();
   
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(false);
   const [pilgrimLocation, setPilgrimLocation] = useState<UserLocationData | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [calculatedDistance, setCalculatedDistance] = useState<number | null>(null);
 
   const assignmentId = route.params?.assignmentId;
 
@@ -288,6 +402,52 @@ const TaskDetails: React.FC = () => {
 
     fetchPilgrimLocation();
   }, [assignment]);
+
+  // Calculate distance when both locations are available
+  useEffect(() => {
+    const calculateDistance = () => {
+      if (pilgrimLocation && currentLocation) {
+        try {
+          const distance = locationService.calculateDistance(
+            {
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+            },
+            {
+              latitude: pilgrimLocation.latitude,
+              longitude: pilgrimLocation.longitude,
+            }
+          );
+          setCalculatedDistance(distance);
+        } catch (error) {
+          console.error('[TaskDetails] Error calculating distance:', error);
+          setCalculatedDistance(null);
+        }
+      } else {
+        setCalculatedDistance(null);
+      }
+    };
+
+    calculateDistance();
+  }, [pilgrimLocation, currentLocation]);
+
+  // Helper function to format distance
+  const formatDistance = (distanceKm: number | null) => {
+    if (distanceKm === null) return 'Unknown';
+    
+    if (distanceKm < 1) {
+      return `${(distanceKm * 1000).toFixed(0)} meters`;
+    } else if (distanceKm < 10) {
+      return `${distanceKm.toFixed(2)} km`;
+    } else {
+      return `${distanceKm.toFixed(1)} km`;
+    }
+  };
+
+  // Helper function to format coordinates
+  const formatCoordinates = (lat: number, lng: number) => {
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  };
 
   const handleAcceptTask = async () => {
     if (!assignment) return;
@@ -598,15 +758,70 @@ const TaskDetails: React.FC = () => {
             </Text>
           ) : pilgrimLocation ? (
             <>
-              <Text style={styles.locationText}>
-                📍 Lat: {pilgrimLocation.latitude.toFixed(6)}
-              </Text>
-              <Text style={styles.locationText}>
-                📍 Lng: {pilgrimLocation.longitude.toFixed(6)}
-              </Text>
-              <Text style={styles.locationText}>
-                🕒 {pilgrimLocation.isStale ? `Last seen ${pilgrimLocation.minutesAgo} min ago` : 'Live location'}
-              </Text>
+              {/* Enhanced Minimap View */}
+              <View style={styles.minimapContainer}>
+                <View style={styles.minimapHeader}>
+                  <Text style={styles.minimapTitle}>📍 Live Location Map</Text>
+                  <Text style={[styles.minimapTitle, { fontSize: 12 }]}>
+                    {pilgrimLocation.isStale ? `${pilgrimLocation.minutesAgo}m ago` : 'LIVE'}
+                  </Text>
+                </View>
+                <View style={styles.minimapContent}>
+                  {/* Map visualization area */}
+                  <View style={styles.minimapVisualization}>
+                    {/* Location dots */}
+                    <View style={[styles.minimapLocationDot, styles.pilgrimDot]} />
+                    <View style={[styles.minimapLocationDot, styles.volunteerDot]} />
+                  </View>
+                  
+                  {/* Information overlay */}
+                  <View style={styles.minimapInfoContainer}>
+                    <Text style={styles.minimapDistance}>
+                      📏 {formatDistance(calculatedDistance)}
+                    </Text>
+                    <Text style={styles.minimapCoordinates}>
+                      📍 {formatCoordinates(pilgrimLocation.latitude, pilgrimLocation.longitude)}
+                    </Text>
+                    {pilgrimLocation.accuracy && (
+                      <Text style={styles.minimapAccuracy}>
+                        GPS: ±{pilgrimLocation.accuracy.toFixed(0)}m
+                        {pilgrimLocation.accuracy < 10 ? ' (Excellent)' : 
+                         pilgrimLocation.accuracy < 30 ? ' (Good)' : 
+                         pilgrimLocation.accuracy < 100 ? ' (Fair)' : ' (Poor)'}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+              
+              {/* Enhanced Legend */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                marginTop: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                backgroundColor: '#f8fafc',
+                borderRadius: 12,
+                marginHorizontal: 4,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 24 }}>
+                  <View style={[
+                    styles.minimapLocationDot,
+                    styles.pilgrimDot,
+                    { position: 'relative', top: 0, left: 0, right: 'auto', marginRight: 8, width: 12, height: 12, borderWidth: 2 }
+                  ]} />
+                  <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>Pilgrim</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={[
+                    styles.minimapLocationDot,
+                    styles.volunteerDot,
+                    { position: 'relative', top: 0, left: 0, right: 'auto', marginRight: 8, width: 12, height: 12, borderWidth: 2 }
+                  ]} />
+                  <Text style={{ fontSize: 13, color: '#374151', fontWeight: '500' }}>You</Text>
+                </View>
+              </View>
             </>
           ) : assignment?.assigned ? (
             <Text style={styles.locationText}>
@@ -617,9 +832,12 @@ const TaskDetails: React.FC = () => {
               ℹ️ Location will be available when assignment is active
             </Text>
           )}
-          <Text style={styles.distanceText}>
-            Estimated distance: {pilgrimLocation ? 'Calculating...' : 'Unknown'}
-          </Text>
+          
+          {!currentLocation && pilgrimLocation && (
+            <Text style={[styles.locationText, { fontSize: 12, color: '#f59e0b', marginTop: 12, textAlign: 'center' }]}>
+              ⚠️ Enable your location to calculate accurate distance
+            </Text>
+          )}
         </View>
           
         {assignment.status === 'completed' && (assignment as any).completion_latitude && (

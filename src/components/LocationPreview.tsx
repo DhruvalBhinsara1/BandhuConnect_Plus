@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { mapService } from '../services/mapService';
 import { LocationDetails } from '../types';
+import { useTheme } from '../theme';
 
 interface LocationPreviewProps {
   latitude: number;
@@ -12,6 +13,7 @@ interface LocationPreviewProps {
 }
 
 export const LocationPreview: React.FC<LocationPreviewProps> = ({ latitude, longitude }) => {
+  const { theme } = useTheme();
   const [locationDetails, setLocationDetails] = useState<LocationDetails | null>(null);
   const [staticMapUrl, setStaticMapUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -47,14 +49,14 @@ export const LocationPreview: React.FC<LocationPreviewProps> = ({ latitude, long
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#4285F4" />
+      <View style={[styles.loadingContainer, { backgroundColor: theme.surface }]}>
+        <ActivityIndicator size="small" color={theme.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.surface }]}>
       <View style={[styles.mapPreviewContainer, { width: windowWidth * 0.95, height: 150 }]}>
         {staticMapUrl ? (
           <>
@@ -76,22 +78,22 @@ export const LocationPreview: React.FC<LocationPreviewProps> = ({ latitude, long
           </>
         ) : (
           <View style={[styles.mapPreviewContainer, { alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: '#888', fontSize: 14 }}>Map preview unavailable</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 14 }}>Map preview unavailable</Text>
           </View>
         )}
       </View>
-      <View style={styles.detailsContainer}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="location" size={20} color="#4285F4" />
+      <View style={[styles.detailsContainer, { backgroundColor: theme.surface }]}>
+        <View style={[styles.iconContainer, { backgroundColor: theme.primary + '20' }]}>
+          <Ionicons name="location" size={20} color={theme.primary} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={styles.name}>
+          <Text style={[styles.name, { color: theme.textPrimary }]}>
             {locationDetails?.landmark || locationDetails?.name || 'Unknown Location'}
           </Text>
           {locationDetails?.locality ? (
-            <Text style={styles.locality}>{locationDetails.locality}</Text>
+            <Text style={[styles.locality, { color: theme.textSecondary }]}>{locationDetails.locality}</Text>
           ) : (
-            <Text style={styles.coordinates}>
+            <Text style={[styles.coordinates, { color: theme.textSecondary }]}>
               {latitude.toFixed(6)}, {longitude.toFixed(6)}
             </Text>
           )}
@@ -110,7 +112,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   container: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',
     ...Platform.select({
@@ -176,7 +177,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e8f0fe',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
@@ -187,16 +187,13 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 2,
   },
   locality: {
     fontSize: 12,
-    color: '#4b5563',
   },
   coordinates: {
     fontSize: 12,
-    color: '#6b7280',
     fontFamily: 'monospace',
   },
 });

@@ -11,13 +11,16 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapView, { Marker, Circle } from 'react-native-maps';
+import MapView, { Marker, Circle, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
 import { secureLocationService } from '../../services/secureLocationService';
 import { APP_ROLE, getCurrentRoleConfig } from '../../constants/appRole';
 import { supabase } from '../../services/supabase';
 import { AuthDebugger } from '../../components/AuthDebugger';
+import { useTheme } from '../../theme';
+import { useAuth } from '../../context/AuthContext';
+import { useRequest } from '../../context/RequestContext';
 
 interface TrackingState {
   isActive: boolean;
@@ -30,6 +33,9 @@ interface TrackingState {
 
 export default function SecureMapScreen() {
   const navigation = useNavigation();
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const { requests } = useRequest();
   const mapRef = useRef<MapView>(null);
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [trackingState, setTrackingState] = useState<TrackingState>({
@@ -46,6 +52,73 @@ export default function SecureMapScreen() {
   const [currentAssignment, setCurrentAssignment] = useState<any>(null);
   const [counterpartLocation, setCounterpartLocation] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Distance calculation function (same as minimap)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  };
+
+  // Format distance function
+  const formatDistance = (distance: number): string => {
+    if (distance < 1000) {
+      return `${Math.round(distance)} m`;
+    }
+    return `${(distance / 1000).toFixed(1)} km`;
+  };
+
+  // Get current user location from locations array
+  const currentUserLocation = locations.find(loc => loc.userId === currentUserId);
+  
+  // Get counterpart location from locations array using assignment data
+  const counterpartLocationFromArray = currentAssignment?.counterpartId 
+    ? locations.find(loc => loc.userId === currentAssignment.counterpartId)
+    : null;
+  
+  // Use counterpart location from array if available, otherwise fall back to counterpartLocation state
+  const effectiveCounterpartLocation = counterpartLocationFromArray || counterpartLocation;
+  
+  // Calculate distance to counterpart
+  const calculatedDistance = effectiveCounterpartLocation && currentUserLocation 
+    ? calculateDistance(
+        currentUserLocation.latitude,
+        currentUserLocation.longitude,
+        effectiveCounterpartLocation.latitude,
+        effectiveCounterpartLocation.longitude
+      )
+    : 0;
+
+  // Debug distance calculation
+  if (effectiveCounterpartLocation && currentUserLocation) {
+    console.log('[SecureMapScreen] Distance calculation:', {
+      userLocation: {
+        lat: currentUserLocation.latitude,
+        lng: currentUserLocation.longitude,
+        name: currentUserLocation.name
+      },
+      counterpartLocation: {
+        lat: effectiveCounterpartLocation.latitude,
+        lng: effectiveCounterpartLocation.longitude,
+        name: effectiveCounterpartLocation.name || 'Unknown'
+      },
+      calculatedDistance,
+      formattedDistance: calculatedDistance > 0 ? formatDistance(calculatedDistance) : 'N/A'
+    });
+  }
+
+  const estimatedArrival = calculatedDistance > 0 
+    ? `${Math.round((calculatedDistance / 1000) / 5 * 60)} min` 
+    : null;
 
   const roleConfig = getCurrentRoleConfig();
 
@@ -146,18 +219,9 @@ export default function SecureMapScreen() {
   };
 
   const updateTrackingStateFromAssignment = async (assignment: any) => {
-    // Use centralized assignment detection logic
-    const { hasActiveAssignment } = await import('../../services/assignmentService');
     const { data: { user } } = await supabase.auth.getUser();
     
-    let hasValidAssignment = false;
-    
-    if (user?.id) {
-      // Check if user has any active assignment using centralized logic
-      hasValidAssignment = await hasActiveAssignment(user.id);
-    }
-    
-    // Validate assignment completeness
+    // Validate assignment completeness using direct assignment data
     const isCompleteAssignment = assignment && 
       assignment.isActive && 
       assignment.assigned && 
@@ -168,14 +232,16 @@ export default function SecureMapScreen() {
       hasAssignment: !!assignment,
       isActive: assignment?.isActive,
       assigned: assignment?.assigned,
-      hasValidAssignment,
       isCompleteAssignment,
       counterpartId: assignment?.counterpartId,
       assignmentId: assignment?.assignmentId,
+      counterpartName: assignment?.counterpartName,
       userId: user?.id
     });
     
-    if (hasValidAssignment && isCompleteAssignment) {
+    // Use direct assignment data instead of complex service logic
+    if (isCompleteAssignment) {
+      console.log('[SecureMapScreen] ✅ Valid assignment found, showing distance card');
       setTrackingState(prev => ({
         ...prev,
         hasAssignment: true,
@@ -184,6 +250,7 @@ export default function SecureMapScreen() {
         showCompletedStatus: false
       }));
     } else {
+      console.log('[SecureMapScreen] ❌ No valid assignment, hiding distance card');
       setTrackingState(prev => ({
         ...prev,
         hasAssignment: false,
@@ -275,8 +342,8 @@ export default function SecureMapScreen() {
           mapRef.current.animateToRegion({
             latitude: ownLocation.latitude,
             longitude: ownLocation.longitude,
-            latitudeDelta: 0.008, // Match the initial zoom level
-            longitudeDelta: 0.008, // Match the initial zoom level
+            latitudeDelta: 0.001, // ~100m view for better user focus
+            longitudeDelta: 0.001, // ~100m view for better user focus
           }, 1000);
         }
       }
@@ -498,27 +565,27 @@ export default function SecureMapScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={roleConfig.primaryColor} />
-        <Text style={styles.loadingText}>Initializing location tracking...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.background }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Initializing location tracking...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Clean Compact Header */}
-      <View style={styles.cleanHeader}>
-        <Text style={styles.headerTitle}>Live Map</Text>
+      <View style={[styles.cleanHeader, { backgroundColor: theme.primary }]}>
+        <Text style={[styles.headerTitle, { color: theme.textInverse }]}>Live Map</Text>
         <View style={styles.headerRight}>
-          <View style={styles.usersBadge}>
-            <Text style={styles.usersText}>{locations.length} online</Text>
+          <View style={[styles.usersBadge, { backgroundColor: 'white' }]}>
+            <Text style={[styles.usersText, { color: theme.primary }]}>{locations.length} online</Text>
           </View>
-          <View style={styles.statusPill}>
+          <View style={[styles.statusPill, { backgroundColor: 'white', borderColor: 'rgba(255, 255, 255, 0.3)' }]}>
             <View style={[styles.statusDot, { 
-              backgroundColor: trackingState.isActive ? '#10B981' : '#EF4444' 
+              backgroundColor: trackingState.isActive ? theme.success : theme.error 
             }]} />
-            <Text style={styles.statusText}>
+            <Text style={[styles.statusText, { color: theme.textPrimary }]}>
               {trackingState.isActive ? 'Active' : 'Off'}
             </Text>
           </View>
@@ -526,25 +593,44 @@ export default function SecureMapScreen() {
       </View>
 
       {/* Request Status Input Bar */}
-      <View style={styles.requestInputBar}>
+      <View style={[styles.requestInputBar, { backgroundColor: theme.surface }]}>
         <TouchableOpacity 
-          style={styles.requestInputField}
+          style={[styles.requestInputField, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}
           onPress={handleRequestTap}
           activeOpacity={0.7}
         >
-          <Ionicons name="search-outline" size={16} color="#3B82F6" />
+          <Ionicons name="search-outline" size={16} color={theme.primary} />
           <Text style={[
             styles.requestInputText,
-            (!trackingState.hasAssignment || !trackingState.assigned) && styles.placeholderText
+            { color: theme.textPrimary },
+            (!trackingState.hasAssignment || !trackingState.assigned) && { color: theme.textSecondary }
           ]}>
-            {trackingState.hasAssignment && trackingState.assigned 
-              ? 'Active request in progress' 
-              : 'Tap to create new request'
-            }
+            {(() => {
+              // Check for active requests from request context
+              const myRequests = requests.filter(r => r.user_id === user?.id);
+              const activeRequests = myRequests.filter(r => 
+                ['pending', 'assigned', 'in_progress'].includes(r.status)
+              );
+              
+              if (activeRequests.length > 0) {
+                const status = activeRequests[0].status;
+                if (status === 'pending') return 'Request submitted, waiting for volunteer';
+                if (status === 'assigned') return 'Volunteer assigned, help is coming';
+                if (status === 'in_progress') return 'Help is in progress';
+              }
+              
+              return 'Tap to create new request';
+            })()}
           </Text>
-          {!trackingState.hasAssignment && (
-            <Ionicons name="add-circle-outline" size={16} color="#10B981" />
-          )}
+          {(() => {
+            const myRequests = requests.filter(r => r.user_id === user?.id);
+            const activeRequests = myRequests.filter(r => 
+              ['pending', 'assigned', 'in_progress'].includes(r.status)
+            );
+            return activeRequests.length === 0 && (
+              <Ionicons name="add-circle-outline" size={16} color={theme.success} />
+            );
+          })()}
         </TouchableOpacity>
       </View>
 
@@ -559,23 +645,111 @@ export default function SecureMapScreen() {
         initialRegion={{
           latitude: 22.2924, // Default to Vadodara, Gujarat (closer to user's location)
           longitude: 73.3627,
-          latitudeDelta: 0.008, // More zoomed in for better neighborhood view
-          longitudeDelta: 0.008, // More zoomed in for better neighborhood view
+          latitudeDelta: 0.001, // ~100m view for better user focus
+          longitudeDelta: 0.001, // ~100m view for better user focus
         }}
       >
         {renderMarkers()}
+        
+        {/* Polyline between user and volunteer */}
+        {effectiveCounterpartLocation && currentUserLocation && trackingState.assigned && (
+          <Polyline
+            coordinates={[
+              {
+                latitude: currentUserLocation.latitude,
+                longitude: currentUserLocation.longitude,
+              },
+              {
+                latitude: effectiveCounterpartLocation.latitude,
+                longitude: effectiveCounterpartLocation.longitude,
+              },
+            ]}
+            strokeColor="#10b981"
+            strokeWidth={3}
+            lineDashPattern={[10, 5]}
+          />
+        )}
       </MapView>
 
-      {/* Subtle Legend - only show when there are multiple users */}
+      {/* Distance & ETA Display - show when tracking counterpart */}
+      {(() => {
+        // More lenient condition for testing - show if we have any counterpart location
+        const hasCounterpart = effectiveCounterpartLocation && currentUserLocation;
+        const shouldShow = trackingState.assigned && hasCounterpart && calculatedDistance > 0;
+        
+        // FALLBACK: Show distance card if we have assignment data and locations (for debugging)
+        const fallbackShow = currentAssignment?.assigned && hasCounterpart && calculatedDistance > 0;
+        
+        const finalShow = shouldShow || fallbackShow;
+        
+        console.log('[SecureMapScreen] Distance card visibility check:', {
+          assigned: trackingState.assigned,
+          hasCounterpartLocation: !!effectiveCounterpartLocation,
+          hasCurrentUserLocation: !!currentUserLocation,
+          calculatedDistance,
+          shouldShow,
+          fallbackShow,
+          finalShow,
+          assignmentData: currentAssignment,
+          trackingState: trackingState,
+          counterpartFromArray: !!counterpartLocationFromArray,
+          counterpartFromState: !!counterpartLocation,
+          locationsCount: locations.length
+        });
+        
+        return finalShow ? (
+          <View style={styles.distanceCard}>
+            <View style={styles.distanceHeader}>
+              <Ionicons name="navigate" size={20} color="#10b981" />
+              <Text style={styles.distanceTitle}>
+                {APP_ROLE === 'pilgrim' 
+                  ? 'Help is on the way' 
+                  : APP_ROLE === 'volunteer' 
+                    ? 'Heading to help pilgrim'
+                    : 'Tracking in progress'
+                }
+              </Text>
+            </View>
+            <View style={styles.distanceContent}>
+              <View style={styles.distanceItem}>
+                <Text style={styles.distanceValue}>{formatDistance(calculatedDistance)}</Text>
+                <Text style={styles.distanceLabel}>
+                  {APP_ROLE === 'pilgrim' ? 'away' : 'to destination'}
+                </Text>
+              </View>
+              {estimatedArrival && (
+                <View style={styles.etaContainer}>
+                  <Text style={styles.etaValue}>{estimatedArrival}</Text>
+                  <Text style={styles.etaLabel}>
+                    {APP_ROLE === 'pilgrim' 
+                      ? 'mins' 
+                      : APP_ROLE === 'volunteer' 
+                        ? 'min ETA'
+                        : 'minutes'
+                    }
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : null;
+      })()}
+
+      {/* Enhanced Legend - only show when there are multiple users */}
       {locations.length > 1 && (
-        <View style={styles.subtleLegend}>
+        <View style={[styles.enhancedLegend, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
           {locations.slice(0, 2).map((location) => { // Show max 2 users
             const markerStyle = getMarkerStyle(location.role, location.isStale);
+            const isCurrentUser = location.userId === currentUserId;
+            const displayName = isCurrentUser 
+              ? 'You' 
+              : (location.name || 'Unknown User');
+            
             return (
-              <View key={location.userId} style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: markerStyle.color }]} />
-                <Text style={styles.legendText} numberOfLines={1}>
-                  {location.role === APP_ROLE ? 'You' : location.name?.split(' ')[0] || 'User'}
+              <View key={location.userId} style={styles.enhancedLegendItem}>
+                <View style={[styles.enhancedLegendDot, { backgroundColor: markerStyle.color }]} />
+                <Text style={[styles.enhancedLegendText, { color: theme.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+                  {displayName}
                 </Text>
               </View>
             );
@@ -586,61 +760,39 @@ export default function SecureMapScreen() {
       {/* Compact Map Controls */}
       <View style={styles.mapControls}>
         <TouchableOpacity
-          style={styles.myLocationButton}
+          style={[styles.myLocationButton, { backgroundColor: theme.error }]}
           onPress={centerOnSelf}
         >
-          <Ionicons name="locate" size={20} color="#FFFFFF" />
+          <Ionicons name="locate" size={20} color="white" />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={locations.length > 0 ? styles.expandButton : styles.controlButton}
+          style={locations.length > 0 ? [styles.expandButton, { backgroundColor: theme.success }] : [styles.controlButton, { backgroundColor: theme.surface }]}
           onPress={fitAllMarkers}
           disabled={locations.length === 0}
         >
-          <Ionicons name="scan" size={18} color={locations.length > 0 ? "#FFFFFF" : "#9CA3AF"} />
+          <Ionicons name="scan" size={18} color={locations.length > 0 ? "white" : theme.textSecondary} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.primary }]}
           onPress={refreshLocations}
         >
-          <Ionicons name="refresh" size={18} color="#FFFFFF" />
+          <Ionicons name="refresh" size={18} color="white" />
         </TouchableOpacity>
       </View>
 
-      {/* Subtle Location Status */}
-      {locations.length > 0 && (
-        <View style={styles.subtleBottomSheet}>
-          <Text style={styles.bottomSheetTitle}>Location Status</Text>
-          {locations.slice(0, 2).map((location) => ( // Show max 2 for cleaner UI
-            <View key={location.userId} style={styles.locationDetails}>
-              <View style={styles.locationRow}>
-                <View style={styles.locationIcon}>
-                  <Ionicons 
-                    name={location.role === APP_ROLE ? "person" : "location"} 
-                    size={14} 
-                    color={location.role === APP_ROLE ? roleConfig.primaryColor : roleConfig.counterpartColor} 
-                  />
-                </View>
-                <View style={styles.locationInfo}>
-                  <Text style={styles.locationLabel}>
-                    {location.role === APP_ROLE ? 'You' : location.name}
-                  </Text>
-                  <Text style={styles.locationValue}>
-                    {location.role === APP_ROLE 
-                      ? 'Live tracking'
-                      : location.isStale 
-                        ? formatLastSeen(location.minutesAgo)
-                        : 'Live location'
-                    }
-                  </Text>
-                </View>
-              </View>
+      {/* Compact Location Status - only show when not assigned to a volunteer */}
+      {locations.length > 0 && !trackingState.assigned && (
+        <View style={[styles.subtleBottomSheet, { backgroundColor: theme.surface, borderColor: theme.borderLight }]}>
+          <View style={styles.locationRow}>
+            <View style={styles.locationIcon}>
+              <Ionicons name="people" size={16} color={theme.primary} />
             </View>
-          ))}
-          {locations.length > 2 && (
-            <Text style={styles.moreLocationsText}>+{locations.length - 2} more users</Text>
-          )}
+            <Text style={[styles.locationLabel, { color: theme.textPrimary }]}>
+              {locations.length} user{locations.length > 1 ? 's' : ''} online
+            </Text>
+          </View>
         </View>
       )}
 
@@ -651,14 +803,12 @@ export default function SecureMapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   header: {
     position: 'absolute',
     top: 44, // Status bar height
     left: 16,
     right: 16,
-    backgroundColor: '#1F2937', // Dark gray background for better contrast
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -680,13 +830,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFFFFF', // White text on blue background
     marginBottom: 0,
     flexShrink: 1, // Allow title to shrink on smaller screens
   },
   headerSubtitle: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
   statusBadge: {
@@ -695,7 +843,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#34D399', // Brighter green
   },
   statusDot: {
     width: 6,
@@ -950,33 +1097,33 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   bottomSheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   locationDetails: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   locationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   locationLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   locationValue: {
     fontSize: 12,
@@ -1116,7 +1263,6 @@ const styles = StyleSheet.create({
   },
   // Clean Header Styles
   cleanHeader: {
-    backgroundColor: '#2563EB', // Blue background for better branding
     paddingHorizontal: '5%', // Responsive horizontal padding
     paddingVertical: 12,
     paddingTop: 48, // Account for status bar on most devices
@@ -1124,7 +1270,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#1D4ED8',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1141,7 +1286,6 @@ const styles = StyleSheet.create({
     maxWidth: '60%', // Limit width on small screens
   },
   usersBadge: {
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1149,25 +1293,21 @@ const styles = StyleSheet.create({
   },
   usersText: {
     fontSize: 11,
-    color: '#6B7280',
     fontWeight: '500',
     textAlign: 'center',
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     minWidth: 50, // Ensure minimum readable width
   },
   
   // Request Input Bar Styles
   requestInputBar: {
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: '5%', // Responsive padding
     paddingVertical: 12,
     borderBottomWidth: 3,
@@ -1183,9 +1323,7 @@ const styles = StyleSheet.create({
   requestInputField: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     borderWidth: 2,
-    borderColor: '#E2E8F0',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1201,12 +1339,10 @@ const styles = StyleSheet.create({
   requestInputText: {
     flex: 1,
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '400',
     minHeight: 20, // Ensure consistent height
   },
   placeholderText: {
-    color: '#9CA3AF', // Lighter color for placeholder-like appearance
     fontStyle: 'italic',
   },
 
@@ -1222,7 +1358,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1240,7 +1375,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3B82F6', // Blue for location
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1255,7 +1389,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#10B981', // Green for expand/fullscreen
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1270,7 +1403,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F59E0B', // Orange for refresh
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1282,65 +1414,140 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
 
-  // Subtle Legend
-  subtleLegend: {
+  // Enhanced Legend with better styling
+  enhancedLegend: {
     position: 'absolute',
     top: '20%', // Responsive positioning
     left: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 6,
-    padding: 8,
+    borderRadius: 12,
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
     zIndex: 6,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-    maxWidth: '30%', // Responsive width
+    minWidth: 120, // Ensure enough space for full names
+    maxWidth: '45%', // Allow more space for longer names
   },
-  legendItem: {
+  enhancedLegendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
+    minHeight: 24, // Larger height for better touch and visibility
+    paddingVertical: 2,
   },
-  legendDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+  enhancedLegendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+    flexShrink: 0, // Don't shrink the dot
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  legendText: {
+  enhancedLegendText: {
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1, // Take remaining space
+    letterSpacing: 0.2,
+  },
+
+  // Distance & ETA Card - Delivery tracking style
+  distanceCard: {
+    position: 'absolute',
+    bottom: '8%', // Lowered from 15% to 8%
+    left: 16,
+    right: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    zIndex: 8,
+  },
+  distanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  distanceTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginLeft: 8,
+    flex: 1,
+  },
+  distanceContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  distanceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  distanceValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginRight: 4,
+  },
+  distanceLabel: {
+    fontSize: 14,
+    color: '#64748b',
+    marginRight: 16,
+  },
+  etaContainer: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  etaValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  etaLabel: {
     fontSize: 10,
-    color: '#6B7280',
-    fontWeight: '500',
-    flexShrink: 1, // Allow text to shrink on very small screens
+    color: '#ffffff',
+    opacity: 0.9,
   },
 
   // Subtle Bottom Sheet
   subtleBottomSheet: {
     position: 'absolute',
-    bottom: '3%', // Responsive bottom positioning
-    left: '4%', // Responsive left margin
-    right: '18%', // Leave space for controls (responsive)
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    bottom: '2%', // Lower positioning
+    left: '4%',
+    right: '4%', // Full width minus margins
     borderRadius: 12,
     padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
     zIndex: 7,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
-    maxHeight: '20%', // Responsive max height
-    minHeight: 60, // Ensure minimum usable height
+    maxHeight: '12%', // Even smaller
+    minHeight: 60,
   },
   moreLocationsText: {
     fontSize: 10,
-    color: '#9CA3AF',
     fontStyle: 'italic',
     marginTop: 6,
     textAlign: 'center',

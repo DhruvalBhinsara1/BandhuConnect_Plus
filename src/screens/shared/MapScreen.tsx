@@ -14,6 +14,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, Region, MapType } from 'react-native-
 import { useAuth } from '../../context/AuthContext';
 import { useLocation } from '../../context/LocationContext';
 import { useMap } from '../../context/MapContext';
+import { useRequest } from '../../context/RequestContext';
 import { useToast } from '../../components/ui/Toast';
 import { MarkerCallout } from '../../components/MarkerCallout';
 import { DebugDrawer } from '../../components/DebugDrawer';
@@ -28,6 +29,7 @@ const MapScreen: React.FC = () => {
   const { user } = useAuth();
   const { userLocations, loading, refreshLocations } = useMap();
   const { currentLocation, isTracking, isBackgroundTracking, permissions, getCurrentLocation } = useLocation();
+  const { requests } = useRequest();
   const toast = useToast();
   const [locations, setLocations] = useState<UserLocationData[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<UserLocationData | null>(null);
@@ -36,8 +38,8 @@ const MapScreen: React.FC = () => {
   const [region, setRegion] = useState<Region>({
     latitude: 19.0760,
     longitude: 72.8777,
-    latitudeDelta: 0.002,
-    longitudeDelta: 0.002,
+    latitudeDelta: 0.001, // ~100m view instead of 0.002
+    longitudeDelta: 0.001, // ~100m view instead of 0.002
   });
   const [mapType, setMapType] = useState<MapType>('standard');
   const [showBuildingView, setShowBuildingView] = useState(true);
@@ -45,6 +47,88 @@ const MapScreen: React.FC = () => {
   const [realtimeLocations, setRealtimeLocations] = useState<UserLocationData[]>([]);
   const [showDebugDrawer, setShowDebugDrawer] = useState(false);
   const [debugTapCount, setDebugTapCount] = useState(0);
+
+  // Distance calculation function (same as minimap)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  };
+
+  const formatDistance = (distance: number): string => {
+    if (distance < 1000) {
+      return `${Math.round(distance)} m`;
+    }
+    return `${(distance / 1000).toFixed(1)} km`;
+  };
+
+  // Find assigned counterpart location based on active requests
+  const getCounterpartLocation = () => {
+    if (!currentLocation || !user) return null;
+    
+    console.log('MapScreen: Finding counterpart location...');
+    console.log('User role:', user.role);
+    console.log('User ID:', user.id);
+    console.log('Requests:', requests);
+    console.log('Locations:', locations);
+    
+    // Find user's active assigned request
+    const userRequests = requests.filter(r => r.user_id === user.id);
+    const assignedRequest = userRequests.find(r => 
+      r.status === 'assigned' || r.status === 'in_progress'
+    );
+    
+    console.log('User requests:', userRequests);
+    console.log('Assigned request:', assignedRequest);
+    
+    if (!assignedRequest || !assignedRequest.volunteer_id) {
+      console.log('No assigned request found');
+      return null;
+    }
+    
+    // Find the volunteer's location
+    const volunteerLocation = locations.find(loc => 
+      loc.user_id === assignedRequest.volunteer_id
+    );
+    
+    console.log('Volunteer location found:', volunteerLocation);
+    
+    return volunteerLocation || null;
+  };
+
+  const counterpartLocation = getCounterpartLocation();
+  
+  // Calculate distance to counterpart
+  const calculatedDistance = counterpartLocation && currentLocation 
+    ? calculateDistance(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        counterpartLocation.latitude,
+        counterpartLocation.longitude
+      )
+    : 0;
+
+  const estimatedArrival = calculatedDistance > 0 
+    ? `${Math.round((calculatedDistance / 1000) / 5 * 60)} min` 
+    : null;
+
+  // Debug logging
+  console.log('MapScreen Distance Debug:', {
+    hasCounterpart: !!counterpartLocation,
+    hasCurrentLocation: !!currentLocation,
+    calculatedDistance,
+    estimatedArrival,
+    shouldShowCard: !!(counterpartLocation && calculatedDistance > 0)
+  });
 
   const getTrackingStatusText = () => {
     if (!permissions?.foreground) return 'Location permission required';
@@ -223,14 +307,14 @@ const MapScreen: React.FC = () => {
         setRegion({
           latitude: firstLocation.latitude,
           longitude: firstLocation.longitude,
-          latitudeDelta: 0.002,
-          longitudeDelta: 0.002,
+          latitudeDelta: 0.001, // ~100m view
+          longitudeDelta: 0.001, // ~100m view
         });
         mapRef.current.animateToRegion({
           latitude: firstLocation.latitude,
           longitude: firstLocation.longitude,
-          latitudeDelta: 0.002,
-          longitudeDelta: 0.002,
+          latitudeDelta: 0.001, // ~100m view
+          longitudeDelta: 0.001, // ~100m view
         }, 1000);
       }
     }
@@ -281,8 +365,8 @@ const MapScreen: React.FC = () => {
       setRegion({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        latitudeDelta: 0.002,
-        longitudeDelta: 0.002,
+        latitudeDelta: 0.001, // ~100m view
+        longitudeDelta: 0.001, // ~100m view
       });
       
       // Also animate the map to the new region
@@ -290,8 +374,8 @@ const MapScreen: React.FC = () => {
         mapRef.current.animateToRegion({
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude,
-          latitudeDelta: 0.002,
-          longitudeDelta: 0.002,
+          latitudeDelta: 0.001, // ~100m view
+          longitudeDelta: 0.001, // ~100m view
         }, 1000);
       }
     }
@@ -419,6 +503,28 @@ const MapScreen: React.FC = () => {
             );
           })}
         </MapView>
+
+        {/* Distance & ETA Display - show when tracking counterpart */}
+        {counterpartLocation && calculatedDistance > 0 && (
+          <View style={styles.distanceCard}>
+            <View style={styles.distanceHeader}>
+              <Ionicons name="navigate" size={16} color="#f59e0b" />
+              <Text style={styles.distanceTitle}>Distance & ETA</Text>
+            </View>
+            <View style={styles.distanceContent}>
+              <View style={styles.distanceItem}>
+                <Text style={styles.distanceValue}>{formatDistance(calculatedDistance)}</Text>
+                <Text style={styles.distanceLabel}>Away</Text>
+              </View>
+              {estimatedArrival && (
+                <View style={styles.distanceItem}>
+                  <Ionicons name="time" size={14} color="#059669" />
+                  <Text style={styles.etaValue}>~{estimatedArrival}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {showLocationNotice && (
           <Animated.View style={[styles.locationNotice, { opacity: noticeOpacity }]}>
@@ -1054,6 +1160,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontWeight: '400',
+  },
+  // Distance & ETA Card
+  distanceCard: {
+    position: 'absolute',
+    top: 120,
+    right: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    minWidth: 120,
+    zIndex: 7,
+  },
+  distanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  distanceTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginLeft: 6,
+  },
+  distanceContent: {
+    gap: 6,
+  },
+  distanceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  distanceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  distanceLabel: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  etaValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#059669',
   },
 });
 

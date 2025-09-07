@@ -4,19 +4,19 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
-import { useTheme } from '../../theme/ThemeContext';
+import { useTheme } from '../../theme';
 import { safeNavigate } from '../../utils/navigationErrorHandler';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { volunteerService } from '../../services/volunteerService';
-import { COLORS, VOLUNTEER_SKILLS } from '../../constants';
+import { VOLUNTEER_SKILLS } from '../../constants';
 
 const VolunteerProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
   const { assignments } = useRequest();
-  const { theme, toggleTheme, themeMode } = useTheme();
+  const { theme } = useTheme();
 
   // Type for the navigation
   type RootStackParamList = {
@@ -122,6 +122,252 @@ const VolunteerProfile: React.FC = () => {
     }));
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      marginLeft: 12,
+      backgroundColor: theme.background,
+    },
+    header: {
+      backgroundColor: theme.surface,
+      paddingHorizontal: 24,
+      paddingTop: 4,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+    },
+    scrollView: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+    },
+    profileCard: {
+      marginBottom: 16,
+    },
+    profileHeader: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    avatarContainer: {
+      backgroundColor: theme.primary + '20',
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    userName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: theme.textPrimary,
+    },
+    userRole: {
+      fontSize: 16,
+      color: theme.textSecondary,
+      marginBottom: 8,
+    },
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      alignSelf: 'center',
+    },
+    statusBadgeAvailable: {
+      backgroundColor: theme.success + '20',
+    },
+    statusBadgeBusy: {
+      backgroundColor: theme.warning + '20',
+    },
+    statusBadgeOffline: {
+      backgroundColor: theme.error + '20',
+    },
+    statusBadgeText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    statusTextAvailable: {
+      color: theme.success,
+    },
+    statusTextBusy: {
+      color: theme.warning,
+    },
+    statusTextOffline: {
+      color: theme.error,
+    },
+    skillsSection: {
+      marginBottom: 16,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.textPrimary,
+      marginBottom: 12,
+    },
+    skillsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    skillChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginRight: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+    },
+    skillChipActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    skillChipInactive: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+    },
+    skillChipTextActive: {
+      color: theme.textInverse,
+    },
+    skillChipTextInactive: {
+      color: theme.textSecondary,
+    },
+    skillBadge: {
+      backgroundColor: theme.primary + '20',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    skillBadgeText: {
+      color: theme.primary,
+      fontSize: 14,
+    },
+    noSkillsText: {
+      color: theme.textSecondary,
+    },
+    statsCard: {
+      marginBottom: 16,
+    },
+    statRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    statLabel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    statLabelText: {
+      color: theme.textSecondary,
+      marginLeft: 8,
+    },
+    statValue: {
+      color: theme.textPrimary,
+      fontWeight: '600',
+    },
+    editActions: {
+      flexDirection: 'row',
+      marginBottom: 32,
+    },
+    saveButton: {
+      flex: 1,
+      marginRight: 8,
+    },
+    cancelButton: {
+      flex: 1,
+    },
+    actions: {
+      marginBottom: 32,
+    },
+    actionButton: {
+      marginBottom: 12,
+    },
+    userEmail: {
+      fontSize: 14,
+      color: theme.textSecondary,
+      marginBottom: 8,
+    },
+    statusContainer: {
+      alignItems: 'center',
+    },
+    statusText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    statusSection: {
+      marginBottom: 16,
+    },
+    statusLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.textPrimary,
+      marginBottom: 12,
+    },
+    statusOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    statusOption: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginRight: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+    },
+    statusOptionActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    statusOptionInactive: {
+      backgroundColor: theme.surface,
+      borderColor: theme.border,
+    },
+    statusOptionText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    statusOptionTextActive: {
+      color: theme.textInverse,
+    },
+    statusOptionTextInactive: {
+      color: theme.textSecondary,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    infoLabel: {
+      fontSize: 14,
+      color: theme.textSecondary,
+    },
+    infoValue: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: theme.textPrimary,
+    },
+    skillsCard: {
+      marginBottom: 16,
+    },
+    skillChipText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -132,7 +378,7 @@ const VolunteerProfile: React.FC = () => {
             <Ionicons 
               name={editing ? "close" : "pencil"} 
               size={24} 
-              color={COLORS.primary} 
+              color={theme.primary} 
             />
           </TouchableOpacity>
         </View>
@@ -143,7 +389,7 @@ const VolunteerProfile: React.FC = () => {
         <Card style={styles.profileCard}>
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
-              <Ionicons name="person" size={32} color={COLORS.primary} />
+              <Ionicons name="person" size={32} color={theme.primary} />
             </View>
             <Text style={styles.userName}>{user?.name}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
@@ -151,13 +397,13 @@ const VolunteerProfile: React.FC = () => {
               <View
                 style={[
                   styles.statusBadge,
-                  { backgroundColor: user?.is_active ? COLORS.success + '20' : COLORS.error + '20' }
+                  { backgroundColor: user?.is_active ? theme.successLight : theme.errorLight }
                 ]}
               >
                 <Text
                   style={[
                     styles.statusText,
-                    { color: user?.is_active ? COLORS.success : COLORS.error }
+                    { color: user?.is_active ? theme.success : theme.error }
                   ]}
                 >
                   {user?.is_active ? 'Online' : 'Offline'}
@@ -272,7 +518,7 @@ const VolunteerProfile: React.FC = () => {
           
           <View style={styles.statRow}>
             <View style={styles.statLabel}>
-              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+              <Ionicons name="checkmark-circle" size={20} color={theme.success} />
               <Text style={styles.statLabelText}>Tasks Completed</Text>
             </View>
             <Text style={styles.statValue}>{stats.completedTasks}</Text>
@@ -280,7 +526,7 @@ const VolunteerProfile: React.FC = () => {
 
           <View style={styles.statRow}>
             <View style={styles.statLabel}>
-              <Ionicons name="time" size={20} color={COLORS.warning} />
+              <Ionicons name="time" size={20} color={theme.warning} />
               <Text style={styles.statLabelText}>Hours Worked</Text>
             </View>
             <Text style={styles.statValue}>{stats.hoursWorked.toFixed(2)}h</Text>
@@ -288,55 +534,10 @@ const VolunteerProfile: React.FC = () => {
 
           <View style={styles.statRow}>
             <View style={styles.statLabel}>
-              <Ionicons name="star" size={20} color={COLORS.warning} />
+              <Ionicons name="star" size={20} color={theme.warning} />
               <Text style={styles.statLabelText}>Rating</Text>
             </View>
             <Text style={styles.statValue}>-</Text>
-          </View>
-        </Card>
-
-        {/* Theme Settings */}
-        <Card style={styles.statsCard}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          
-          <View style={styles.statRow}>
-            <View style={styles.statLabel}>
-              <Ionicons 
-                name={themeMode === 'dark' ? "moon" : themeMode === 'light' ? "sunny" : "contrast"} 
-                size={20} 
-                color={COLORS.primary} 
-              />
-              <Text style={styles.statLabelText}>Theme</Text>
-            </View>
-            <TouchableOpacity
-              onPress={toggleTheme}
-              style={[
-                styles.themeToggle,
-                { backgroundColor: COLORS.primary + '20', borderColor: COLORS.primary }
-              ]}
-            >
-              <Text style={[styles.themeToggleText, { color: COLORS.primary }]}>
-                {themeMode === 'dark' ? 'Dark' : themeMode === 'light' ? 'Light' : 'Auto'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.statRow}>
-            <View style={styles.statLabel}>
-              <Ionicons name="settings" size={20} color={COLORS.primary} />
-              <Text style={styles.statLabelText}>Theme Demo</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => safeNavigate(navigation, 'ThemeDemo')}
-              style={[
-                styles.themeToggle,
-                { backgroundColor: COLORS.secondary + '20', borderColor: COLORS.secondary }
-              ]}
-            >
-              <Text style={[styles.themeToggleText, { color: COLORS.secondary }]}>
-                View Demo
-              </Text>
-            </TouchableOpacity>
           </View>
         </Card>
 
@@ -389,15 +590,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     marginLeft: 12,
-    backgroundColor: '#f9fafb',
   },
   header: {
-    backgroundColor: '#ffffff',
     paddingHorizontal: 24,
     paddingTop: 4,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   headerTop: {
     flexDirection: 'row',
@@ -407,7 +605,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
   },
   scrollView: {
     flex: 1,
@@ -422,7 +619,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   avatarContainer: {
-    backgroundColor: '#dbeafe',
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -433,10 +629,8 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
   },
   userEmail: {
-    color: '#6b7280',
   },
   statusContainer: {
     flexDirection: 'row',
@@ -456,7 +650,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   statusLabel: {
-    color: '#374151',
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 8,
@@ -472,22 +665,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusOptionActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
   },
   statusOptionInactive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d1d5db',
   },
   statusOptionText: {
     fontSize: 14,
     textTransform: 'capitalize',
   },
   statusOptionTextActive: {
-    color: '#ffffff',
   },
   statusOptionTextInactive: {
-    color: '#374151',
   },
   infoRow: {
     flexDirection: 'row',
@@ -495,10 +682,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoLabel: {
-    color: '#6b7280',
   },
   infoValue: {
-    color: '#111827',
     textTransform: 'capitalize',
   },
   skillsCard: {
@@ -507,7 +692,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 16,
   },
   skillsContainer: {
@@ -523,21 +707,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   skillChipActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
   },
   skillChipInactive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#d1d5db',
   },
   skillChipText: {
     fontSize: 14,
   },
   skillChipTextActive: {
-    color: '#ffffff',
   },
   skillChipTextInactive: {
-    color: '#374151',
   },
   skillBadge: {
     backgroundColor: '#dbeafe',
@@ -591,16 +769,6 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginBottom: 12,
-  },
-  themeToggle: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  themeToggleText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
 });
 
