@@ -111,7 +111,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
     try {
       setLoading(true);
       
-      // Load all requests for overview tab with user profile information
+      // Load all requests for overview tab with user profile information and current location
       const { data: allRequestsData } = await supabase
         .from('assistance_requests')
         .select(`
@@ -126,9 +126,27 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
         `)
         .order('created_at', { ascending: false });
       
-      if (allRequestsData) setAllRequests(allRequestsData);
+      // Get user locations separately and merge
+      if (allRequestsData) {
+        const requestsWithLocation = await Promise.all(
+          allRequestsData.map(async (request) => {
+            const { data: locationData } = await supabase
+              .from('user_locations')
+              .select('latitude, longitude, last_updated, is_active')
+              .eq('user_id', request.user_id)
+              .eq('is_active', true)
+              .single();
+            
+            return {
+              ...request,
+              user_location: locationData
+            };
+          })
+        );
+        setAllRequests(requestsWithLocation);
+      }
       
-      // Load pending requests for assignment tab with user profile information
+      // Load pending requests for assignment tab with user profile information and current location
       const { data: requestsData } = await supabase
         .from('assistance_requests')
         .select(`
@@ -143,8 +161,26 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
-      
-      if (requestsData) setRequests(requestsData);
+
+      // Get user locations separately and merge for pending requests
+      if (requestsData) {
+        const requestsWithLocation = await Promise.all(
+          requestsData.map(async (request) => {
+            const { data: locationData } = await supabase
+              .from('user_locations')
+              .select('latitude, longitude, last_updated, is_active')
+              .eq('user_id', request.user_id)
+              .eq('is_active', true)
+              .single();
+            
+            return {
+              ...request,
+              user_location: locationData
+            };
+          })
+        );
+        setRequests(requestsWithLocation);
+      }
 
       // Load available volunteers - simplified to avoid RLS recursion
       const { data: volunteersData } = await supabase
@@ -1083,28 +1119,42 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                   {/* Location Section */}
                   <View style={styles.requestDetailsSection}>
                     <Text style={styles.requestDetailsSectionTitle}>Location</Text>
-                    <MiniMap
-                      latitude={selectedRequestDetails.userLocation?.latitude}
-                      longitude={selectedRequestDetails.userLocation?.longitude}
-                      userName={selectedRequestDetails.user?.name}
-                      style={styles.miniMapContainer}
-                    />
+                    {selectedRequestDetails.user_location?.latitude && selectedRequestDetails.user_location?.longitude ? (
+                      <MiniMap
+                        latitude={selectedRequestDetails.user_location.latitude}
+                        longitude={selectedRequestDetails.user_location.longitude}
+                        userName={selectedRequestDetails.user?.name}
+                        style={styles.miniMapContainer}
+                      />
+                    ) : selectedRequestDetails.location_latitude && selectedRequestDetails.location_longitude ? (
+                      <View>
+                        <Text style={styles.fallbackLocationTitle}>Request Location (Live location not available)</Text>
+                        <MiniMap
+                          latitude={selectedRequestDetails.location_latitude}
+                          longitude={selectedRequestDetails.location_longitude}
+                          userName={selectedRequestDetails.user?.name}
+                          style={styles.miniMapContainer}
+                        />
+                      </View>
+                    ) : (
+                      <View style={styles.noLocationContainer}>
+                        <Ionicons name="location-outline" size={32} color="#9ca3af" />
+                        <Text style={styles.noLocationText}>Location not available for this user</Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Photos Section */}
                   <View style={styles.requestDetailsSection}>
                     <Text style={styles.requestDetailsSectionTitle}>Photos</Text>
-                    {selectedRequestDetails.photos && selectedRequestDetails.photos.length > 0 ? (
-                      <ScrollView horizontal style={styles.photosContainer}>
-                        {selectedRequestDetails.photos.map((photo: any, index: number) => (
-                          <Image
-                            key={index}
-                            source={{ uri: photo.photo_url }}
-                            style={styles.requestPhoto}
-                            resizeMode="cover"
-                          />
-                        ))}
-                      </ScrollView>
+                    {selectedRequestDetails.photo_url ? (
+                      <View style={styles.photosContainer}>
+                        <Image
+                          source={{ uri: selectedRequestDetails.photo_url }}
+                          style={styles.requestPhoto}
+                          resizeMode="cover"
+                        />
+                      </View>
                     ) : (
                       <View style={styles.noPhotosContainer}>
                         <Ionicons name="camera-outline" size={32} color="#9ca3af" />
@@ -1928,12 +1978,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   photosContainer: {
-    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   requestPhoto: {
-    width: 120,
-    height: 120,
-    borderRadius: 8,
+    width: 200,
+    height: 200,
+    borderRadius: 12,
     marginRight: 12,
     backgroundColor: '#f3f4f6',
   },
@@ -1950,6 +2001,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 8,
+    fontStyle: 'italic',
+  },
+  noLocationContainer: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  noLocationText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  fallbackLocationTitle: {
+    fontSize: 12,
+    color: '#f59e0b',
+    marginBottom: 8,
+    fontWeight: '500',
+    textAlign: 'center',
     fontStyle: 'italic',
   },
 });
