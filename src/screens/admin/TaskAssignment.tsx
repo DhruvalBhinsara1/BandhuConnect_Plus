@@ -111,18 +111,36 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
     try {
       setLoading(true);
       
-      // Load all requests for overview tab
+      // Load all requests for overview tab with user profile information
       const { data: allRequestsData } = await supabase
         .from('assistance_requests')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!assistance_requests_user_id_fkey (
+            id,
+            name,
+            email,
+            phone,
+            role
+          )
+        `)
         .order('created_at', { ascending: false });
       
       if (allRequestsData) setAllRequests(allRequestsData);
       
-      // Load pending requests for assignment tab
+      // Load pending requests for assignment tab with user profile information
       const { data: requestsData } = await supabase
         .from('assistance_requests')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!assistance_requests_user_id_fkey (
+            id,
+            name,
+            email,
+            phone,
+            role
+          )
+        `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       
@@ -1531,13 +1549,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: isSmallScreen ? 12 : 16,
     padding: isSmallScreen ? 16 : 20,
-    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginHorizontal: isSmallScreen ? 8 : 12,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
+    width: isSmallScreen ? SCREEN_WIDTH - 16 : SCREEN_WIDTH - 24,
+    alignSelf: 'center',
   },
   titleContainer: {
     marginBottom: isSmallScreen ? 16 : 20,
@@ -1610,13 +1630,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: isSmallScreen ? 6 : 8,
+    gap: isSmallScreen ? 8 : 12,
     paddingHorizontal: 0,
+    marginTop: 4,
   },
   modernStatusCard: {
-    flex: 1,
-    minWidth: isSmallScreen ? SCREEN_WIDTH * 0.2 : SCREEN_WIDTH * 0.21,
-    maxWidth: isSmallScreen ? SCREEN_WIDTH * 0.23 : SCREEN_WIDTH * 0.24,
+    width: isSmallScreen ? '48%' : '48%',
     backgroundColor: '#ffffff',
     borderRadius: isSmallScreen ? 8 : 10,
     padding: 0,
@@ -1624,13 +1643,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     position: 'relative',
-    minHeight: isSmallScreen ? 65 : 75,
+    minHeight: isSmallScreen ? 70 : 80,
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
+    marginBottom: isSmallScreen ? 6 : 8,
   },
   statusCardContent: {
     alignItems: 'center',
