@@ -670,6 +670,15 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                   <View style={[styles.priorityChip, { backgroundColor: getPriorityColor(request.priority) }]}>
                     <Text style={styles.priorityChipText}>{request.priority.toUpperCase()}</Text>
                   </View>
+                  {request.status !== 'pending' && (
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) }]}>
+                      <Text style={[styles.statusText, { color: 'white' }]}>
+                        {request.status === 'assigned' ? 'ASSIGNED' :
+                         request.status === 'in_progress' ? 'IN PROGRESS' :
+                         request.status === 'completed' ? 'COMPLETED' : request.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.requestDate}>{formatDate(request.created_at)}</Text>
               </View>
@@ -725,13 +734,24 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                   <Text style={styles.viewDetailsText}>View Details</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity 
-                  style={styles.assignButton}
-                  onPress={() => handleAssignRequest(request)}
-                >
-                  <Ionicons name="person-add" size={16} color="white" />
-                  <Text style={styles.assignButtonText}>Assign</Text>
-                </TouchableOpacity>
+                {request.status === 'pending' ? (
+                  <TouchableOpacity 
+                    style={styles.assignButton}
+                    onPress={() => handleAssignRequest(request)}
+                  >
+                    <Ionicons name="person-add" size={16} color="white" />
+                    <Text style={styles.assignButtonText}>Assign</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.assignedButton}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                    <Text style={styles.assignedButtonText}>
+                      {request.status === 'assigned' ? 'Assigned' :
+                       request.status === 'in_progress' ? 'In Progress' :
+                       request.status === 'completed' ? 'Completed' : 'Not Available'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           ))
@@ -1876,6 +1896,22 @@ const styles = StyleSheet.create({
     color: 'white',
     marginLeft: 6,
     fontWeight: '600',
+  },
+  assignedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  assignedButtonText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 6,
+    fontWeight: '500',
   },
   // Request Details Modal Styles
   requestDetailsModalContent: {

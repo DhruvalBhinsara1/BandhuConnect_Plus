@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   statLabel: {
-    color: PROFESSIONAL_DESIGN.COLORS.primaryLight,
+    color: 'white',
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
   },
   content: {

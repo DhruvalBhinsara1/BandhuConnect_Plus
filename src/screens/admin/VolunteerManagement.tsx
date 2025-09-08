@@ -85,7 +85,15 @@ const VolunteerManagement: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('assistance_requests')
-        .select('*')
+        .select(`
+          *,
+          user:profiles!assistance_requests_user_id_fkey(
+            id,
+            name,
+            email,
+            phone
+          )
+        `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
       
@@ -94,6 +102,7 @@ const VolunteerManagement: React.FC = () => {
         return;
       }
       
+      console.log('📥 Loaded requests with user data:', data);
       setRequests(data || []);
     } catch (error) {
       console.error('Error loading requests:', error);
@@ -435,165 +444,152 @@ const VolunteerManagement: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Professional Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Volunteer Management</Text>
-          <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-            <Ionicons name="refresh-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
-          </TouchableOpacity>
-        </View>
+      <FlatList
+        data={activeTab === 'volunteers' ? filteredVolunteers : requests}
+        renderItem={activeTab === 'volunteers' ? renderVolunteerItem : renderRequestItem}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        ListHeaderComponent={
+          <View>
+            {/* Compact Header */}
+            <View style={styles.header}>
+              <View style={styles.headerRow}>
+                <Text style={styles.headerTitle}>Volunteer Management</Text>
+                <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+                  <Ionicons name="refresh-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
-        {/* Professional Statistics Section */}
-        <View style={styles.statsSection}>
-          <Text style={styles.statsTitle}>Overview</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{volunteers.length}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={[styles.statCard, styles.availableStatCard]}>
-              <Text style={[styles.statValue, styles.availableStatValue]}>
-                {volunteers.filter(v => v.volunteer_status === 'available').length}
-              </Text>
-              <Text style={styles.statLabel}>Available</Text>
-            </View>
-            <View style={[styles.statCard, styles.busyStatCard]}>
-              <Text style={[styles.statValue, styles.busyStatValue]}>
-                {volunteers.filter(v => v.volunteer_status === 'busy' || v.volunteer_status === 'on_duty').length}
-              </Text>
-              <Text style={styles.statLabel}>Busy</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Professional Tab System */}
-        <View style={styles.tabSystem}>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'volunteers' && styles.activeTab]}
-              onPress={() => setActiveTab('volunteers')}
-            >
-              <Ionicons 
-                name="people-outline" 
-                size={16} 
-                color={activeTab === 'volunteers' ? PROFESSIONAL_DESIGN.COLORS.accent : PROFESSIONAL_DESIGN.COLORS.textSecondary} 
-              />
-              <Text style={[styles.tabText, activeTab === 'volunteers' && styles.activeTabText]}>
-                Volunteers
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
-              onPress={() => setActiveTab('requests')}
-            >
-              <Ionicons 
-                name="list-outline" 
-                size={16} 
-                color={activeTab === 'requests' ? PROFESSIONAL_DESIGN.COLORS.accent : PROFESSIONAL_DESIGN.COLORS.textSecondary} 
-              />
-              <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
-                Pending Requests
-              </Text>
-              {requests.length > 0 && (
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{requests.length}</Text>
+              {/* Compact Statistics Section */}
+              <View style={styles.statsSection}>
+                <Text style={styles.statsTitle}>Overview</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statCard}>
+                    <Text style={styles.statValue}>{volunteers.length}</Text>
+                    <Text style={styles.statLabel}>Total</Text>
+                  </View>
+                  <View style={[styles.statCard, styles.availableStatCard]}>
+                    <Text style={[styles.statValue, styles.availableStatValue]}>
+                      {volunteers.filter(v => v.volunteer_status === 'available').length}
+                    </Text>
+                    <Text style={styles.statLabel}>Available</Text>
+                  </View>
+                  <View style={[styles.statCard, styles.busyStatCard]}>
+                    <Text style={[styles.statValue, styles.busyStatValue]}>
+                      {volunteers.filter(v => v.volunteer_status === 'busy' || v.volunteer_status === 'on_duty').length}
+                    </Text>
+                    <Text style={styles.statLabel}>Busy</Text>
+                  </View>
                 </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+              </View>
 
-      {/* Professional Action Panel - Only show for requests tab */}
-      {activeTab === 'requests' && requests.length > 0 && (
-        <View style={styles.actionPanel}>
-          <View style={styles.actionInfo}>
-            <Text style={styles.actionTitle}>
-              {requests.length} Pending Request{requests.length !== 1 ? 's' : ''}
-            </Text>
-            <Text style={styles.actionSubtitle}>
-              {volunteers.filter(v => v.volunteer_status === 'available').length} volunteers available for assignment
-            </Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={[
-              styles.actionButton,
-              autoAssigning && styles.actionButtonDisabled
-            ]}
-            onPress={handleBatchAutoAssign}
-            disabled={autoAssigning}
-          >
-            {autoAssigning ? (
-              <>
-                <Ionicons name="hourglass-outline" size={16} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
-                <Text style={styles.actionButtonText}>Processing...</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="flash-outline" size={16} color="white" />
-                <Text style={styles.actionButtonText}>Auto-Assign All</Text>
-              </>
+              {/* Compact Tab System */}
+              <View style={styles.tabSystem}>
+                <View style={styles.tabContainer}>
+                  <TouchableOpacity 
+                    style={[styles.tab, activeTab === 'volunteers' && styles.activeTab]}
+                    onPress={() => setActiveTab('volunteers')}
+                  >
+                    <Ionicons 
+                      name="people-outline" 
+                      size={16} 
+                      color={activeTab === 'volunteers' ? PROFESSIONAL_DESIGN.COLORS.accent : PROFESSIONAL_DESIGN.COLORS.textSecondary} 
+                    />
+                    <Text style={[styles.tabText, activeTab === 'volunteers' && styles.activeTabText]}>
+                      Volunteers
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.tab, activeTab === 'requests' && styles.activeTab]}
+                    onPress={() => setActiveTab('requests')}
+                  >
+                    <Ionicons 
+                      name="list-outline" 
+                      size={16} 
+                      color={activeTab === 'requests' ? PROFESSIONAL_DESIGN.COLORS.accent : PROFESSIONAL_DESIGN.COLORS.textSecondary} 
+                    />
+                    <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>
+                      Pending Requests
+                    </Text>
+                    {requests.length > 0 && (
+                      <View style={styles.tabBadge}>
+                        <Text style={styles.tabBadgeText}>{requests.length}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Compact Action Panel - Only show for requests tab */}
+            {activeTab === 'requests' && requests.length > 0 && (
+              <View style={styles.actionPanel}>
+                <View style={styles.actionInfo}>
+                  <Text style={styles.actionTitle}>
+                    {requests.length} Pending Request{requests.length !== 1 ? 's' : ''}
+                  </Text>
+                  <Text style={styles.actionSubtitle}>
+                    {volunteers.filter(v => v.volunteer_status === 'available').length} volunteers available for assignment
+                  </Text>
+                </View>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.actionButton,
+                    autoAssigning && styles.actionButtonDisabled
+                  ]}
+                  onPress={handleBatchAutoAssign}
+                  disabled={autoAssigning}
+                >
+                  {autoAssigning ? (
+                    <>
+                      <Ionicons name="hourglass-outline" size={16} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
+                      <Text style={styles.actionButtonText}>Processing...</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="flash-outline" size={16} color="white" />
+                      <Text style={styles.actionButtonText}>Auto-Assign All</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Professional Content Area */}
-      <View style={styles.contentArea}>
-        {activeTab === 'volunteers' ? (
-          <FlatList
-            data={filteredVolunteers}
-            renderItem={renderVolunteerItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="people-outline" size={64} color={PROFESSIONAL_DESIGN.COLORS.textTertiary} />
-                </View>
-                <Text style={styles.emptyTitle}>No volunteers found</Text>
-                <Text style={styles.emptySubtitle}>
-                  {filter === 'active' 
+          </View>
+        }
+        contentContainerStyle={styles.container}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIcon}>
+              <Ionicons 
+                name={activeTab === 'volunteers' ? "people-outline" : "clipboard-outline"} 
+                size={64} 
+                color={PROFESSIONAL_DESIGN.COLORS.textTertiary} 
+              />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'volunteers' ? 'No volunteers found' : 'No pending requests'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {activeTab === 'volunteers' 
+                ? (filter === 'active' 
                     ? 'No active volunteers at the moment'
                     : filter === 'available'
                     ? 'No available volunteers'
                     : filter === 'busy'
                     ? 'No busy volunteers'
                     : 'No volunteers registered yet'
-                  }
-                </Text>
-              </View>
-            }
-          />
-        ) : (
-          <FlatList
-            data={requests}
-            renderItem={renderRequestItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="clipboard-outline" size={64} color={PROFESSIONAL_DESIGN.COLORS.textTertiary} />
-                </View>
-                <Text style={styles.emptyTitle}>No pending requests</Text>
-                <Text style={styles.emptySubtitle}>
-                  All requests have been assigned or completed
-                </Text>
-              </View>
-            }
-          />
-        )}
-      </View>
+                  )
+                : 'All requests have been assigned or completed'
+              }
+            </Text>
+          </View>
+        }
+      />
 
       {/* Professional Edit Modal */}
       <Modal
@@ -674,24 +670,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
   },
   
   // Professional Header Design
   header: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.xl,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.xxl,
-    paddingTop: PROFESSIONAL_DESIGN.SPACING.xxxl,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
+    paddingTop: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginHorizontal: -PROFESSIONAL_DESIGN.SPACING.md,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: PROFESSIONAL_DESIGN.COLORS.border,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
   },
   
   headerTitle: {
@@ -710,46 +708,47 @@ const styles = StyleSheet.create({
   
   // Enhanced Statistics Section
   statsSection: {
-    marginTop: PROFESSIONAL_DESIGN.SPACING.lg,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
   },
   
   statsTitle: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h6,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    fontSize: 12,
   },
   
   statsRow: {
     flexDirection: 'row',
-    gap: PROFESSIONAL_DESIGN.SPACING.md,
+    gap: PROFESSIONAL_DESIGN.SPACING.sm,
   },
   
   statCard: {
     flex: 1,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: PROFESSIONAL_DESIGN.SPACING.lg,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    padding: PROFESSIONAL_DESIGN.SPACING.md,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   
   statValue: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h3,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h4,
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
     fontWeight: '700' as const,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   
   statLabel: {
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    fontSize: 11,
   },
   
   // Specialized stat variants
@@ -773,14 +772,14 @@ const styles = StyleSheet.create({
   
   // Professional Tab System
   tabSystem: {
-    marginTop: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.md,
   },
   
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: 6,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    padding: 4,
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
   },
@@ -790,19 +789,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md + 2,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    gap: PROFESSIONAL_DESIGN.SPACING.xs,
   },
   
   activeTab: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   
   tabText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
     fontWeight: '500' as const,
   },
@@ -815,10 +813,10 @@ const styles = StyleSheet.create({
   tabBadge: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.error,
     borderRadius: PROFESSIONAL_DESIGN.RADIUS.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
     marginLeft: 4,
-    minWidth: 20,
+    minWidth: 16,
     alignItems: 'center',
   },
   
@@ -826,13 +824,16 @@ const styles = StyleSheet.create({
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
     color: PROFESSIONAL_DESIGN.COLORS.textInverse,
     fontWeight: '600' as const,
+    fontSize: 10,
   },
   
   // Professional Action Panel
   actionPanel: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.xl,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.lg,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
+    marginHorizontal: -PROFESSIONAL_DESIGN.SPACING.md,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
     borderBottomWidth: 1,
     borderBottomColor: PROFESSIONAL_DESIGN.COLORS.border,
     flexDirection: 'row',
@@ -845,60 +846,52 @@ const styles = StyleSheet.create({
   },
   
   actionTitle: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h5,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
+    fontWeight: '600' as const,
   },
   
   actionSubtitle: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
   },
   
   actionButton: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.accent,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
     borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
+    gap: PROFESSIONAL_DESIGN.SPACING.xs,
   },
   
   actionButtonText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textInverse,
+    fontWeight: '600' as const,
   },
   
   actionButtonDisabled: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.textTertiary,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
-  },
-  
-  // Professional Content Area
-  contentArea: {
-    flex: 1,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
-    paddingTop: PROFESSIONAL_DESIGN.SPACING.lg,
   },
   
   // Professional Volunteer Cards
   volunteerCard: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: PROFESSIONAL_DESIGN.SPACING.xl,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    padding: PROFESSIONAL_DESIGN.SPACING.md,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   
   volunteerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
   },
   
   volunteerInfo: {
@@ -906,27 +899,28 @@ const styles = StyleSheet.create({
   },
   
   volunteerName: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h5,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginBottom: 4,
+    fontWeight: '600' as const,
   },
   
   volunteerContact: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginTop: 6,
+    gap: 6,
   },
   
   statusBadge: {
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -936,30 +930,32 @@ const styles = StyleSheet.create({
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
     fontWeight: '600' as const,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+    fontSize: 10,
   },
   
   skillsSection: {
-    marginTop: PROFESSIONAL_DESIGN.SPACING.lg,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
   },
   
   skillsLabel: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h6,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginBottom: 4,
+    fontWeight: '500' as const,
   },
   
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    gap: 4,
   },
   
   skillChip: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
@@ -969,26 +965,27 @@ const styles = StyleSheet.create({
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
     fontWeight: '500' as const,
+    fontSize: 10,
   },
   
   tasksInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
-    marginTop: PROFESSIONAL_DESIGN.SPACING.md,
+    gap: 4,
+    marginTop: 6,
   },
   
   tasksText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
   },
   
   // Professional Action Buttons
   buttonRow: {
     flexDirection: 'row',
-    gap: PROFESSIONAL_DESIGN.SPACING.md,
-    marginTop: PROFESSIONAL_DESIGN.SPACING.lg,
-    paddingTop: PROFESSIONAL_DESIGN.SPACING.lg,
+    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingTop: PROFESSIONAL_DESIGN.SPACING.sm,
     borderTopWidth: 1,
     borderTopColor: PROFESSIONAL_DESIGN.COLORS.border,
   },
@@ -996,37 +993,39 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.accent,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    gap: 4,
   },
   
   secondaryButton: {
     flex: 1,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.borderDark,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+    gap: 4,
   },
   
   primaryButtonText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textInverse,
+    fontWeight: '600' as const,
   },
   
   secondaryButtonText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
+    fontWeight: '600' as const,
   },
   
   disabledButton: {
