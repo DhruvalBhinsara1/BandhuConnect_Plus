@@ -54,6 +54,7 @@ CREATE TABLE assistance_requests (
     location_latitude DECIMAL(10, 8),
     location_longitude DECIMAL(11, 8),
     location_description TEXT,
+    photo_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

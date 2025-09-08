@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, TextInput, ActivityIndicator, StyleSheet, SafeAreaView, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, TextInput, ActivityIndicator, StyleSheet, SafeAreaView, RefreshControl, Image, Dimensions } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import { AssistanceRequest, User, Assignment } from '../../types';
 import { autoAssignmentService } from '../../services/autoAssignmentService';
@@ -10,7 +11,13 @@ import { requestService } from '../../services/requestService';
 import { bulkCompletionService } from '../../services/bulkCompletionService';
 import { realTimeStatusService } from '../../services/realTimeStatusService';
 import { Logger } from '../../utils/logger';
+import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
 import AutoAssignModal from './AutoAssignModal';
+import MiniMap from '../../components/MiniMap';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isSmallScreen = SCREEN_WIDTH < 350;
+const isMediumScreen = SCREEN_WIDTH < 400;
 
 const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
   const navigation = useNavigation<any>();
@@ -24,6 +31,8 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
   const [showVolunteerModal, setShowVolunteerModal] = useState(false);
   const [showCustomTaskModal, setShowCustomTaskModal] = useState(false);
   const [showAutoAssignModal, setShowAutoAssignModal] = useState(false);
+  const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
+  const [selectedRequestDetails, setSelectedRequestDetails] = useState<any>(null);
   const [customTask, setCustomTask] = useState({
     type: 'general',
     title: '',
@@ -34,6 +43,28 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
     scheduledTime: null as Date | null,
     scheduledTimeText: '',
   });
+
+  // Helper function to get the appropriate icon for each request type
+  const getRequestTypeIcon = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'medical':
+        return 'medical-outline';
+      case 'emergency':
+        return 'warning-outline';
+      case 'guidance':
+        return 'help-circle-outline';
+      case 'transport':
+        return 'car-outline';
+      case 'accommodation':
+        return 'home-outline';
+      case 'food':
+        return 'restaurant-outline';
+      case 'general':
+        return 'information-circle-outline';
+      default:
+        return 'help-circle-outline';
+    }
+  };
 
   // Handle navigation params for volunteer-specific auto-assignment
   const routeParams = route?.params;
@@ -472,6 +503,42 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
     return colors[status as keyof typeof colors] || '#6b7280';
   };
 
+  const getTypeBadgeColor = (type: string) => {
+    const colors = {
+      medical: '#ef4444',
+      emergency: '#dc2626',
+      guidance: '#3b82f6',
+      transport: '#059669',
+      accommodation: '#7c3aed',
+      food: '#ea580c',
+      general: '#6b7280',
+    };
+    return colors[type?.toLowerCase() as keyof typeof colors] || '#6b7280';
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const colors = {
+      high: '#ef4444',
+      medium: '#f59e0b',
+      low: '#10b981',
+    };
+    return colors[priority?.toLowerCase() as keyof typeof colors] || '#6b7280';
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)}h ago`;
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)}d ago`;
+    }
+  };
+
   // New unified overview tab
   const renderAllRequestsTab = () => {
     const pendingRequests = allRequests.filter(r => r.status === 'pending');
@@ -481,106 +548,137 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
 
     return (
       <View style={styles.tabContent}>
-        <View style={styles.headerSection}>
-          <Text style={styles.sectionTitle}>Request Overview</Text>
-          <Text style={styles.sectionSubtitle}>Manage all assistance requests and tasks in one place</Text>
+        <View style={styles.modernHeaderSection}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.modernSectionTitle}>Request Overview</Text>
+            <Text style={styles.modernSectionSubtitle}>Manage all assistance requests and tasks in one place</Text>
+          </View>
           
-          <View style={styles.batchButtonContainer}>
+          <View style={styles.modernButtonContainer}>
             <TouchableOpacity 
-              style={styles.batchAutoButton}
+              style={styles.modernAutoButton}
               onPress={batchAutoAssign}
               disabled={loading}
             >
-              <Text style={styles.batchAutoButtonText}>🤖 Auto-Assign All Pending</Text>
+              <Ionicons name="flash" size={16} color="white" />
+              <Text style={styles.modernAutoButtonText}>Auto-Assign All</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.markAllDoneButton}
+              style={styles.modernCompleteButton}
               onPress={markAllAsDone}
               disabled={loading}
             >
-              <Text style={styles.markAllDoneButtonText}>✅ Mark All as Done</Text>
+              <Ionicons name="checkmark-circle" size={16} color="white" />
+              <Text style={styles.modernCompleteButtonText}>Mark All Done</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Status Summary Cards */}
-          <View style={styles.statusSummary}>
-            <View style={[styles.statusCard, { borderLeftColor: '#f59e0b' }]}>
-              <Text style={styles.statusNumber}>{pendingRequests.length}</Text>
-              <Text style={styles.statusLabel}>Pending</Text>
+          {/* Enhanced Status Summary Cards */}
+          <View style={styles.modernStatusGrid}>
+            <View style={[styles.modernStatusCard, styles.statusCardContent]}>
+              <Text style={styles.statusCardNumber}>{pendingRequests.length}</Text>
+              <Text style={styles.statusCardLabel}>PENDING</Text>
+              <View style={[styles.statusCardIndicator, { backgroundColor: '#f59e0b' }]} />
             </View>
-            <View style={[styles.statusCard, { borderLeftColor: '#3b82f6' }]}>
-              <Text style={styles.statusNumber}>{assignedRequests.length}</Text>
-              <Text style={styles.statusLabel}>Assigned</Text>
+            <View style={[styles.modernStatusCard, styles.statusCardContent]}>
+              <Text style={styles.statusCardNumber}>{assignedRequests.length}</Text>
+              <Text style={styles.statusCardLabel}>ASSIGNED</Text>
+              <View style={[styles.statusCardIndicator, { backgroundColor: '#3b82f6' }]} />
             </View>
-            <View style={[styles.statusCard, { borderLeftColor: '#8b5cf6' }]}>
-              <Text style={styles.statusNumber}>{inProgressRequests.length}</Text>
-              <Text style={styles.statusLabel}>In Progress</Text>
+            <View style={[styles.modernStatusCard, styles.statusCardContent]}>
+              <Text style={styles.statusCardNumber}>{inProgressRequests.length}</Text>
+              <Text style={styles.statusCardLabel}>IN PROGRESS</Text>
+              <View style={[styles.statusCardIndicator, { backgroundColor: '#8b5cf6' }]} />
             </View>
-            <View style={[styles.statusCard, { borderLeftColor: '#10b981' }]}>
-              <Text style={styles.statusNumber}>{completedRequests.length}</Text>
-              <Text style={styles.statusLabel}>Completed</Text>
+            <View style={[styles.modernStatusCard, styles.statusCardContent]}>
+              <Text style={styles.statusCardNumber}>{completedRequests.length}</Text>
+              <Text style={styles.statusCardLabel}>COMPLETED</Text>
+              <View style={[styles.statusCardIndicator, { backgroundColor: '#10b981' }]} />
             </View>
           </View>
         </View>
         
         {allRequests.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📋</Text>
+            <Ionicons name="document-outline" size={64} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
             <Text style={styles.emptyText}>No requests found</Text>
           </View>
         ) : (
           allRequests.map((request, index) => (
-            <View key={`${request.id}-${index}`} style={styles.requestCard}>
-              <TouchableOpacity
-                style={styles.requestContent}
-                onPress={() => request.status === 'pending' ? handleAssignRequest(request) : null}
-              >
-                <View style={styles.requestHeader}>
-                  <Text style={styles.requestTitle}>{request.title}</Text>
-                  <View style={styles.requestBadges}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) + '20' }]}>
-                      <Text style={[styles.statusText, { color: getStatusColor(request.status) }]}>
-                        {request.status}
-                      </Text>
-                    </View>
-                    <View style={[styles.priorityBadge, { backgroundColor: getStatusColor(request.priority) + '20' }]}>
-                      <Text style={[styles.priorityText, { color: getStatusColor(request.priority) }]}>
-                        {request.priority}
-                      </Text>
-                    </View>
+            <View key={`${request.id}-${index}`} style={styles.modernRequestCard}>
+              <View style={styles.cardHeader}>
+                {/* Type and Priority Badges */}
+                <View style={styles.badgesRow}>
+                  <View style={[styles.typeBadge, { backgroundColor: getTypeBadgeColor(request.type) }]}>
+                    <Text style={styles.typeBadgeText}>{request.type.toUpperCase()}</Text>
+                  </View>
+                  <View style={[styles.priorityChip, { backgroundColor: getPriorityColor(request.priority) }]}>
+                    <Text style={styles.priorityChipText}>{request.priority.toUpperCase()}</Text>
                   </View>
                 </View>
-                <Text style={styles.requestDescription}>{request.description}</Text>
-                <View style={styles.requestMeta}>
-                  <View style={styles.requestType}>
-                    <Text style={styles.metaIcon}>🏥</Text>
-                    <Text style={styles.metaText}>{request.type}</Text>
+                <Text style={styles.requestDate}>{formatDate(request.created_at)}</Text>
+              </View>
+
+              {/* Main Content */}
+              <View style={styles.cardContent}>
+                <View style={styles.contentLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: getTypeBadgeColor(request.type) }]}>
+                    <Ionicons 
+                      name={getRequestTypeIcon(request.type)} 
+                      size={24} 
+                      color="white"
+                    />
                   </View>
-                  <Text style={styles.metaText}>
-                    {new Date(request.created_at).toLocaleDateString()}
+                </View>
+                
+                <View style={styles.contentRight}>
+                  <Text style={styles.modernRequestTitle}>{request.title}</Text>
+                  <Text style={styles.modernRequestDescription} numberOfLines={3}>
+                    {request.description}
                   </Text>
-                </View>
-              </TouchableOpacity>
-              
-              {request.status === 'pending' && (
-                <View style={styles.assignmentActions}>
-                  <TouchableOpacity 
-                    style={styles.manualAssignButton}
-                    onPress={() => handleAssignRequest(request)}
-                  >
-                    <Text style={styles.manualAssignButtonText}>👤 Assign</Text>
-                  </TouchableOpacity>
                   
-                  <TouchableOpacity 
-                    style={styles.autoAssignButton}
-                    onPress={() => autoAssignRequest(request)}
-                    disabled={loading}
-                  >
-                    <Text style={styles.autoAssignButtonText}>🤖 Auto</Text>
-                  </TouchableOpacity>
+                  {/* User Info */}
+                  <View style={styles.userInfoRow}>
+                    <Ionicons name="person-outline" size={16} color="#6b7280" />
+                    <Text style={styles.userInfoText}>
+                      {request.user?.name || 'Unknown User'}
+                    </Text>
+                  </View>
+                  
+                  {/* Location Info */}
+                  {request.location_description && (
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location-outline" size={16} color="#6b7280" />
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {request.location_description}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              )}
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.cardActions}>
+                <TouchableOpacity 
+                  style={styles.viewDetailsButton}
+                  onPress={() => {
+                    setSelectedRequestDetails(request);
+                    setShowRequestDetailsModal(true);
+                  }}
+                >
+                  <Ionicons name="eye-outline" size={16} color="#6b7280" />
+                  <Text style={styles.viewDetailsText}>View Details</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.assignButton}
+                  onPress={() => handleAssignRequest(request)}
+                >
+                  <Ionicons name="person-add" size={16} color="white" />
+                  <Text style={styles.assignButtonText}>Assign</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}
@@ -597,7 +695,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
       
       {requests.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📋</Text>
+          <Ionicons name="document-outline" size={64} color="#9ca3af" />
           <Text style={styles.emptyText}>No pending requests</Text>
         </View>
       ) : (
@@ -618,7 +716,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
               <Text style={styles.requestDescription}>{request.description}</Text>
               <View style={styles.requestMeta}>
                 <View style={styles.requestType}>
-                  <Text style={styles.metaIcon}>🏥</Text>
+                  <Ionicons name="medical-outline" size={16} color="#6b7280" />
                   <Text style={styles.metaText}>{request.type}</Text>
                 </View>
                 <Text style={styles.metaText}>
@@ -632,7 +730,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                 style={styles.manualAssignButton}
                 onPress={() => handleAssignRequest(request)}
               >
-                <Text style={styles.manualAssignButtonText}>👤 Manual Assign</Text>
+                <Text style={styles.manualAssignButtonText}>Manual Assign</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -640,7 +738,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                 onPress={() => autoAssignRequest(request)}
                 disabled={loading}
               >
-                <Text style={styles.autoAssignButtonText}>🤖 Auto Assign</Text>
+                <Text style={styles.autoAssignButtonText}>Auto Assign</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -659,12 +757,12 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
         style={styles.createButton}
         onPress={() => setShowCustomTaskModal(true)}
       >
-        <Text style={styles.createButtonText}>➕ Create New Task</Text>
+        <Text style={styles.createButtonText}>Create New Task</Text>
       </TouchableOpacity>
 
       {volunteers.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>➕</Text>
+          <Ionicons name="add-circle-outline" size={64} color="#9ca3af" />
           <Text style={styles.emptyText}>Create your first custom task</Text>
         </View>
       ) : (
@@ -693,9 +791,11 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
                 )}
               </View>
             </View>
-            <Text style={styles.selectionIcon}>
-              {selectedVolunteer?.id === volunteer.id ? "✅" : "⚪"}
-            </Text>
+            <Ionicons 
+              name={selectedVolunteer?.id === volunteer.id ? "checkmark-circle" : "ellipse-outline"} 
+              size={24} 
+              color={selectedVolunteer?.id === volunteer.id ? "#10b981" : "#9ca3af"} 
+            />
           </TouchableOpacity>
         ))
       )}
@@ -709,7 +809,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Request Management</Text>
+        <Text style={styles.headerTitle}>Task Assignment</Text>
         <View />
       </View>
 
@@ -719,7 +819,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
           onPress={() => setActiveTab('all')}
         >
           <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-            📋 All Requests
+            All Requests
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -727,7 +827,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
           onPress={() => setActiveTab('assign')}
         >
           <Text style={[styles.tabText, activeTab === 'assign' && styles.activeTabText]}>
-            ⚡ Quick Assign
+            Quick Assign
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -735,7 +835,7 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
           onPress={() => setActiveTab('create')}
         >
           <Text style={[styles.tabText, activeTab === 'create' && styles.activeTabText]}>
-            ➕ Create Request
+            Create Request
           </Text>
         </TouchableOpacity>
       </View>
@@ -901,6 +1001,106 @@ const TaskAssignment: React.FC<{ route?: any }> = ({ route }) => {
         </View>
       </Modal>
 
+      {/* Request Details Modal */}
+      <Modal
+        visible={showRequestDetailsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRequestDetailsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.requestDetailsModalContent}>
+            <View style={styles.requestDetailsHeader}>
+              <Text style={styles.requestDetailsTitle}>Request Details</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowRequestDetailsModal(false)}
+              >
+                <Ionicons name="close" size={20} color="#374151" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.requestDetailsBody}>
+              {selectedRequestDetails && (
+                <>
+                  {/* Main Request Info */}
+                  <View style={styles.requestDetailsSection}>
+                    <Text style={styles.requestDetailsSectionTitle}>Request Information</Text>
+                    <View style={styles.requestDetailsCard}>
+                      <Text style={styles.requestDetailsType}>{selectedRequestDetails.type}</Text>
+                      <Text style={styles.requestDetailsMainTitle}>{selectedRequestDetails.title}</Text>
+                      <Text style={styles.requestDetailsDescription}>{selectedRequestDetails.description}</Text>
+                      <View style={styles.requestDetailsMetaRow}>
+                        <View style={[styles.priorityChip, { backgroundColor: getPriorityColor(selectedRequestDetails.priority) }]}>
+                          <Text style={styles.priorityChipText}>{selectedRequestDetails.priority.toUpperCase()}</Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedRequestDetails.status) + '20' }]}>
+                          <Text style={[styles.statusText, { color: getStatusColor(selectedRequestDetails.status) }]}>
+                            {selectedRequestDetails.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* User Information */}
+                  <View style={styles.requestDetailsSection}>
+                    <Text style={styles.requestDetailsSectionTitle}>User Information</Text>
+                    <View style={styles.requestDetailsCard}>
+                      <View style={styles.modalUserInfoRow}>
+                        <Ionicons name="person-outline" size={20} color="#374151" />
+                        <Text style={styles.modalUserInfoText}>{selectedRequestDetails.user?.name || 'Unknown User'}</Text>
+                      </View>
+                      <View style={styles.modalUserInfoRow}>
+                        <Ionicons name="call-outline" size={20} color="#374151" />
+                        <Text style={styles.modalUserInfoText}>{selectedRequestDetails.user?.phone || 'Phone not available'}</Text>
+                      </View>
+                      <View style={styles.modalUserInfoRow}>
+                        <Ionicons name="shield-outline" size={20} color="#374151" />
+                        <Text style={styles.modalUserInfoText}>{selectedRequestDetails.user?.role || 'Role not specified'}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Location Section */}
+                  <View style={styles.requestDetailsSection}>
+                    <Text style={styles.requestDetailsSectionTitle}>Location</Text>
+                    <MiniMap
+                      latitude={selectedRequestDetails.userLocation?.latitude}
+                      longitude={selectedRequestDetails.userLocation?.longitude}
+                      userName={selectedRequestDetails.user?.name}
+                      style={styles.miniMapContainer}
+                    />
+                  </View>
+
+                  {/* Photos Section */}
+                  <View style={styles.requestDetailsSection}>
+                    <Text style={styles.requestDetailsSectionTitle}>Photos</Text>
+                    {selectedRequestDetails.photos && selectedRequestDetails.photos.length > 0 ? (
+                      <ScrollView horizontal style={styles.photosContainer}>
+                        {selectedRequestDetails.photos.map((photo: any, index: number) => (
+                          <Image
+                            key={index}
+                            source={{ uri: photo.photo_url }}
+                            style={styles.requestPhoto}
+                            resizeMode="cover"
+                          />
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <View style={styles.noPhotosContainer}>
+                        <Ionicons name="camera-outline" size={32} color="#9ca3af" />
+                        <Text style={styles.noPhotosText}>No photos uploaded</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Auto-Assign Modal for Volunteer-Specific Assignment */}
       <AutoAssignModal
         visible={showAutoAssignModal}
@@ -1024,20 +1224,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 12,
+    padding: 8,
     borderLeftWidth: 4,
     alignItems: 'center',
+    minWidth: 70,
+    maxWidth: 85,
   },
   statusNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statusLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#6b7280',
     textAlign: 'center',
+    lineHeight: 12,
   },
   requestBadges: {
     flexDirection: 'row',
@@ -1321,6 +1524,412 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 4,
     marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  // Modern Enhanced Styles
+  modernHeaderSection: {
+    backgroundColor: 'white',
+    borderRadius: isSmallScreen ? 12 : 16,
+    padding: isSmallScreen ? 16 : 20,
+    marginHorizontal: isSmallScreen ? 12 : 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  titleContainer: {
+    marginBottom: isSmallScreen ? 16 : 20,
+  },
+  modernSectionTitle: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+  },
+  modernSectionSubtitle: {
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#6b7280',
+    lineHeight: isSmallScreen ? 18 : 24,
+  },
+  modernButtonContainer: {
+    flexDirection: 'row',
+    gap: isSmallScreen ? 6 : 8,
+    marginBottom: 20,
+    paddingHorizontal: 0,
+    alignItems: 'stretch',
+  },
+  modernAutoButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3b82f6',
+    paddingVertical: isSmallScreen ? 8 : 10,
+    paddingHorizontal: isSmallScreen ? 8 : 12,
+    borderRadius: 10,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: isSmallScreen ? 36 : 40,
+  },
+  modernAutoButtonText: {
+    color: 'white',
+    fontSize: isSmallScreen ? 11 : 12,
+    fontWeight: '600',
+    marginLeft: isSmallScreen ? 3 : 4,
+    flexShrink: 1,
+  },
+  modernCompleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10b981',
+    paddingVertical: isSmallScreen ? 8 : 10,
+    paddingHorizontal: isSmallScreen ? 8 : 12,
+    borderRadius: 10,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+    minHeight: isSmallScreen ? 36 : 40,
+  },
+  modernCompleteButtonText: {
+    color: 'white',
+    fontSize: isSmallScreen ? 11 : 12,
+    fontWeight: '600',
+    marginLeft: isSmallScreen ? 3 : 4,
+    flexShrink: 1,
+  },
+  modernStatusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: isSmallScreen ? 6 : 8,
+    paddingHorizontal: 0,
+  },
+  modernStatusCard: {
+    flex: 1,
+    minWidth: isSmallScreen ? SCREEN_WIDTH * 0.2 : SCREEN_WIDTH * 0.21,
+    maxWidth: isSmallScreen ? SCREEN_WIDTH * 0.23 : SCREEN_WIDTH * 0.24,
+    backgroundColor: '#ffffff',
+    borderRadius: isSmallScreen ? 8 : 10,
+    padding: 0,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    position: 'relative',
+    minHeight: isSmallScreen ? 65 : 75,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  statusCardContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isSmallScreen ? 6 : 8,
+    paddingHorizontal: isSmallScreen ? 4 : 6,
+    flex: 1,
+    gap: isSmallScreen ? 2 : 3,
+  },
+  statusCardNumber: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  statusCardLabel: {
+    fontSize: isSmallScreen ? 7 : 8,
+    color: '#374151',
+    fontWeight: '600',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    lineHeight: isSmallScreen ? 8 : 9,
+  },
+  statusCardIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  // Modern Card Styles
+  modernRequestCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  priorityChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  priorityChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
+    textTransform: 'uppercase',
+  },
+  requestDate: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  cardContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  contentLeft: {
+    marginRight: 16,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contentRight: {
+    flex: 1,
+  },
+  modernRequestTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  modernRequestDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  userInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  userInfoText: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 6,
+    flex: 1,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 12,
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  assignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#3b82f6',
+  },
+  assignButtonText: {
+    fontSize: 14,
+    color: 'white',
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  // Request Details Modal Styles
+  requestDetailsModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 0,
+    margin: 20,
+    marginTop: 60,
+    maxHeight: '85%',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  requestDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  requestDetailsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  requestDetailsBody: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  requestDetailsSection: {
+    marginBottom: 24,
+  },
+  requestDetailsSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  requestDetailsCard: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  requestDetailsType: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  requestDetailsMainTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  requestDetailsDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  requestDetailsMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modalUserInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalUserInfoText: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 12,
+    flex: 1,
+  },
+  miniMapContainer: {
+    marginHorizontal: 0,
+  },
+  photosContainer: {
+    flexDirection: 'row',
+  },
+  requestPhoto: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  noPhotosContainer: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  noPhotosText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
     fontStyle: 'italic',
   },
 });

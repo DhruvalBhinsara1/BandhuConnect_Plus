@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet, Modal, TextInput } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
@@ -10,16 +10,10 @@ import { Logger } from '../../utils/logger';
 import { User, Assignment } from '../../types';
 import EnhancedRequestCard from '../../components/admin/EnhancedRequestCard';
 import { LocationFormatter } from '../../utils/locationFormatter';
-import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
-
-type RouteParams = {
-  initialTab?: 'volunteers' | 'requests';
-  autoAssignMode?: boolean;
-};
+import { PROFESSIONAL_DESIGN, PROFESSIONAL_STYLES } from '../../design/professionalDesignSystem';
 
 const VolunteerManagement: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const { user } = useAuth();
   const { assignments, getAssignments } = useRequest();
   
@@ -28,10 +22,7 @@ const VolunteerManagement: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'active' | 'available' | 'busy'>('all');
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>(
-    route.params?.initialTab || 'volunteers'
-  );
-  const [autoAssignMode, setAutoAssignMode] = useState(route.params?.autoAssignMode || false);
+  const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>('volunteers');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({
@@ -110,44 +101,80 @@ const VolunteerManagement: React.FC = () => {
     // Navigate to TaskAssignment screen with volunteer pre-selected for auto-assignment
     navigation.navigate('TaskAssignment', { 
       selectedVolunteer: volunteer,
-      mode: 'assign_task'
+      mode: 'auto_assign_to_volunteer'
     });
   };
 
-  const handleViewTasks = (volunteer: User) => {
-    // Navigate to TaskAssignment screen with volunteer pre-selected for viewing tasks
-    navigation.navigate('TaskAssignment', { 
-      selectedVolunteer: volunteer,
-      mode: 'view_tasks'
-    });
+  const getFilteredVolunteers = () => {
+    if (filter === 'all') return volunteers;
+    if (filter === 'active') return volunteers.filter(v => v.is_active);
+    if (filter === 'available') return volunteers.filter(v => v.is_active && v.volunteer_status === 'available');
+    if (filter === 'busy') return volunteers.filter(v => v.is_active && (v.volunteer_status === 'on_duty' || v.volunteer_status === 'busy'));
+    return volunteers;
+  };
+
+  const getVolunteerAssignments = (volunteerId: string) => {
+    return assignments.filter(a => a.volunteer_id === volunteerId);
   };
 
   const handleVolunteerOptions = (volunteer: User) => {
     Alert.alert(
-      volunteer.name,
-      'Choose an action',
+      `${volunteer.name} Options`,
+      'Choose an action:',
       [
-        { text: 'Edit Profile', onPress: () => handleEditProfile(volunteer) },
-        { text: 'View Tasks', onPress: () => handleViewTasks(volunteer) },
-        { text: 'Assign Task', onPress: () => handleAssignTask(volunteer) },
-        { text: 'Cancel', style: 'cancel' }
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `${volunteer.is_active ? 'Deactivate' : 'Activate'}`,
+          onPress: async () => {
+            try {
+              const newStatus = !volunteer.is_active;
+              const result = await volunteerService.updateVolunteerStatus(volunteer.id, newStatus);
+              
+              if (result.error) {
+                Alert.alert('Error', 'Failed to update volunteer status. Please try again.');
+              } else {
+                await loadVolunteers();
+                Alert.alert('Success', `Volunteer ${newStatus ? 'activated' : 'deactivated'} successfully`);
+              }
+            } catch (error) {
+              Alert.alert('Error', 'An unexpected error occurred.');
+            }
+          }
+        },
+        {
+          text: 'View Profile',
+          onPress: () => handleViewProfile(volunteer)
+        },
+        {
+          text: 'Contact Info',
+          onPress: () => handleContactInfo(volunteer)
+        }
       ]
     );
   };
 
-  const handleEditProfile = (volunteer: User) => {
+  const handleViewProfile = (volunteer: User) => {
     setSelectedVolunteer(volunteer);
     setEditForm({
       name: volunteer.name || '',
       email: volunteer.email || '',
       phone: volunteer.phone || '',
-      skills: Array.isArray(volunteer.skills) ? volunteer.skills.join(', ') : (volunteer.skills || ''),
+      skills: volunteer.skills?.join(', ') || '',
     });
     setEditModalVisible(true);
   };
 
   const handleSaveProfile = async () => {
-    if (!selectedVolunteer) return;
+    if (!selectedVolunteer) {
+      console.log('❌ Save Profile: No selected volunteer');
+      return;
+    }
+
+    console.log('🔄 Starting profile update for:', {
+      volunteerId: selectedVolunteer.id,
+      volunteerName: selectedVolunteer.name,
+      formData: editForm
+    });
 
     try {
       const skillsArray = editForm.skills
@@ -155,28 +182,44 @@ const VolunteerManagement: React.FC = () => {
         .map(skill => skill.trim())
         .filter(skill => skill.length > 0);
 
-      const updateData = {
+      console.log('📝 Processed skills array:', skillsArray);
+
+      const profileData = {
         name: editForm.name,
         email: editForm.email,
         phone: editForm.phone,
         skills: skillsArray,
       };
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', selectedVolunteer.id);
+      console.log('📤 Sending update via volunteerService:', {
+        volunteerId: selectedVolunteer.id,
+        profileData
+      });
+
+      const { data, error } = await volunteerService.updateProfile(selectedVolunteer.id, profileData);
 
       if (error) {
-        Alert.alert('Error', 'Failed to update volunteer profile');
+        console.log('❌ Profile update failed:', error);
+        Alert.alert('Error', `Failed to update volunteer profile: ${error.message}`);
         return;
       }
 
+      if (!data) {
+        console.log('⚠️ Update completed but no data returned');
+        Alert.alert('Warning', 'Update may not have been applied. Please check the volunteer profile.');
+        return;
+      }
+
+      console.log('✅ Profile updated successfully:', data);
       Alert.alert('Success', 'Volunteer profile updated successfully');
       setEditModalVisible(false);
-      loadVolunteers(); // Refresh the list
+      
+      console.log('🔄 Refreshing volunteer list...');
+      await loadVolunteers(); // Refresh the list
+      console.log('✅ Volunteer list refreshed');
     } catch (error) {
-      Alert.alert('Error', 'Failed to update volunteer profile');
+      console.log('❌ Unexpected error during profile update:', error);
+      Alert.alert('Error', `Failed to update volunteer profile: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -185,64 +228,75 @@ const VolunteerManagement: React.FC = () => {
     setSelectedVolunteer(null);
   };
 
-  const getVolunteerAssignments = (volunteerId: string): Assignment[] => {
-    return assignments.filter(assignment => assignment.volunteer_id === volunteerId);
-  };
-
-  const getFilteredVolunteers = () => {
-    switch (filter) {
-      case 'active':
-        return volunteers.filter(v => v.is_active);
-      case 'available':
-        return volunteers.filter(v => v.volunteer_status === 'available');
-      case 'busy':
-        return volunteers.filter(v => v.volunteer_status === 'busy' || v.volunteer_status === 'on_duty');
-      default:
-        return volunteers;
-    }
-  };
-
-  const handleBatchAutoAssign = async () => {
-    if (requests.length === 0) {
-      Alert.alert('No Requests', 'There are no pending requests to assign.');
-      return;
-    }
-
-    const availableVolunteers = volunteers.filter(v => 
-      v.is_active && v.volunteer_status === 'available'
-    );
-
-    if (availableVolunteers.length === 0) {
-      Alert.alert('No Available Volunteers', 'There are no available volunteers for assignment.');
-      return;
-    }
-
+  const handleContactInfo = (volunteer: User) => {
     Alert.alert(
-      'Auto-Assign All Requests',
-      `This will attempt to automatically assign ${requests.length} pending requests to ${availableVolunteers.length} available volunteers. Continue?`,
+      `Contact ${volunteer.name}`,
+      `Email: ${volunteer.email}\nPhone: ${volunteer.phone}`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Assign', onPress: performBatchAutoAssign }
+        { text: 'Copy Email', onPress: () => Alert.alert('Copied', 'Email copied to clipboard') },
+        { text: 'Copy Phone', onPress: () => Alert.alert('Copied', 'Phone copied to clipboard') }
       ]
     );
   };
 
-  const performBatchAutoAssign = async () => {
+  const handleViewTasks = (volunteer: User) => {
+    const volunteerAssignments = getVolunteerAssignments(volunteer.id);
+    const activeAssignments = volunteerAssignments.filter(a => 
+      ['assigned', 'accepted', 'on_duty'].includes(a.status)
+    );
+    
+    if (activeAssignments.length === 0) {
+      Alert.alert('No Active Tasks', `${volunteer.name} has no active tasks at the moment.`);
+      return;
+    }
+    
+    const tasksList = activeAssignments.map((assignment, index) => 
+      `${index + 1}. ${assignment.request?.description || 'Task'} (${assignment.status})`
+    ).join('\n');
+    
+    Alert.alert(
+      `${volunteer.name}'s Active Tasks`,
+      tasksList,
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleBatchAutoAssign = async () => {
+    if (autoAssigning) return;
+    
     setAutoAssigning(true);
-    Logger.autoAssignment.start(requests.length);
-
-    let assigned = 0;
-    let failed = 0;
-
+    Logger.autoAssignment.start(0);
+    
     try {
-      for (const request of requests) {
+      // Get pending requests first
+      const { data: requests, error: requestError } = await supabase
+        .from('assistance_requests')
+        .select('*')
+        .eq('status', 'pending');
+        
+      if (requestError || !requests) {
+        throw new Error('Failed to fetch pending requests');
+      }
+      
+      if (requests.length === 0) {
+        Alert.alert('No Pending Requests', 'There are no pending requests to assign.');
+        return;
+      }
+      
+      Logger.autoAssignment.start(requests.length);
+      
+      let assigned = 0;
+      let failed = 0;
+      
+      for (let i = 0; i < requests.length; i++) {
+        const request = requests[i];
+        Logger.autoAssignment.requestProcessing(request, i + 1, requests.length);
+        
         try {
-          Logger.autoAssignment.requestProcessing(request, assigned + failed, requests.length);
-          
-          const { data: result, error } = await supabase.rpc('auto_assign_volunteer', {
+          const { data: result, error } = await supabase.rpc('auto_assign_request_enhanced', {
             p_request_id: request.id,
-            p_max_distance: 5000, // 5km radius
-            p_min_score: 0.4 // Lowered threshold for better success rate
+            p_min_match_score: 0.3
           });
           
           if (error) {
@@ -306,12 +360,12 @@ const VolunteerManagement: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     const statusColors = {
-      available: PROFESSIONAL_DESIGN.COLORS.success,
-      on_duty: PROFESSIONAL_DESIGN.COLORS.info,
-      busy: PROFESSIONAL_DESIGN.COLORS.warning,
-      offline: PROFESSIONAL_DESIGN.COLORS.textTertiary,
+      available: '#10b981',
+      on_duty: '#8b5cf6',
+      busy: '#f59e0b',
+      offline: '#6b7280',
     };
-    return statusColors[status as keyof typeof statusColors] || PROFESSIONAL_DESIGN.COLORS.textTertiary;
+    return statusColors[status as keyof typeof statusColors] || '#6b7280';
   };
 
   const getStatusText = (volunteer: User) => {
@@ -669,6 +723,9 @@ const VolunteerManagement: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+export default VolunteerManagement;
+
 
 const styles = StyleSheet.create({
   container: {
@@ -1086,6 +1143,11 @@ const styles = StyleSheet.create({
     color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
   },
   
+  modalButton: {
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+  },
+  
   cancelButton: {
     paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
     paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
@@ -1101,8 +1163,12 @@ const styles = StyleSheet.create({
     color: PROFESSIONAL_DESIGN.COLORS.accent,
   },
   
-  cancelButtonText: {
+  modalButtonText: {
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
+    color: PROFESSIONAL_DESIGN.COLORS.accent,
+  },
+  
+  cancelButtonText: {
     color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
   },
   
@@ -1142,6 +1208,382 @@ const styles = StyleSheet.create({
     color: PROFESSIONAL_DESIGN.COLORS.textTertiary,
     marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
   },
-});
 
-export default VolunteerManagement;
+  // Legacy styles for compatibility - will be phased out
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contactInfo: {
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusLabel: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginRight: 8,
+  },
+  skillsContainer: {
+    marginBottom: 8,
+  },
+  skillsLabel: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  skillsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skillBadge: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  moreSkillsText: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  tasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  cardSubtitle: {
+    color: '#9ca3af',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    marginRight: 8,
+  },
+  outlineButtonText: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  listContainer: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  volunteerName: {
+    fontWeight: 'bold',
+    color: '#111827',
+    fontSize: 18,
+    marginRight: 8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  statChip: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  availableChip: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  busyChip: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#fde68a',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  availableValue: {
+    color: '#16a34a',
+  },
+  busyValue: {
+    color: '#d97706',
+  },
+  statType: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  availableType: {
+    color: '#16a34a',
+  },
+  busyType: {
+    color: '#d97706',
+  },
+  enhancedTabSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 20,
+  },
+  enhancedTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  activeEnhancedTab: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  enhancedTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeEnhancedTabText: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  requestCountBadge: {
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  requestCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  filterTabs: {
+    flexDirection: 'row',
+    marginTop: 16,
+  },
+  filterTab: {
+    marginRight: 16,
+    paddingBottom: 8,
+  },
+  activeFilterTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#3b82f6',
+  },
+  filterTabText: {
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  activeFilterTabText: {
+    color: '#2563eb',
+  },
+  autoAssignSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  autoAssignButton: {
+    backgroundColor: '#3b82f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  autoAssignButtonDisabled: {
+    backgroundColor: '#d1d5db',
+  },
+  autoAssignButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  autoAssignButtonTextDisabled: {
+    color: '#9ca3af',
+  },
+  tabSelector: {
+    flexDirection: 'row',
+    marginTop: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 4,
+  },
+  activeTab: {
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  requestCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  requestTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  requestTypeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  requestTime: {
+    color: '#9ca3af',
+    fontSize: 12,
+  },
+  requestDescription: {
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  requestLocation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  requestLocationText: {
+    color: '#6b7280',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  assignButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  assignButtonText: {
+    color: 'white',
+    fontWeight: '500',
+    fontSize: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  requestsOverview: {
+    flex: 1,
+  },
+  requestsCount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  availableVolunteers: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  streamlinedAutoAssignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  streamlinedAutoAssignButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  streamlinedAutoAssignButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  streamlinedAutoAssignButtonTextDisabled: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

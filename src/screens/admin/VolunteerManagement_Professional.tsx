@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, FlatList, TouchableOpacity, RefreshControl, Alert, StyleSheet, Modal, TextInput } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useRequest } from '../../context/RequestContext';
@@ -12,14 +12,8 @@ import EnhancedRequestCard from '../../components/admin/EnhancedRequestCard';
 import { LocationFormatter } from '../../utils/locationFormatter';
 import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
 
-type RouteParams = {
-  initialTab?: 'volunteers' | 'requests';
-  autoAssignMode?: boolean;
-};
-
 const VolunteerManagement: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const { user } = useAuth();
   const { assignments, getAssignments } = useRequest();
   
@@ -28,10 +22,7 @@ const VolunteerManagement: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'active' | 'available' | 'busy'>('all');
   const [autoAssigning, setAutoAssigning] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>(
-    route.params?.initialTab || 'volunteers'
-  );
-  const [autoAssignMode, setAutoAssignMode] = useState(route.params?.autoAssignMode || false);
+  const [activeTab, setActiveTab] = useState<'volunteers' | 'requests'>('volunteers');
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({
@@ -229,7 +220,7 @@ const VolunteerManagement: React.FC = () => {
 
   const performBatchAutoAssign = async () => {
     setAutoAssigning(true);
-    Logger.autoAssignment.start(requests.length);
+    Logger.autoAssignment.batchStart(requests.length);
 
     let assigned = 0;
     let failed = 0;
@@ -237,7 +228,7 @@ const VolunteerManagement: React.FC = () => {
     try {
       for (const request of requests) {
         try {
-          Logger.autoAssignment.requestProcessing(request, assigned + failed, requests.length);
+          Logger.autoAssignment.requestStart(request.id, request.type, request.priority);
           
           const { data: result, error } = await supabase.rpc('auto_assign_volunteer', {
             p_request_id: request.id,

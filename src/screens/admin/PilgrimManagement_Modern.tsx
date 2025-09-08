@@ -128,11 +128,11 @@ const PilgrimManagement: React.FC = () => {
       case 'pending':
         return PROFESSIONAL_DESIGN.COLORS.warning;
       case 'assigned':
-        return PROFESSIONAL_DESIGN.COLORS.cyan;        // New cyan blue
+        return PROFESSIONAL_DESIGN.COLORS.info;
       case 'in_progress':
-        return PROFESSIONAL_DESIGN.COLORS.primary;     // Now teal
+        return PROFESSIONAL_DESIGN.COLORS.primary;
       case 'completed':
-        return PROFESSIONAL_DESIGN.COLORS.emerald;     // Vibrant emerald green
+        return PROFESSIONAL_DESIGN.COLORS.success;
       case 'cancelled':
         return PROFESSIONAL_DESIGN.COLORS.error;
       default:
@@ -228,7 +228,7 @@ const PilgrimManagement: React.FC = () => {
     <TouchableOpacity style={styles.itemCard} onPress={() => handlePilgrimAction(item, 'view')}>
       <View style={styles.itemHeader}>
         <View style={styles.avatarContainer}>
-          <Ionicons name="person" size={24} color={PROFESSIONAL_DESIGN.COLORS.emerald} />
+          <Ionicons name="person" size={24} color={PROFESSIONAL_DESIGN.COLORS.primary} />
         </View>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>{item.name || 'Unknown Pilgrim'}</Text>
@@ -241,8 +241,8 @@ const PilgrimManagement: React.FC = () => {
           )}
         </View>
         <View style={styles.statusContainer}>
-          <View style={[styles.statusIndicator, { backgroundColor: item.is_active ? PROFESSIONAL_DESIGN.COLORS.mint : PROFESSIONAL_DESIGN.COLORS.error }]} />
-          <Text style={[styles.statusText, { color: item.is_active ? PROFESSIONAL_DESIGN.COLORS.mint : PROFESSIONAL_DESIGN.COLORS.error }]}>
+          <View style={[styles.statusIndicator, { backgroundColor: item.is_active ? PROFESSIONAL_DESIGN.COLORS.success : PROFESSIONAL_DESIGN.COLORS.error }]} />
+          <Text style={[styles.statusText, { color: item.is_active ? PROFESSIONAL_DESIGN.COLORS.success : PROFESSIONAL_DESIGN.COLORS.error }]}>
             {item.is_active ? 'Active' : 'Inactive'}
           </Text>
         </View>
@@ -290,7 +290,7 @@ const PilgrimManagement: React.FC = () => {
     <TouchableOpacity style={styles.itemCard}>
       <View style={styles.itemHeader}>
         <View style={styles.requestIconContainer}>
-          <Ionicons name="help-circle" size={24} color={PROFESSIONAL_DESIGN.COLORS.cyan} />
+          <Ionicons name="help-circle" size={24} color={PROFESSIONAL_DESIGN.COLORS.warning} />
         </View>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>{item.title || 'Assistance Request'}</Text>
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
     marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
     borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.teal + '40',    // Subtle teal border
+    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
   },
   searchInput: {
     flex: 1,
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.emerald + '20',  // Light emerald background
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.primary + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: PROFESSIONAL_DESIGN.SPACING.md,
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.cyan + '20',     // Light cyan background
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.warning + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: PROFESSIONAL_DESIGN.SPACING.md,
@@ -672,16 +672,16 @@ const styles = StyleSheet.create({
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
   },
   activateButton: {
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.mint,       // Vibrant mint green
-    borderColor: PROFESSIONAL_DESIGN.COLORS.mint,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.success,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.success,
   },
   deactivateButton: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.error,
     borderColor: PROFESSIONAL_DESIGN.COLORS.error,
   },
   assignButton: {
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.sky,        // Sky blue for assign action
-    borderColor: PROFESSIONAL_DESIGN.COLORS.sky,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.primary,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.primary,
   },
   actionButtonText: {
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,

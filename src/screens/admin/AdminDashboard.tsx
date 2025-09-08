@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -7,6 +7,10 @@ import { useRequest } from '../../context/RequestContext';
 import { volunteerService } from '../../services/volunteerService';
 import { supabase } from '../../services/supabase';
 import { AdminStats } from '../../types';
+import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isSmallScreen = SCREEN_WIDTH < 350;
 
 const AdminDashboard: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -266,7 +270,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.autoAssignSection}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
-                <Ionicons name="flash" size={20} color="#3b82f6" />
+                <Ionicons name="flash" size={20} color={PROFESSIONAL_DESIGN.COLORS.primary} />
                 <Text style={styles.sectionTitle}>Auto-Assignment AI</Text>
               </View>
               <View style={styles.aiIndicator}>
@@ -298,7 +302,7 @@ const AdminDashboard: React.FC = () => {
             </View>
             
             <View style={styles.lastAssignInfo}>
-              <Ionicons name="time-outline" size={14} color="#6b7280" />
+              <Ionicons name="time-outline" size={14} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
               <Text style={styles.lastAssignText}>Last auto-assignment: {formatLastAutoAssignTime()}</Text>
             </View>
           </View>
@@ -311,23 +315,29 @@ const AdminDashboard: React.FC = () => {
                 style={styles.actionButton}
                 onPress={() => navigation.navigate('VolunteerManagement')}
               >
-                <Ionicons name="people" size={24} color="#3b82f6" />
+                <Ionicons name="people" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.primary} />
                 <Text style={styles.actionButtonText}>Manage Volunteers</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => navigation.navigate('TaskAssignment')}
+                onPress={() => navigation.navigate('VolunteerManagement', { initialTab: 'requests' })}
               >
-                <Ionicons name="clipboard" size={24} color="#10b981" />
+                <Ionicons name="clipboard" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.success} />
                 <Text style={styles.actionButtonText}>Manage Requests</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => navigation.navigate('TaskAssignment')}
+                onPress={() => {
+                  // Navigate to VolunteerManagement with auto-assign mode
+                  navigation.navigate('VolunteerManagement', { 
+                    initialTab: 'requests',
+                    autoAssignMode: true 
+                  });
+                }}
               >
-                <Ionicons name="flash" size={24} color="#f59e0b" />
+                <Ionicons name="flash" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.warning} />
                 <Text style={styles.actionButtonText}>Auto-Assign Tasks</Text>
               </TouchableOpacity>
               
@@ -335,7 +345,7 @@ const AdminDashboard: React.FC = () => {
                 style={styles.actionButton}
                 onPress={() => navigation.navigate('Profile')}
               >
-                <Ionicons name="settings" size={24} color="#8b5cf6" />
+                <Ionicons name="settings" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.info} />
                 <Text style={styles.actionButtonText}>Settings</Text>
               </TouchableOpacity>
             </View>
@@ -348,7 +358,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.statsGrid}>
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="checkmark-circle" size={28} color="#10b981" />
+                <Ionicons name="checkmark-circle" size={28} color={PROFESSIONAL_DESIGN.COLORS.success} />
                 <Text style={styles.gridNumber}>{stats.availableVolunteers}</Text>
                 <Text style={styles.gridLabel}>Available</Text>
               </View>
@@ -356,7 +366,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="shield-checkmark" size={28} color="#8b5cf6" />
+                <Ionicons name="shield-checkmark" size={28} color={PROFESSIONAL_DESIGN.COLORS.info} />
                 <Text style={styles.gridNumber}>{stats.onDutyVolunteers}</Text>
                 <Text style={styles.gridLabel}>On Duty</Text>
               </View>
@@ -364,7 +374,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="moon" size={28} color="#6b7280" />
+                <Ionicons name="moon" size={28} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
                 <Text style={styles.gridNumber}>{stats.offlineVolunteers}</Text>
                 <Text style={styles.gridLabel}>Offline</Text>
               </View>
@@ -372,7 +382,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="people" size={28} color="#3b82f6" />
+                <Ionicons name="people" size={28} color={PROFESSIONAL_DESIGN.COLORS.primary} />
                 <Text style={styles.gridNumber}>{stats.activeVolunteers}</Text>
                 <Text style={styles.gridLabel}>Total Active</Text>
               </View>
@@ -386,7 +396,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.statsGrid}>
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="hourglass" size={28} color="#ef4444" />
+                <Ionicons name="hourglass" size={28} color={PROFESSIONAL_DESIGN.COLORS.error} />
                 <Text style={styles.gridNumber}>{stats.pendingRequests}</Text>
                 <Text style={styles.gridLabel}>Pending</Text>
               </View>
@@ -394,7 +404,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="person-add" size={28} color="#3b82f6" />
+                <Ionicons name="person-add" size={28} color={PROFESSIONAL_DESIGN.COLORS.primary} />
                 <Text style={styles.gridNumber}>{stats.assignedRequests}</Text>
                 <Text style={styles.gridLabel}>Assigned</Text>
               </View>
@@ -402,7 +412,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="play" size={28} color="#f59e0b" />
+                <Ionicons name="play" size={28} color={PROFESSIONAL_DESIGN.COLORS.warning} />
                 <Text style={styles.gridNumber}>{stats.inProgressRequests}</Text>
                 <Text style={styles.gridLabel}>In Progress</Text>
               </View>
@@ -410,7 +420,7 @@ const AdminDashboard: React.FC = () => {
 
             <View style={styles.gridCard}>
               <View style={styles.cardContent}>
-                <Ionicons name="checkmark-done" size={28} color="#10b981" />
+                <Ionicons name="checkmark-done" size={28} color={PROFESSIONAL_DESIGN.COLORS.success} />
                 <Text style={styles.gridNumber}>{stats.completedRequests}</Text>
                 <Text style={styles.gridLabel}>Completed</Text>
               </View>
@@ -423,14 +433,14 @@ const AdminDashboard: React.FC = () => {
           </View>
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
-              <Ionicons name="people" size={32} color="#3b82f6" />
+              <Ionicons name="people" size={32} color={PROFESSIONAL_DESIGN.COLORS.primary} />
               <View style={styles.summaryContent}>
                 <Text style={styles.summaryNumber}>{stats.totalVolunteers}</Text>
                 <Text style={styles.summaryLabel}>Total Volunteers</Text>
               </View>
             </View>
             <View style={styles.summaryCard}>
-              <Ionicons name="list" size={32} color="#f59e0b" />
+              <Ionicons name="list" size={32} color={PROFESSIONAL_DESIGN.COLORS.warning} />
               <View style={styles.summaryContent}>
                 <Text style={styles.summaryNumber}>{stats.totalRequests}</Text>
                 <Text style={styles.summaryLabel}>Total Requests</Text>
@@ -442,7 +452,7 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Recent Requests</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('RequestManagement')}>
+              <TouchableOpacity onPress={() => navigation.navigate('TaskAssignment')}>
                 <Text style={styles.linkText}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -472,7 +482,7 @@ const AdminDashboard: React.FC = () => {
                         </Text>
                       </View>
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+                    <Ionicons name="chevron-forward" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
                   </View>
                 </TouchableOpacity>
               ))
@@ -521,87 +531,91 @@ const AdminDashboard: React.FC = () => {
 // Helper function for status colors
 const getStatusColor = (status: string) => {
   const statusColors = {
-    pending: '#f59e0b',
-    assigned: '#3b82f6',
-    accepted: '#10b981',
-    on_duty: '#8b5cf6',
-    completed: '#10b981',
-    cancelled: '#ef4444',
+    pending: PROFESSIONAL_DESIGN.COLORS.warning,
+    assigned: PROFESSIONAL_DESIGN.COLORS.primary,
+    accepted: PROFESSIONAL_DESIGN.COLORS.success,
+    on_duty: PROFESSIONAL_DESIGN.COLORS.info,
+    completed: PROFESSIONAL_DESIGN.COLORS.success,
+    cancelled: PROFESSIONAL_DESIGN.COLORS.error,
   };
-  return statusColors[status as keyof typeof statusColors] || '#6b7280';
+  return statusColors[status as keyof typeof statusColors] || PROFESSIONAL_DESIGN.COLORS.textSecondary;
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
   },
   scrollView: {
     flex: 1,
   },
   header: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.primary,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.xl,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.xxl,
     paddingTop: 40,
+    ...PROFESSIONAL_DESIGN.SHADOWS.md,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
   },
   headerTitle: {
     color: 'white',
-    fontSize: 24,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h1,
     fontWeight: 'bold',
   },
   headerSubtitle: {
-    color: '#bfdbfe',
-    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.85)',
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h3,
+    fontWeight: '500',
   },
   quickStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: PROFESSIONAL_DESIGN.SPACING.sm,
   },
   statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
     flex: 1,
-    marginHorizontal: 4,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statNumber: {
     color: 'white',
-    fontSize: 24,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h2,
     fontWeight: 'bold',
   },
   statLabel: {
-    color: '#bfdbfe',
-    fontSize: 14,
+    color: PROFESSIONAL_DESIGN.COLORS.primaryLight,
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.xl,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.lg,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
+    gap: PROFESSIONAL_DESIGN.SPACING.md,
   },
   gridCard: {
     width: '48%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
+    padding: PROFESSIONAL_DESIGN.SPACING.lg,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    borderWidth: 1,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   cardContent: {
     alignItems: 'center',
@@ -617,15 +631,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
+    padding: PROFESSIONAL_DESIGN.SPACING.lg,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
+    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -681,11 +691,13 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   actionButtonText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#374151',
+    marginTop: isSmallScreen ? 6 : PROFESSIONAL_DESIGN.SPACING.sm,
+    fontSize: isSmallScreen ? 10 : 12,
+    fontWeight: '600',
+    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
     textAlign: 'center',
+    lineHeight: isSmallScreen ? 12 : 16,
+    flexShrink: 1,
   },
   dateText: {
     color: '#9ca3af',
@@ -726,6 +738,17 @@ const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
     flex: 1,
+    minWidth: isSmallScreen ? SCREEN_WIDTH * 0.2 : SCREEN_WIDTH * 0.22,
+    maxWidth: isSmallScreen ? SCREEN_WIDTH * 0.24 : SCREEN_WIDTH * 0.25,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
+    padding: isSmallScreen ? PROFESSIONAL_DESIGN.SPACING.md : PROFESSIONAL_DESIGN.SPACING.lg,
+    marginHorizontal: isSmallScreen ? 2 : PROFESSIONAL_DESIGN.SPACING.xs,
+    borderWidth: 1,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
+    aspectRatio: 1,
+    justifyContent: 'center',
   },
   actionIcon: {
     padding: 12,
@@ -754,16 +777,12 @@ const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
+    padding: PROFESSIONAL_DESIGN.SPACING.lg,
     flex: 1,
-    marginHorizontal: 6,
+    marginHorizontal: PROFESSIONAL_DESIGN.SPACING.xs,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
   },
   summaryContent: {
     marginLeft: 12,
@@ -779,31 +798,24 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   quickActions: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.xl,
+    padding: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
+    ...PROFESSIONAL_DESIGN.SHADOWS.md,
   },
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: isSmallScreen ? 8 : 12,
   },
   autoAssignSection: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.xl,
+    padding: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
+    ...PROFESSIONAL_DESIGN.SHADOWS.md,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -812,10 +824,10 @@ const styles = StyleSheet.create({
   aiIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.success + '20', // Light green with transparency
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.xs,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
   },
   aiDot: {
     width: 6,

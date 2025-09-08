@@ -64,12 +64,16 @@ class AutoAssignmentService {
       const bestMatch = scoredVolunteers[0];
       
       // Only auto-assign if the match score is above threshold
-      if (bestMatch.score < 0.6) {
+      const MIN_MATCH_SCORE = 0.4; // Lowered threshold for better assignment success rate
+      if (bestMatch.score < MIN_MATCH_SCORE) {
+        console.log(`❌ Best match score ${(bestMatch.score * 100).toFixed(1)}% below threshold (${(MIN_MATCH_SCORE * 100)}%)`);
         return { 
           success: false, 
-          message: `Best match score (${(bestMatch.score * 100).toFixed(1)}%) below threshold. Manual assignment recommended.` 
+          message: `Best match score (${(bestMatch.score * 100).toFixed(1)}%) below threshold (${(MIN_MATCH_SCORE * 100)}%). Manual assignment recommended.` 
         };
       }
+      
+      console.log(`✅ Auto-assigning to ${bestMatch.volunteer.name} with score ${(bestMatch.score * 100).toFixed(1)}%`);
 
       // Create the assignment
       const assignment = await this.createAssignment(request, bestMatch.volunteer);
@@ -186,6 +190,25 @@ class AutoAssignmentService {
         }
 
         console.log('✅ Found volunteers via RPC:', volunteers?.length || 0);
+        
+        // If no volunteers found with current criteria, try expanded search
+        if (!volunteers || volunteers.length === 0) {
+          console.log('🔍 No volunteers found with current criteria, expanding search...');
+          
+          const { data: expandedVolunteers, error: expandedError } = await supabase.rpc('find_nearest_volunteers', {
+            target_lat: latitude,
+            target_lng: longitude,
+            max_distance_meters: 20000, // Expand to 20km radius
+            required_skills: [], // Remove skill requirements
+            limit_count: 15
+          });
+          
+          if (!expandedError && expandedVolunteers && expandedVolunteers.length > 0) {
+            console.log('✅ Found volunteers with expanded search:', expandedVolunteers.length);
+            return expandedVolunteers;
+          }
+        }
+        
         return volunteers || [];
       } catch (rpcError) {
         console.log('⚠️ RPC volunteer search failed, using fallback query...');

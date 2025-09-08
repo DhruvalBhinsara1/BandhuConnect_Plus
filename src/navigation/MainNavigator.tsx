@@ -58,21 +58,26 @@ const TaskStack = () => (
 const AdminStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Dashboard" component={AdminDashboard} />
-    <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
     <Stack.Screen name="Profile" component={AdminProfile} />
   </Stack.Navigator>
 );
 
-const ManagementStack = () => (
+const VolunteerManagementStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="VolunteerManagement" component={VolunteerManagement} />
     <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
   </Stack.Navigator>
 );
 
-const RequestStack = () => (
+const RequestManagementStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="TaskAssignment" component={TaskAssignment} />
+  </Stack.Navigator>
+);
+
+const PilgrimManagementStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="PilgrimManagement" component={PilgrimManagement} />
   </Stack.Navigator>
 );
 
@@ -94,28 +99,28 @@ const MainNavigator: React.FC = () => {
 
     switch (routeName) {
       case 'Home':
-        iconName = focused ? 'home' : 'home-outline';
+        iconName = focused ? 'grid' : 'grid-outline'; // Dashboard icon
         break;
       case 'Tasks':
         iconName = focused ? 'list' : 'list-outline';
         break;
       case 'Requests':
-        iconName = focused ? 'add-circle' : 'add-circle-outline';
+        iconName = focused ? 'clipboard' : 'clipboard-outline'; // Request management icon
         break;
       case 'Management':
-        iconName = focused ? 'people' : 'people-outline';
+        iconName = focused ? 'people' : 'people-outline'; // Volunteer management icon
         break;
       case 'Pilgrims':
-        iconName = focused ? 'walk' : 'walk-outline';
+        iconName = focused ? 'person' : 'person-outline'; // Pilgrim management icon
         break;
       case 'Map':
         iconName = focused ? 'map' : 'map-outline';
         break;
       case 'Profile':
-        iconName = focused ? 'person' : 'person-outline';
+        iconName = focused ? 'person-circle' : 'person-circle-outline';
         break;
       default:
-        iconName = 'home-outline';
+        iconName = 'ellipse-outline';
     }
 
     return <Ionicons name={iconName} size={size} color={color} />;
@@ -159,11 +164,31 @@ const MainNavigator: React.FC = () => {
           headerShown: false,
         })}
       >
-        <Tab.Screen name="Home" component={AdminStack} />
-        <Tab.Screen name="Management" component={ManagementStack} />
-        <Tab.Screen name="Pilgrims" component={PilgrimManagement} />
-        <Tab.Screen name="Requests" component={RequestStack} />
-        <Tab.Screen name="Profile" component={AdminProfile} />
+        <Tab.Screen 
+          name="Home" 
+          component={AdminStack} 
+          options={{ title: 'Dashboard' }}
+        />
+        <Tab.Screen 
+          name="Management" 
+          component={VolunteerManagementStack} 
+          options={{ title: 'Volunteers' }}
+        />
+        <Tab.Screen 
+          name="Pilgrims" 
+          component={PilgrimManagementStack} 
+          options={{ title: 'Pilgrims' }}
+        />
+        <Tab.Screen 
+          name="Requests" 
+          component={RequestManagementStack} 
+          options={{ title: 'Requests' }}
+        />
+        <Tab.Screen 
+          name="Profile" 
+          component={AdminProfile} 
+          options={{ title: 'Profile' }}
+        />
       </Tab.Navigator>
     );
   }
