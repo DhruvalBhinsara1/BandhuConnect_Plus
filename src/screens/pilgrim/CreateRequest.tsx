@@ -17,8 +17,10 @@ import { useTheme } from '../../theme';
 import { REQUEST_TYPES, PRIORITY_LEVELS, STATUS_COLORS } from '../../constants';
 import { RequestType, Priority } from '../../types';
 import { secureMapService, UserLocationData } from '../../services/secureMapService';
+import { RequestService } from '../../services/requestService';
 import { locationService } from '../../services/locationService';
 
+const requestService = new RequestService();
 const CreateRequest: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -61,14 +63,23 @@ const CreateRequest: React.FC = () => {
   const checkForActiveHelp = async () => {
     try {
       const assignmentStatus = await secureMapService.getAssignmentStatus();
-      if (assignmentStatus.hasAssignment && assignmentStatus.isActive) {
+      // Fetch latest requests for the user
+      const { data: userRequests } = await requestService.getRequests({ userId: user?.id });
+      // Find any active request (not completed/cancelled)
+      const activeRequest = userRequests?.find(
+        (r) => r.status !== 'completed' && r.status !== 'cancelled'
+      );
+      // Only set helpOnWay to true if assignment is truly active and request is not completed/cancelled
+      if (
+        assignmentStatus.hasAssignment &&
+        assignmentStatus.isActive &&
+        activeRequest
+      ) {
         setHelpOnWay(true);
         setAssignmentStatus(assignmentStatus);
-        
         // Get volunteer location
         const volunteerLoc = await secureMapService.getCounterpartLocation();
         setVolunteerLocation(volunteerLoc);
-        
         // Calculate distance and ETA
         if (currentLocation && volunteerLoc) {
           const distance = locationService.calculateDistance(
@@ -76,7 +87,6 @@ const CreateRequest: React.FC = () => {
             volunteerLoc
           );
           setCalculatedDistance(distance);
-          
           // Estimate arrival time (assuming 5 km/h walking speed)
           const walkingSpeedKmh = 5;
           const timeHours = distance / walkingSpeedKmh;
@@ -185,6 +195,8 @@ const CreateRequest: React.FC = () => {
         toast.showError('Error', 'Failed to create request. Please try again.');
       } else {
         toast.showSuccess('Success', 'Your request has been submitted successfully!');
+        // Force refresh assignment status after submitting request
+        await checkForActiveHelp();
         navigation.goBack();
       }
     } finally {
