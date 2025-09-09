@@ -819,12 +819,10 @@ export default function SecureMapScreen() {
             const myAssignments = requests
               .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
               .filter(Boolean);
-            
-            const volunteerHasAssignment = myAssignments.length > 0 && 
-              myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
-            
+            // Show polyline if assignment is active or completed and counterpart is available
+            const volunteerHasAssignment = myAssignments.length > 0 &&
+              myAssignments.some(a => ['pending', 'accepted', 'in_progress', 'completed'].includes(a?.status));
             finalShow = volunteerHasAssignment && hasCounterpart;
-            
             console.log('[SecureMapScreen] VOLUNTEER POLYLINE CHECK:', {
               myAssignments: myAssignments.map(a => ({ id: a?.id, status: a?.status })),
               volunteerHasAssignment,
@@ -880,10 +878,9 @@ export default function SecureMapScreen() {
           const myAssignments = requests
             .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
             .filter(Boolean);
-          
-          const volunteerHasAssignment = myAssignments.length > 0 && 
-            myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
-          
+          // Show ETA if assignment is active or completed and counterpart is available
+          const volunteerHasAssignment = myAssignments.length > 0 &&
+            myAssignments.some(a => ['pending', 'accepted', 'in_progress', 'completed'].includes(a?.status));
           finalShow = volunteerHasAssignment && hasCounterpart && calculatedDistance > 0;
         } else {
           // For pilgrims: Check if they have requests with assigned status
