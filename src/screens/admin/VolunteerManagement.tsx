@@ -9,7 +9,7 @@ import { supabase } from '../../services/supabase';
 import { Logger } from '../../utils/logger';
 import { User, Assignment } from '../../types';
 import EnhancedRequestCard from '../../components/admin/EnhancedRequestCard';
-import LargeScaleEventManager from '../../components/admin/LargeScaleEventManager';
+import TaskAssignment from './TaskAssignment';
 import { LocationFormatter } from '../../utils/locationFormatter';
 import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
 
@@ -41,7 +41,7 @@ const VolunteerManagement: React.FC = () => {
     phone: '',
     skills: '',
   });
-  const [eventManagerVisible, setEventManagerVisible] = useState(false);
+  // Removed: eventManagerVisible and related event manager UI
 
   useEffect(() => {
     loadVolunteers();
@@ -465,9 +465,6 @@ const VolunteerManagement: React.FC = () => {
               <View style={styles.headerRow}>
                 <Text style={styles.headerTitle}>Volunteer Management</Text>
                 <View style={styles.headerActions}>
-                  <TouchableOpacity style={styles.eventManagerButton} onPress={() => setEventManagerVisible(true)}>
-                    <Ionicons name="settings-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.primary} />
-                  </TouchableOpacity>
                   <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
                     <Ionicons name="refresh-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
                   </TouchableOpacity>
@@ -674,11 +671,8 @@ const VolunteerManagement: React.FC = () => {
         </SafeAreaView>
       </Modal>
 
-      {/* Large-Scale Event Manager */}
-      <LargeScaleEventManager 
-        isVisible={eventManagerVisible}
-        onClose={() => setEventManagerVisible(false)}
-      />
+  {/* Task Assignment Restored */}
+  <TaskAssignment />
     </SafeAreaView>
   );
 };

@@ -1,43 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, RefreshControl, Alert } from 'react-native';
-import PROFESSIONAL_DESIGN from '../../design/professionalDesignSystem';
-import { largeScaleEventAutoAssignmentService } from '../../services/largeScaleEventAutoAssignmentService';
-import { StyleSheet } from 'react-native';
+// Deprecated: Use TaskAssignment.tsx for admin assignment workflows.
+export default function DeprecatedLargeScaleEventManager() {
+  return null;
+}
 
-// Fallback inline types if not found
-type EventStats = {
-  totalVolunteers: number;
-  availableVolunteers: number;
-  busyVolunteers: number;
-  offlineVolunteers: number;
-  coveragePercentage: number;
-  capacityStatus: string;
-  recommendations: {
-    expandSearchRadius: boolean;
-    activateOfflineVolunteers: boolean;
-    increaseAssignmentLimits: boolean;
-    emergencyRecruitment: boolean;
-  };
-};
-type EventConfiguration = {
-  eventName: string;
-  centerLat: number;
-  centerLng: number;
-  radiusKm: number;
-  isActive: boolean;
-  emergencyMode: boolean;
-  maxAssignmentsPerVolunteer: number;
-  minMatchThreshold: number;
-};
-type LargeScaleEventManagerProps = { isVisible: boolean; onClose: () => void };
+// Deprecated: Use TaskAssignment.tsx for admin assignment workflows.
+export default function DeprecatedLargeScaleEventManager() {
+  return null;
+}
 
-const LargeScaleEventManager: React.FC<LargeScaleEventManagerProps> = ({ isVisible, onClose }) => {
-  const [eventStats, setEventStats] = useState<EventStats | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
-  const [eventConfig, setEventConfig] = useState<EventConfiguration>({
-    eventName: 'Mahakumbh 2025',
-    centerLat: 25.4358,
+// Deprecated: Use TaskAssignment.tsx for admin assignment workflows.
+export default function DeprecatedLargeScaleEventManager() {
+  return null;
+}
     centerLng: 81.8463,
     radiusKm: 50,
     isActive: false,
