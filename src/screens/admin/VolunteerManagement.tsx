@@ -9,6 +9,7 @@ import { supabase } from '../../services/supabase';
 import { Logger } from '../../utils/logger';
 import { User, Assignment } from '../../types';
 import EnhancedRequestCard from '../../components/admin/EnhancedRequestCard';
+import LargeScaleEventManager from '../../components/admin/LargeScaleEventManager';
 import { LocationFormatter } from '../../utils/locationFormatter';
 import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
 
@@ -40,6 +41,7 @@ const VolunteerManagement: React.FC = () => {
     phone: '',
     skills: '',
   });
+  const [eventManagerVisible, setEventManagerVisible] = useState(false);
 
   useEffect(() => {
     loadVolunteers();
@@ -462,9 +464,14 @@ const VolunteerManagement: React.FC = () => {
             <View style={styles.header}>
               <View style={styles.headerRow}>
                 <Text style={styles.headerTitle}>Volunteer Management</Text>
-                <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-                  <Ionicons name="refresh-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                  <TouchableOpacity style={styles.eventManagerButton} onPress={() => setEventManagerVisible(true)}>
+                    <Ionicons name="settings-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+                    <Ionicons name="refresh-outline" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Compact Statistics Section */}
@@ -666,6 +673,12 @@ const VolunteerManagement: React.FC = () => {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Large-Scale Event Manager */}
+      <LargeScaleEventManager 
+        isVisible={eventManagerVisible}
+        onClose={() => setEventManagerVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -712,6 +725,20 @@ const styles = StyleSheet.create({
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
     borderWidth: 1,
     borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+  },
+
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: PROFESSIONAL_DESIGN.SPACING.sm,
+  },
+
+  eventManagerButton: {
+    padding: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.primary + '20',
+    borderWidth: 1,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.primary,
   },
   
   // Enhanced Statistics Section

@@ -1,3 +1,7 @@
+// Re-export the Supabase client from the canonical module with correct casing
+export { default } from './Supabase';
+export { supabase } from './Supabase';
+
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import 'react-native-url-polyfill/auto';
