@@ -819,13 +819,13 @@ export default function SecureMapScreen() {
             const myAssignments = requests
               .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
               .filter(Boolean);
-            // Show polyline if assignment is active or completed and counterpart is available
-            const volunteerHasAssignment = myAssignments.length > 0 &&
-              myAssignments.some(a => ['pending', 'accepted', 'in_progress', 'completed'].includes(a?.status));
-            finalShow = volunteerHasAssignment && hasCounterpart;
+            // Show polyline only if assignment is active (not completed/cancelled) and counterpart is available
+            const volunteerHasActiveAssignment = myAssignments.length > 0 &&
+              myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
+            finalShow = volunteerHasActiveAssignment && hasCounterpart;
             console.log('[SecureMapScreen] VOLUNTEER POLYLINE CHECK:', {
               myAssignments: myAssignments.map(a => ({ id: a?.id, status: a?.status })),
-              volunteerHasAssignment,
+              volunteerHasActiveAssignment,
               hasCounterpart,
               finalShow
             });
@@ -878,10 +878,10 @@ export default function SecureMapScreen() {
           const myAssignments = requests
             .map(request => assignments.find(a => a.request_id === request.id && a.volunteer_id === user?.id))
             .filter(Boolean);
-          // Show ETA if assignment is active or completed and counterpart is available
-          const volunteerHasAssignment = myAssignments.length > 0 &&
-            myAssignments.some(a => ['pending', 'accepted', 'in_progress', 'completed'].includes(a?.status));
-          finalShow = volunteerHasAssignment && hasCounterpart && calculatedDistance > 0;
+          // Show ETA only if assignment is active (not completed/cancelled) and counterpart is available
+          const volunteerHasActiveAssignment = myAssignments.length > 0 &&
+            myAssignments.some(a => ['pending', 'accepted', 'in_progress'].includes(a?.status));
+          finalShow = volunteerHasActiveAssignment && hasCounterpart && calculatedDistance > 0;
         } else {
           // For pilgrims: Check if they have requests with assigned status
           const myRequests = requests.filter(r => r.user_id === user?.id);
