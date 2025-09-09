@@ -237,46 +237,39 @@ const OverviewScreen: React.FC<{ setActiveTab: (tab: TabType) => void }> = ({ se
       {/* Quick Actions */}
       <View style={styles.actionsSection}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setActiveTab('volunteers')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#3b82f6' }]}>
-              <Text style={styles.actionEmoji}>👥</Text>
-            </View>
-            <Text style={styles.actionLabel}>Volunteers</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setActiveTab('pilgrims')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#f59e0b' }]}>
-              <Text style={styles.actionEmoji}>🙏</Text>
-            </View>
-            <Text style={styles.actionLabel}>Pilgrims</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setActiveTab('requests')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}>
-              <Text style={styles.actionEmoji}>📋</Text>
-            </View>
-            <Text style={styles.actionLabel}>Requests</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setActiveTab('assignments')}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}>
-              <Text style={styles.actionEmoji}>📝</Text>
-            </View>
-            <Text style={styles.actionLabel}>Assignments</Text>
-          </TouchableOpacity>
+        <View style={[styles.actionsGrid, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}> 
+          <View style={{ width: '48%' }}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setActiveTab('volunteers')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#3b82f6' }]}> 
+                <Text style={styles.actionEmoji}>👥</Text>
+              </View>
+              <Text style={styles.actionLabel}>Volunteers</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ width: '48%' }}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setActiveTab('pilgrims')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#f59e0b' }]}> 
+                <Text style={styles.actionEmoji}>🙏</Text>
+              </View>
+              <Text style={styles.actionLabel}>Pilgrims</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ width: '48%', marginTop: 16 }}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setActiveTab('requests')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#8b5cf6' }]}> 
+                <Text style={styles.actionEmoji}>📋</Text>
+              </View>
+              <Text style={styles.actionLabel}>Requests</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ width: '48%', marginTop: 16 }}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => setActiveTab('assignments')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#10b981' }]}> 
+                <Text style={styles.actionEmoji}>📝</Text>
+              </View>
+              <Text style={styles.actionLabel}>Assignments</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </ScrollView>

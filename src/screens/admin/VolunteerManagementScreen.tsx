@@ -190,28 +190,30 @@ const VolunteerManagementScreen: React.FC = () => {
                   <Text style={styles.badgeText}>
                     {selectedVolunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
                   </Text>
-                </View>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: selectedVolunteer.duty_status === 'on_duty' ? '#3b82f6' : '#6b7280' }
-                ]}>
-                  <Text style={styles.badgeText}>
-                    {selectedVolunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.profileDetails}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Email:</Text>
-                <Text style={styles.detailValue}>{selectedVolunteer.email || 'Not provided'}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Phone:</Text>
-                <Text style={styles.detailValue}>{selectedVolunteer.phone || 'Not provided'}</Text>
-              </View>
-              <View style={styles.detailRow}>
+                <ScrollView 
+                  style={styles.volunteersList}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                  }
+                >
+                  {loading && (
+                    <View style={{ alignItems: 'center', marginTop: 40 }}>
+                      <Text style={styles.loading}>Loading volunteers...</Text>
+                    </View>
+                  )}
+                  {!loading && filteredVolunteers.length === 0 && (
+                    <Text style={styles.noVolunteers}>
+                      {searchTerm ? 'No volunteers match your search' : 'No volunteers found'}
+                    </Text>
+                  )}
+                  {!loading && filteredVolunteers.length > 0 && (
+                    filteredVolunteers.map((volunteer) => (
+                      <View key={volunteer.id} style={styles.volunteerCard}>
+                        {/* ...existing code... */}
+                      </View>
+                    ))
+                  )}
+                </ScrollView>
                 <Text style={styles.detailLabel}>Age:</Text>
                 <Text style={styles.detailValue}>{selectedVolunteer.age || 'Not provided'}</Text>
               </View>
@@ -377,6 +379,29 @@ const VolunteerManagementScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  loading: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  noVolunteers: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  volunteerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
@@ -447,19 +472,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  loading: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 16,
-    marginTop: 40,
-  },
-  noVolunteers: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 16,
-    marginTop: 40,
-  },
-  volunteerCard: {
+        {loading ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <Text style={styles.loading}>Loading volunteers...</Text>
+          </View>
+        ) : filteredVolunteers.length === 0 ? (
+          <Text style={styles.noVolunteers}>
+            {searchTerm ? 'No volunteers match your search' : 'No volunteers found'}
+          </Text>
+        ) : (
+          filteredVolunteers.map((volunteer) => (
+            <View key={volunteer.id} style={styles.volunteerCard}>
+              {/* ...existing code... */}
+            </View>
+          ))
+        )}
     backgroundColor: '#ffffff',
     borderRadius: 8,
     padding: 16,
