@@ -1582,16 +1582,18 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   cancelButton: {
-    backgroundColor: '#6b7280',
+    backgroundColor: '#374151', // Darker grey for better contrast
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     flex: 0.45,
+    borderWidth: 1,
+    borderColor: '#4B5563', // Add border for better definition
   },
   cancelButtonText: {
-    color: 'white',
+    color: '#FFFFFF', // Ensure white text for maximum contrast
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600', // Increased font weight for better visibility
     textAlign: 'center',
   },
   createTaskButton: {

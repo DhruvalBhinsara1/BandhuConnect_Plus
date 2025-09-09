@@ -233,7 +233,7 @@ const VolunteerManagement: React.FC = () => {
           const { data: result, error } = await supabase.rpc('auto_assign_volunteer', {
             p_request_id: request.id,
             p_max_distance: 5000, // 5km radius
-            p_min_score: 0.4 // Lowered threshold for better success rate
+            p_min_score: 0.25 // Further lowered threshold to match our enhanced algorithm
           });
           
           if (error) {

@@ -1,6 +1,6 @@
 # BandhuConnect+
 
-**Version:** 2.3.0  
+**Version:** 2.3.1  
 **Repository:** [GitHub](https://github.com/DhruvalBhinsara1/BandhuConnect_Plus)  
 **Status:** ✅ Production Ready  
 **Last Updated:** September 8, 2025
@@ -153,7 +153,7 @@ npm start
 
 ## 🔮 **Roadmap**
 
-### **Version 2.3.0** (October 2025)
+### **Version 2.3.1** (October 2025)
 
 - Offline mode and data synchronization
 - Advanced analytics and reporting dashboard

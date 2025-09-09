@@ -56,17 +56,45 @@ class AutoAssignmentService {
       // Calculate match scores for each volunteer
       console.log('🔍 Scoring volunteers...');
       const scoredVolunteers = await this.scoreVolunteers(request, volunteers);
-      console.log('🔍 Scored volunteers:', scoredVolunteers.map(v => ({ name: v.volunteer.name, score: v.score })));
+      console.log('🔍 Scored volunteers:', scoredVolunteers.map(v => ({ 
+        name: v.volunteer.name, 
+        score: v.score.toFixed(3),
+        skillMatch: v.skillMatch.toFixed(3),
+        distance: v.distance,
+        availability: v.availabilityScore.toFixed(3)
+      })));
       
       // Sort by best match (highest score)
       scoredVolunteers.sort((a, b) => b.score - a.score);
       
       const bestMatch = scoredVolunteers[0];
+      console.log(`🎯 Best match: ${bestMatch.volunteer.name} with score ${(bestMatch.score * 100).toFixed(1)}%`);
       
       // Only auto-assign if the match score is above threshold
-      const MIN_MATCH_SCORE = 0.4; // Lowered threshold for better assignment success rate
+      const MIN_MATCH_SCORE = 0.25; // Further lowered threshold for better assignment success rate
       if (bestMatch.score < MIN_MATCH_SCORE) {
         console.log(`❌ Best match score ${(bestMatch.score * 100).toFixed(1)}% below threshold (${(MIN_MATCH_SCORE * 100)}%)`);
+        // Try to find any alternative by further lowering standards temporarily
+        if (scoredVolunteers.length > 0) {
+          const emergencyMatch = scoredVolunteers[0];
+          if (emergencyMatch.score >= 0.15 && request.priority === 'high') {
+            console.log(`🚨 Emergency assignment for high priority request with score ${(emergencyMatch.score * 100).toFixed(1)}%`);
+            const assignment = await this.createAssignment(request, emergencyMatch.volunteer);
+            if (assignment) {
+              await this.updateRequestStatus(requestId, 'assigned');
+              await this.updateVolunteerStatus(emergencyMatch.volunteer.id, 'busy');
+              await this.notifyVolunteer(emergencyMatch.volunteer, request, assignment.id);
+              
+              return {
+                success: true,
+                assignedVolunteer: emergencyMatch.volunteer,
+                assignmentId: assignment.id,
+                message: `Emergency assignment to ${emergencyMatch.volunteer.name} (${(emergencyMatch.score * 100).toFixed(1)}% match)`,
+                matchScore: emergencyMatch.score
+              };
+            }
+          }
+        }
         return { 
           success: false, 
           message: `Best match score (${(bestMatch.score * 100).toFixed(1)}%) below threshold (${(MIN_MATCH_SCORE * 100)}%). Manual assignment recommended.` 
@@ -180,9 +208,9 @@ class AutoAssignmentService {
         const { data: volunteers, error } = await supabase.rpc('find_nearest_volunteers', {
           target_lat: latitude,
           target_lng: longitude,
-          max_distance_meters: 10000, // 10km radius
-          required_skills: this.getRequiredSkills(request.type),
-          limit_count: 10
+          max_distance_meters: 15000, // Increased from 10km to 15km radius
+          required_skills: [], // Removed strict skill requirements for broader search
+          limit_count: 20 // Increased from 10 to get more candidates
         });
 
         if (error) {
@@ -198,9 +226,9 @@ class AutoAssignmentService {
           const { data: expandedVolunteers, error: expandedError } = await supabase.rpc('find_nearest_volunteers', {
             target_lat: latitude,
             target_lng: longitude,
-            max_distance_meters: 20000, // Expand to 20km radius
+            max_distance_meters: 25000, // Further expand to 25km radius
             required_skills: [], // Remove skill requirements
-            limit_count: 15
+            limit_count: 30
           });
           
           if (!expandedError && expandedVolunteers && expandedVolunteers.length > 0) {
@@ -226,8 +254,8 @@ class AutoAssignmentService {
           `)
           .eq('role', 'volunteer')
           .eq('is_active', true)
-          .in('volunteer_status', ['available', 'busy'])
-          .limit(20);
+          .in('volunteer_status', ['available', 'busy', 'offline']) // Include more statuses
+          .limit(30); // Increased limit
 
         if (fallbackError) {
           console.error('❌ Fallback volunteer query failed:', fallbackError);
@@ -236,7 +264,7 @@ class AutoAssignmentService {
 
         console.log('✅ Found volunteers via fallback query:', volunteers?.length || 0);
         
-        // Calculate distance manually for fallback volunteers
+        // Calculate distance manually for fallback volunteers (assign reasonable defaults)
         return (volunteers || []).map(v => ({
           id: v.id,
           user_id: v.id,
@@ -251,7 +279,7 @@ class AutoAssignmentService {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           volunteer_id: v.id,
-          distance_meters: 5000 // Default distance for fallback
+          distance_meters: 8000 // Default reasonable distance for fallback
         })) as User[];
       }
     } catch (error) {
@@ -278,30 +306,33 @@ class AutoAssignmentService {
    * Calculate comprehensive match score for a volunteer
    */
   private async calculateMatchScore(request: AssistanceRequest, volunteer: any): Promise<VolunteerMatch> {
-    // Skill matching score (40% weight)
+    // Skill matching score (35% weight) - reduced to allow for more flexibility
     const skillMatch = this.calculateSkillMatch(request.type, volunteer.skills || []);
     
-    // Distance score (30% weight) - closer is better
+    // Distance score (25% weight) - reduced emphasis on distance
     const distanceScore = this.calculateDistanceScore(volunteer.distance_meters || 0);
     
-    // Availability score (20% weight)
+    // Availability score (30% weight) - increased to prioritize available volunteers
     const availabilityScore = this.calculateAvailabilityScore(volunteer.volunteer_status, volunteer.rating || 0);
     
     // Priority urgency bonus (10% weight)
     const urgencyBonus = this.calculateUrgencyBonus(request.priority);
 
-    // Weighted final score
+    // Check current workload and adjust availability accordingly
+    const workloadPenalty = await this.calculateWorkloadPenalty(volunteer.volunteer_id || volunteer.id);
+
+    // Weighted final score with more balanced approach
     const finalScore = (
-      skillMatch * 0.4 +
-      distanceScore * 0.3 +
-      availabilityScore * 0.2 +
-      urgencyBonus * 0.1
+      skillMatch * 0.35 +
+      distanceScore * 0.25 +
+      (availabilityScore - workloadPenalty) * 0.30 +
+      urgencyBonus * 0.10
     );
 
     return {
       volunteer: {
-        id: volunteer.volunteer_id,
-        user_id: volunteer.volunteer_id,
+        id: volunteer.volunteer_id || volunteer.id,
+        user_id: volunteer.volunteer_id || volunteer.id,
         name: volunteer.name,
         email: '',
         phone: volunteer.phone,
@@ -313,11 +344,42 @@ class AutoAssignmentService {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as User,
-      score: Math.min(finalScore, 1.0), // Cap at 1.0
+      score: Math.max(Math.min(finalScore, 1.0), 0.0), // Cap between 0 and 1
       distance: volunteer.distance_meters || 0,
       skillMatch,
       availabilityScore
     };
+  }
+
+  /**
+   * Calculate workload penalty based on current assignments
+   */
+  private async calculateWorkloadPenalty(volunteerId: string): Promise<number> {
+    try {
+      const { data: assignments, error } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('volunteer_id', volunteerId)
+        .in('status', ['pending', 'accepted', 'in_progress']);
+
+      if (error) {
+        console.log('⚠️ Could not check workload for volunteer:', volunteerId);
+        return 0; // No penalty if we can't check
+      }
+
+      const activeCount = assignments?.length || 0;
+      
+      // Penalty increases with workload
+      if (activeCount === 0) return 0;     // No penalty
+      if (activeCount === 1) return 0.1;   // Small penalty  
+      if (activeCount === 2) return 0.2;   // Medium penalty
+      if (activeCount >= 3) return 0.4;    // High penalty
+      
+      return 0;
+    } catch (error) {
+      console.log('⚠️ Error checking workload:', error);
+      return 0; // No penalty on error
+    }
   }
 
   /**
@@ -327,18 +389,19 @@ class AutoAssignmentService {
     const requiredSkills = this.getRequiredSkills(requestType);
     
     if (!requiredSkills || requiredSkills.length === 0) {
-      return 0.7; // Base score for general requests
+      return 0.8; // Higher base score for general requests
     }
 
     if (!volunteerSkills || volunteerSkills.length === 0) {
-      return 0.3; // Low score for volunteers with no listed skills
+      return 0.5; // Increased score for volunteers with no listed skills (give them a chance)
     }
 
-    // Calculate overlap
+    // Calculate overlap with more flexible matching
     const matchingSkills = requiredSkills.filter(skill => 
       volunteerSkills.some(vSkill => 
         vSkill.toLowerCase().includes(skill.toLowerCase()) ||
-        skill.toLowerCase().includes(vSkill.toLowerCase())
+        skill.toLowerCase().includes(vSkill.toLowerCase()) ||
+        this.areSkillsRelated(skill, vSkill) // Add related skill matching
       )
     );
 
@@ -349,18 +412,50 @@ class AutoAssignmentService {
       skill.toLowerCase().includes(requestType.toLowerCase())
     ).length * 0.1;
 
-    return Math.min(matchRatio + skillBonus, 1.0);
+    // Ensure minimum score for general helpfulness
+    const minScore = 0.4;
+    const calculatedScore = Math.min(matchRatio + skillBonus, 1.0);
+    
+    return Math.max(calculatedScore, minScore);
+  }
+
+  /**
+   * Check if two skills are related (helper method for better matching)
+   */
+  private areSkillsRelated(skill1: string, skill2: string): boolean {
+    const relatedSkills: Record<string, string[]> = {
+      'medical': ['health', 'nurse', 'doctor', 'paramedic', 'first_aid'],
+      'emergency': ['crisis', 'urgent', 'rescue', 'safety'],
+      'guidance': ['help', 'assist', 'support', 'direct', 'guide'],
+      'communication': ['language', 'speak', 'translate', 'talk'],
+      'crowd_management': ['security', 'control', 'organize', 'manage'],
+      'cleaning': ['sanitation', 'hygiene', 'maintenance', 'tidy']
+    };
+
+    const s1 = skill1.toLowerCase();
+    const s2 = skill2.toLowerCase();
+
+    for (const [key, related] of Object.entries(relatedSkills)) {
+      if ((s1.includes(key) || related.some(r => s1.includes(r))) &&
+          (s2.includes(key) || related.some(r => s2.includes(r)))) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
    * Calculate distance-based score (closer = higher score)
    */
   private calculateDistanceScore(distanceMeters: number): number {
-    if (distanceMeters <= 1000) return 1.0;      // Within 1km
-    if (distanceMeters <= 3000) return 0.8;      // Within 3km
-    if (distanceMeters <= 5000) return 0.6;      // Within 5km
-    if (distanceMeters <= 10000) return 0.4;     // Within 10km
-    return 0.2; // Beyond 10km
+    if (distanceMeters <= 500) return 1.0;       // Within 0.5km - excellent
+    if (distanceMeters <= 1000) return 0.9;      // Within 1km - very good
+    if (distanceMeters <= 2000) return 0.8;      // Within 2km - good
+    if (distanceMeters <= 5000) return 0.7;      // Within 5km - acceptable
+    if (distanceMeters <= 10000) return 0.6;     // Within 10km - fair
+    if (distanceMeters <= 15000) return 0.4;     // Within 15km - acceptable for urgent cases
+    return 0.3; // Beyond 15km but still possible
   }
 
   /**
@@ -369,23 +464,23 @@ class AutoAssignmentService {
   private calculateAvailabilityScore(status: string, rating: number): number {
     let baseScore = 0;
     
-    // Status-based scoring
+    // Status-based scoring with more lenient approach
     switch (status) {
       case 'available':
         baseScore = 1.0;
         break;
       case 'busy':
-        baseScore = 0.3; // Can still be assigned if urgent
+        baseScore = 0.6; // Increased from 0.3 - busy volunteers can still help if needed
         break;
       case 'offline':
-        baseScore = 0.1;
+        baseScore = 0.3; // Increased from 0.1 - they might come online
         break;
       default:
-        baseScore = 0.5;
+        baseScore = 0.7; // More optimistic default
     }
 
-    // Rating bonus (0-5 scale)
-    const ratingBonus = (rating || 0) / 5 * 0.2;
+    // Rating bonus (0-5 scale) with more generous scaling
+    const ratingBonus = (rating || 3) / 5 * 0.3; // Default to 3 if no rating, increased bonus
     
     return Math.min(baseScore + ratingBonus, 1.0);
   }

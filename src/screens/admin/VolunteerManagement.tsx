@@ -250,8 +250,8 @@ const VolunteerManagement: React.FC = () => {
           
           const { data: result, error } = await supabase.rpc('auto_assign_volunteer', {
             p_request_id: request.id,
-            p_max_distance: 5000, // 5km radius
-            p_min_score: 0.4 // Lowered threshold for better success rate
+            p_max_distance: 15000, // Increased to 15km radius for better coverage
+            p_min_score: 0.25 // Further lowered threshold to match our enhanced algorithm
           });
           
           if (error) {
@@ -338,6 +338,7 @@ const VolunteerManagement: React.FC = () => {
 
     return (
       <View style={styles.volunteerCard}>
+        {/* Header with name and options */}
         <View style={styles.volunteerHeader}>
           <View style={styles.volunteerInfo}>
             <Text style={styles.volunteerName}>
@@ -348,15 +349,16 @@ const VolunteerManagement: React.FC = () => {
             {item.phone && (
               <Text style={styles.volunteerContact}>{item.phone}</Text>
             )}
-            
+
+            {/* Status and task info in a row */}
             <View style={styles.statusContainer}>
               <View style={[
                 styles.statusBadge, 
-                { backgroundColor: item.is_active ? PROFESSIONAL_DESIGN.COLORS.success + '20' : PROFESSIONAL_DESIGN.COLORS.error + '20' }
+                { backgroundColor: item.is_active ? '#dcfce7' : '#fee2e2' }
               ]}>
                 <Text style={[
                   styles.statusText, 
-                  { color: item.is_active ? PROFESSIONAL_DESIGN.COLORS.success : PROFESSIONAL_DESIGN.COLORS.error }
+                  { color: item.is_active ? '#166534' : '#dc2626' }
                 ]}>
                   {item.is_active ? 'Active' : 'Inactive'}
                 </Text>
@@ -376,18 +378,19 @@ const VolunteerManagement: React.FC = () => {
             </View>
 
             <View style={styles.tasksInfo}>
-              <Ionicons name="briefcase-outline" size={16} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
+              <Ionicons name="briefcase-outline" size={16} color={'#6b7280'} />
               <Text style={styles.tasksText}>
                 {activeAssignments.length} active task{activeAssignments.length !== 1 ? 's' : ''}
               </Text>
             </View>
           </View>
 
-          <TouchableOpacity onPress={() => handleVolunteerOptions(item)}>
-            <Ionicons name="ellipsis-vertical" size={20} color={PROFESSIONAL_DESIGN.COLORS.textSecondary} />
+          <TouchableOpacity onPress={() => handleVolunteerOptions(item)} style={styles.optionsButton}>
+            <Ionicons name="ellipsis-vertical" size={20} color={'#6b7280'} />
           </TouchableOpacity>
         </View>
 
+        {/* Skills section */}
         {item.skills && item.skills.length > 0 && (
           <View style={styles.skillsSection}>
             <Text style={styles.skillsLabel}>Skills</Text>
@@ -406,12 +409,13 @@ const VolunteerManagement: React.FC = () => {
           </View>
         )}
 
+        {/* Action buttons */}
         <View style={styles.buttonRow}>
           <TouchableOpacity 
             style={styles.secondaryButton} 
             onPress={() => handleViewTasks(item)}
           >
-            <Ionicons name="eye-outline" size={16} color={PROFESSIONAL_DESIGN.COLORS.textPrimary} />
+            <Ionicons name="eye-outline" size={16} color={PROFESSIONAL_DESIGN.COLORS.sky} />
             <Text style={styles.secondaryButtonText}>View Tasks</Text>
           </TouchableOpacity>
           
@@ -432,7 +436,7 @@ const VolunteerManagement: React.FC = () => {
               styles.primaryButtonText,
               (!item.is_active || item.volunteer_status === 'busy' || item.volunteer_status === 'on_duty') && styles.disabledButtonText
             ]}>
-              Assign Task
+              Assign
             </Text>
           </TouchableOpacity>
         </View>
@@ -561,7 +565,7 @@ const VolunteerManagement: React.FC = () => {
             )}
           </View>
         }
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.flatListContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
@@ -671,6 +675,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
     paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+  },
+  
+  flatListContent: {
+    paddingBottom: PROFESSIONAL_DESIGN.SPACING.lg,
   },
   
   // Professional Header Design
@@ -880,160 +888,172 @@ const styles = StyleSheet.create({
   // Professional Volunteer Cards
   volunteerCard: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
-    padding: PROFESSIONAL_DESIGN.SPACING.md,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+    borderColor: '#f1f5f9',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   
   volunteerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginBottom: 16,
   },
   
   volunteerInfo: {
     flex: 1,
   },
+
+  optionsButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
   
   volunteerName: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
-    color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
-    marginBottom: 4,
-    fontWeight: '600' as const,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 6,
+    lineHeight: 22,
   },
   
   volunteerContact: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
-    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 3,
+    lineHeight: 18,
   },
   
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    gap: 6,
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 8,
   },
   
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   
   statusText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
-    fontWeight: '600' as const,
+    fontSize: 11,
+    fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    fontSize: 10,
+    letterSpacing: 0.5,
   },
   
   skillsSection: {
-    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.sm,
+    marginTop: 12,
+    marginBottom: 16,
   },
   
   skillsLabel: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
-    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
-    marginBottom: 4,
-    fontWeight: '500' as const,
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 6,
+    fontWeight: '500',
   },
   
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
+    gap: 6,
   },
   
   skillChip: {
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+    borderColor: '#bfdbfe',
   },
   
   skillText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
-    color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
-    fontWeight: '500' as const,
-    fontSize: 10,
+    fontSize: 11,
+    color: '#1e40af',
+    fontWeight: '600',
   },
   
   tasksInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
+    gap: 6,
+    marginTop: 8,
   },
   
   tasksText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
-    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   
   // Professional Action Buttons
   buttonRow: {
     flexDirection: 'row',
-    gap: PROFESSIONAL_DESIGN.SPACING.sm,
-    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
-    paddingTop: PROFESSIONAL_DESIGN.SPACING.sm,
+    gap: 12,
+    marginTop: 16,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: PROFESSIONAL_DESIGN.COLORS.border,
+    borderTopColor: '#f1f5f9',
   },
   
   primaryButton: {
     flex: 1,
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.accent,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   
   secondaryButton: {
     flex: 1,
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    backgroundColor: '#f8fafc',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.borderDark,
+    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
   },
   
   primaryButtonText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
-    color: PROFESSIONAL_DESIGN.COLORS.textInverse,
-    fontWeight: '600' as const,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   
   secondaryButtonText: {
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.bodySmall,
-    color: PROFESSIONAL_DESIGN.COLORS.textPrimary,
-    fontWeight: '600' as const,
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '600',
   },
   
   disabledButton: {
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.textTertiary,
+    backgroundColor: '#9ca3af',
   },
   
   disabledButtonText: {
-    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
+    color: '#ffffff',
   },
   
   // Professional Empty States
