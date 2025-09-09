@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2025-08-15
 
+## [2.3.2] - 2025-09-09
+
 ### Added
 
 - **Basic Assignment System**: Manual volunteer-pilgrim assignment functionality
@@ -81,8 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Database Migration**: Moved from local storage to Supabase for scalability
 - **UI Framework**: Migrated to React Native with Expo for better performance
-
-## [2.0.0] - 2025-07-20
+- **v2.3.2**: Latest release with bug fixes and improvements
 
 ### Added
 

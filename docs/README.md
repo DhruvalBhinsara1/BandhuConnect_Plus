@@ -1,6 +1,6 @@
 # BandhuConnect+ Documentation
 
-**Version:** 2.3.0  
+**Version:** 2.3.2  
 **Last Updated:** September 9, 2025  
 **Status:** ✅ Production Ready
 

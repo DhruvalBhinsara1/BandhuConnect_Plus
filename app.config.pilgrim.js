@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "BandhuConnect+ Pilgrim",
     slug: "bandhuconnect-pilgrim",
-    version: "2.3.1",
+  version: "2.3.2",
     orientation: "portrait",
     userInterfaceStyle: "light",
     main: "./index.ts",

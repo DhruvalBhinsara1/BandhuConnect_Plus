@@ -103,35 +103,14 @@ npm start
 - **PostgreSQL**: Robust relational database with RLS
 - **Google Maps**: Mapping and geolocation services
 - **WebSocket**: Real-time bidirectional communication
-
-## 📚 **Documentation**
-
-### **Getting Started**
-
-- [📖 Project Overview](./docs/project/PROJECT_OVERVIEW.md) - What BandhuConnect+ is and why it exists
 - [⚡ Quick Start Guide](./docs/setup/QUICK_START.md) - Get running in 5 minutes
 - [🔧 Installation Guide](./docs/setup/INSTALLATION.md) - Detailed setup instructions
 - [📦 Build Instructions](./docs/setup/BUILD_INSTRUCTIONS.md) - Creating production builds
 
 ### **Development**
-
-- [👨‍💻 Development Guide](./docs/development/DEVELOPMENT_GUIDE.md) - Coding standards and workflow
-- [🧩 Component Architecture](./docs/components/COMPONENT_ARCHITECTURE.md) - UI structure and patterns
-- [🎨 UI Guidelines](./docs/ui/UI_GUIDELINES.md) - Design system and accessibility
-- [🗃️ Database Schema](./docs/database/DATABASE_SCHEMA.md) - Data structure and relationships
-
-### **Testing & Deployment**
-
-- [🧪 Testing Guide](./docs/testing/TESTING_GUIDE.md) - How to test the application
-- [🎭 Demo Environment](./docs/testing/DEMO_ENVIRONMENT.md) - Parul University test scenarios
-- [🚀 Production Deployment](./docs/deployment/PRODUCTION.md) - Going live checklist
-- [📋 Changelog](./docs/reference/CHANGELOG.md) - Version history and updates
+- [ Changelog](./docs/reference/CHANGELOG.md) - Version history and updates
 
 ## 🎪 **Use Cases**
-
-### **Target Events**
-
-- **Religious Gatherings**: Kumbh Mela, temple festivals, pilgrimages
 - **Music Festivals**: Large outdoor entertainment events
 - **Sports Events**: Stadium coordination, marathon support
 - **Public Gatherings**: Parades, celebrations, demonstrations
@@ -147,7 +126,6 @@ npm start
 ## 📊 **Success Metrics**
 
 - **⚡ Response Time**: Average 2-3 minutes from request to assignment
-- **🎯 Success Rate**: 95%+ successful help completion rate
 - **📍 Location Accuracy**: Sub-10 meter precision for tracking
 - **🔄 System Reliability**: 99.9% uptime during peak events
 

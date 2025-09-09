@@ -3,7 +3,7 @@ export default {
     name: "BandhuConnect+ Volunteer",
     slug: "bandhuconnect-volunteer",
     version: "2.3.1",
-    orientation: "portrait",
+    version: "2.3.2",
     userInterfaceStyle: "light",
     main: "./index.ts",
     splash: {

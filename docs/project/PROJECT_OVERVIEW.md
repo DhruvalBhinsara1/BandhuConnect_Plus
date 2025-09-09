@@ -1,12 +1,12 @@
 # BandhuConnect+ Project Overview
 
-**Version:** 2.3.1  
+**Version:** 2.3.2  
 **Target Audience:** Large-scale public events, religious gatherings, festivals  
 **Primary Use Case:** Emergency assistance coordination during Kumbh Mela and similar events
 
 ## 🎯 **Mission Statement**
 
-## 🚀 Recent Changes (v2.3.1)
+## 🚀 Recent Changes (v2.3.2)
 
 - Modernized admin interface with card-based design and 2x2 statistics grid
 - Live location tracking for pilgrims in request details

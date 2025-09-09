@@ -127,7 +127,7 @@ const LoadingScreen: React.FC = () => {
             Connecting Hearts, Ensuring Safety
           </Text>
           <Text style={[styles.version, { color: theme.theme.textTertiary }]}>
-            Version 2.3.1
+            Version 2.3.2
           </Text>
         </Animated.View>
 
