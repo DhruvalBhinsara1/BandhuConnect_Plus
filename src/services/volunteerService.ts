@@ -267,16 +267,24 @@ export class VolunteerService {
         assignmentStatuses: assignments?.map(a => a.status)
       });
       
-      // Calculate actual hours worked based on duty time (started_at to completed_at)
+      // Calculate actual hours worked based on duty time
       let hoursWorked = 0;
       if (assignments) {
         hoursWorked = assignments.reduce((total, assignment) => {
-          // Only count hours for completed tasks that have both started_at and completed_at
-          if (assignment.status === 'completed' && assignment.started_at && assignment.completed_at) {
-            const startTime = new Date(assignment.started_at).getTime();
-            const endTime = new Date(assignment.completed_at).getTime();
-            const hoursOnDuty = (endTime - startTime) / (1000 * 60 * 60); // Convert ms to hours
-            return total + Math.max(0, hoursOnDuty); // Ensure non-negative hours
+          // Only count hours for completed tasks
+          if (assignment.status === 'completed' && assignment.completed_at) {
+            // Try started_at first, then fall back to accepted_at or assigned_at
+            const startTime = assignment.started_at || assignment.accepted_at || assignment.assigned_at;
+            
+            if (startTime) {
+              const start = new Date(startTime).getTime();
+              const end = new Date(assignment.completed_at).getTime();
+              const hoursOnDuty = (end - start) / (1000 * 60 * 60); // Convert ms to hours
+              // Only add positive hours and reasonable limits
+              if (hoursOnDuty > 0 && hoursOnDuty < 24) {
+                return total + hoursOnDuty;
+              }
+            }
           }
           return total;
         }, 0);

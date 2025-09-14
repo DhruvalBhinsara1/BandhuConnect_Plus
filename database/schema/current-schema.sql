@@ -51,9 +51,8 @@ CREATE TABLE assistance_requests (
     type request_type NOT NULL DEFAULT 'general',
     priority priority_level NOT NULL DEFAULT 'medium',
     status request_status NOT NULL DEFAULT 'pending',
-    location_latitude DECIMAL(10, 8),
-    location_longitude DECIMAL(11, 8),
-    location_description TEXT,
+    location GEOGRAPHY(POINT, 4326) NOT NULL,
+    address TEXT,
     photo_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

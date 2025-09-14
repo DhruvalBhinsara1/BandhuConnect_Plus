@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +26,7 @@ const VolunteerProfile: React.FC = () => {
   
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     completedTasks: 0,
     totalTasks: 0,
@@ -37,6 +38,15 @@ const VolunteerProfile: React.FC = () => {
     skills: user?.skills || [],
     status: user?.volunteer_status || 'available',
   });
+
+  // Helper function to format hours display intelligently
+  const formatHoursDisplay = (hours: number): string => {
+    if (hours < 1) {
+      const minutes = Math.round(hours * 60);
+      return `${minutes}m`;
+    }
+    return `${hours.toFixed(2)}h`;
+  };
 
   useEffect(() => {
     if (user) {
@@ -62,11 +72,17 @@ const VolunteerProfile: React.FC = () => {
       
       let totalHours = 0;
       completed.forEach(assignment => {
-        if (assignment.started_at && assignment.completed_at) {
-          const start = new Date(assignment.started_at);
+        // Try started_at first, then fall back to accepted_at or assigned_at
+        const startTime = assignment.started_at || assignment.accepted_at || assignment.assigned_at;
+        
+        if (startTime && assignment.completed_at) {
+          const start = new Date(startTime);
           const end = new Date(assignment.completed_at);
           const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          totalHours += hours;
+          // Only add positive hours and reasonable limits
+          if (hours > 0 && hours < 24) {
+            totalHours += hours;
+          }
         }
       });
 
@@ -75,6 +91,20 @@ const VolunteerProfile: React.FC = () => {
         totalTasks: userAssignments.length,
         hoursWorked: totalHours,
       });
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh user data and stats
+      await loadStats();
+      // You could also refresh other data here if needed
+      console.log('Profile refreshed successfully');
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -384,7 +414,19 @@ const VolunteerProfile: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.primary]}
+            tintColor={theme.primary}
+            title="Refreshing..."
+            titleColor={theme.textSecondary}
+          />
+        }
+      >
         {/* Profile Info */}
         <Card style={styles.profileCard}>
           <View style={styles.profileHeader}>
@@ -529,7 +571,7 @@ const VolunteerProfile: React.FC = () => {
               <Ionicons name="time" size={20} color={theme.warning} />
               <Text style={styles.statLabelText}>Hours Worked</Text>
             </View>
-            <Text style={styles.statValue}>{stats.hoursWorked.toFixed(2)}h</Text>
+            <Text style={styles.statValue}>{formatHoursDisplay(stats.hoursWorked)}</Text>
           </View>
 
           <View style={styles.statRow}>

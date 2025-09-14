@@ -30,6 +30,15 @@ const VolunteerDashboard: React.FC = () => {
   const [hasActiveAssignment, setHasActiveAssignment] = useState(false);
   const [realtimeHours, setRealtimeHours] = useState(0);
 
+  // Helper function to format hours display intelligently
+  const formatHoursDisplay = (hours: number): string => {
+    if (hours < 1) {
+      const minutes = Math.round(hours * 60);
+      return `${minutes}m`;
+    }
+    return `${hours.toFixed(2)}h`;
+  };
+
   useEffect(() => {
     loadDashboardData();
   }, [user]);
@@ -94,28 +103,76 @@ const VolunteerDashboard: React.FC = () => {
     // Import centralized assignment detection
     const { ACTIVE_ASSIGNMENT_STATUSES } = await import('../../services/assignmentService');
     
-    // Always use local assignments for consistency with the UI display
-    const completed = assignments.filter(a => a.status === 'completed').length;
+    // First try to get stats from volunteer service (pre-calculated)
+    const { data: volunteerStats, error } = await volunteerService.getVolunteerStats(user.id);
+    if (volunteerStats && !error) {
+      console.log('✅ Using pre-calculated stats from service:', volunteerStats);
+      setStats({
+        totalTasks: volunteerStats.totalTasks,
+        completedTasks: volunteerStats.completedTasks,
+        activeAssignments: volunteerStats.activeAssignments,
+        hoursWorked: volunteerStats.hoursWorked,
+      });
+      return;
+    }
+    
+    console.log('⚠️ Service stats failed, falling back to local calculation:', error);
+    
+    // Fallback: Calculate from local assignments data
+    const completed = assignments.filter(a => a.status === 'completed');
     const active = assignments.filter(a => ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as any)).length;
     
-    console.log('📊 Dashboard stats calculation:', {
+    // Calculate actual hours worked based on start and end times
+    let totalHoursWorked = 0;
+    completed.forEach(assignment => {
+      // Try started_at first (if available), then fall back to assigned_at/accepted_at
+      const startTime = assignment.started_at || assignment.accepted_at || assignment.assigned_at;
+      
+      if (startTime && assignment.completed_at) {
+        const start = new Date(startTime);
+        const end = new Date(assignment.completed_at);
+        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        // Only add positive hours (prevent negative values from invalid timestamps)
+        if (hours > 0 && hours < 24) { // Reasonable upper limit to prevent data errors
+          totalHoursWorked += hours;
+        }
+      }
+    });
+    
+    console.log('📊 Dashboard stats calculation (fallback):', {
       totalAssignments: assignments.length,
-      completed,
+      completedCount: completed.length,
       active,
-      assignmentStatuses: assignments.map(a => ({ id: a.id, status: a.status, assigned: a.assigned }))
+      totalHoursWorked,
+      sampleAssignment: completed[0] ? {
+        id: completed[0].id,
+        status: completed[0].status,
+        started_at: completed[0].started_at,
+        accepted_at: completed[0].accepted_at,
+        assigned_at: completed[0].assigned_at,
+        completed_at: completed[0].completed_at
+      } : null,
+      assignmentStatuses: assignments.map(a => ({ 
+        id: a.id, 
+        status: a.status,
+        assigned: a.assigned,
+        started_at: a.started_at,
+        completed_at: a.completed_at
+      }))
     });
     
     setStats({
       totalTasks: assignments.length,
-      completedTasks: completed,
+      completedTasks: completed.length,
       activeAssignments: active,
-      hoursWorked: completed * 2, // 2 hours per completed task
+      hoursWorked: totalHoursWorked,
     });
     
-    console.log('✅ Dashboard stats set to:', {
+    console.log('✅ Dashboard stats set to (fallback):', {
       totalTasks: assignments.length,
-      completedTasks: completed,
+      completedTasks: completed.length,
       activeAssignments: active,
+      hoursWorked: totalHoursWorked,
     });
   };
 
@@ -163,10 +220,15 @@ const VolunteerDashboard: React.FC = () => {
             <View style={styles.dutyStatusRow}>
               <View>
                 <Text style={styles.dutyStatusTitle}>
-                  {hasActiveAssignment ? 'On Duty' : 'Off Duty'}
+                  {hasActiveAssignment ? 'On Duty' : isTracking ? 'Checked In' : 'Checked Out'}
                 </Text>
                 <Text style={styles.dutyStatusSubtitle}>
-                  {hasActiveAssignment ? 'Assignment active' : isTracking ? 'Location tracking active' : 'No active assignments'}
+                  {hasActiveAssignment
+                    ? 'Assignment active'
+                    : isTracking
+                      ? 'Available for assignments'
+                      : 'Check in to receive assignments'
+                  }
                 </Text>
               </View>
               <Button
@@ -216,7 +278,7 @@ const VolunteerDashboard: React.FC = () => {
               <View style={styles.statCardContent}>
                 <Ionicons name="timer" size={32} color={COLORS.secondary} />
                 <Text style={styles.statNumber}>
-                  {(stats.hoursWorked + realtimeHours).toFixed(2)}h
+                  {formatHoursDisplay(stats.hoursWorked + realtimeHours)}
                 </Text>
                 <Text style={styles.statLabel}>Hours Worked</Text>
               </View>

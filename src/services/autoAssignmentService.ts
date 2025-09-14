@@ -1,3 +1,16 @@
+/**
+ * Auto Assignment Service
+ *
+ * IMPORTANT: This service only assigns tasks to volunteers who have CHECKED IN
+ * Volunteers must have recent location data (within 24 hours) to be eligible for assignments
+ *
+ * Algorithm:
+ * 1. Find volunteers within 15km radius (expands to 25km if needed)
+ * 2. Filter to only include volunteers who have checked in (location data < 24h old)
+ * 3. Score volunteers based on skills, distance, availability, and check-in recency
+ * 4. Assign to highest-scoring volunteer above minimum threshold
+ */
+
 import { supabase } from './supabase';
 import { AssistanceRequest, User, Assignment } from '../types';
 
@@ -56,12 +69,13 @@ class AutoAssignmentService {
       // Calculate match scores for each volunteer
       console.log('🔍 Scoring volunteers...');
       const scoredVolunteers = await this.scoreVolunteers(request, volunteers);
-      console.log('🔍 Scored volunteers:', scoredVolunteers.map(v => ({ 
-        name: v.volunteer.name, 
+      console.log('🔍 Scored volunteers:', scoredVolunteers.map(v => ({
+        name: v.volunteer.name,
         score: v.score.toFixed(3),
         skillMatch: v.skillMatch.toFixed(3),
         distance: v.distance,
-        availability: v.availabilityScore.toFixed(3)
+        availability: v.availabilityScore.toFixed(3),
+        status: v.volunteer.volunteer_status
       })));
       
       // Sort by best match (highest score)
@@ -161,10 +175,10 @@ class AutoAssignmentService {
   private async findMatchingVolunteers(request: AssistanceRequest): Promise<User[]> {
     try {
       console.log('🔍 Finding volunteers for request location:', request.location);
-      
+
       // Try to extract coordinates from request location using multiple methods
       let latitude: number, longitude: number;
-      
+
       // Method 1: Try the RPC function if it exists
       try {
         const { data: locationData, error: rpcError } = await supabase.rpc('get_coordinates_from_geography', {
@@ -180,7 +194,7 @@ class AutoAssignmentService {
         }
       } catch (rpcError) {
         console.log('⚠️ RPC coordinate extraction failed, trying direct query...');
-        
+
         // Method 2: Use request location directly if it has coordinates
         if (request.location && typeof request.location === 'object') {
           const locationObj = request.location as any;
@@ -203,7 +217,7 @@ class AutoAssignmentService {
         console.log('✅ Extracted coordinates via direct query:', { latitude, longitude });
       }
 
-      // Try to use the find_nearest_volunteers function
+      // Try to use the find_nearest_volunteers function with check-in status
       try {
         const { data: volunteers, error } = await supabase.rpc('find_nearest_volunteers', {
           target_lat: latitude,
@@ -218,11 +232,15 @@ class AutoAssignmentService {
         }
 
         console.log('✅ Found volunteers via RPC:', volunteers?.length || 0);
-        
-        // If no volunteers found with current criteria, try expanded search
-        if (!volunteers || volunteers.length === 0) {
-          console.log('🔍 No volunteers found with current criteria, expanding search...');
-          
+
+        // Filter volunteers to only include those who have checked in
+        const checkedInVolunteers = await this.filterCheckedInVolunteers(volunteers || []);
+        console.log('🔐 After check-in filter:', checkedInVolunteers.length, 'volunteers eligible');
+
+        // If no checked-in volunteers found with current criteria, try expanded search
+        if (checkedInVolunteers.length === 0) {
+          console.log('🔍 No checked-in volunteers found with current criteria, expanding search...');
+
           const { data: expandedVolunteers, error: expandedError } = await supabase.rpc('find_nearest_volunteers', {
             target_lat: latitude,
             target_lng: longitude,
@@ -230,17 +248,18 @@ class AutoAssignmentService {
             required_skills: [], // Remove skill requirements
             limit_count: 30
           });
-          
+
           if (!expandedError && expandedVolunteers && expandedVolunteers.length > 0) {
-            console.log('✅ Found volunteers with expanded search:', expandedVolunteers.length);
-            return expandedVolunteers;
+            const checkedInExpanded = await this.filterCheckedInVolunteers(expandedVolunteers);
+            console.log('✅ Found checked-in volunteers with expanded search:', checkedInExpanded.length);
+            return checkedInExpanded;
           }
         }
-        
-        return volunteers || [];
+
+        return checkedInVolunteers;
       } catch (rpcError) {
         console.log('⚠️ RPC volunteer search failed, using fallback query...');
-        
+
         // Fallback: Simple query for volunteers without distance calculation
         const { data: volunteers, error: fallbackError } = await supabase
           .from('profiles')
@@ -263,28 +282,83 @@ class AutoAssignmentService {
         }
 
         console.log('✅ Found volunteers via fallback query:', volunteers?.length || 0);
-        
-        // Calculate distance manually for fallback volunteers (assign reasonable defaults)
-        return (volunteers || []).map(v => ({
-          id: v.id,
-          user_id: v.id,
-          name: v.name,
-          email: '',
-          phone: v.phone,
-          role: 'volunteer',
-          skills: v.skills,
-          volunteer_status: v.volunteer_status,
-          rating: v.rating,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          volunteer_id: v.id,
-          distance_meters: 8000 // Default reasonable distance for fallback
-        })) as User[];
+
+        // Filter for checked-in volunteers and calculate distance manually
+        const checkedInFallbackVolunteers = await this.filterCheckedInVolunteers(
+          (volunteers || []).map(v => ({
+            id: v.id,
+            user_id: v.id,
+            name: v.name,
+            email: '',
+            phone: v.phone,
+            role: 'volunteer',
+            skills: v.skills,
+            volunteer_status: v.volunteer_status,
+            rating: v.rating,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            volunteer_id: v.id,
+            distance_meters: 8000 // Default reasonable distance for fallback
+          })) as User[]
+        );
+
+        console.log('🔐 After check-in filter (fallback):', checkedInFallbackVolunteers.length, 'volunteers eligible');
+        return checkedInFallbackVolunteers;
       }
     } catch (error) {
       console.error('❌ Error in findMatchingVolunteers:', error);
       return [];
+    }
+  }
+
+  /**
+   * Filter volunteers to only include those who have checked in
+   */
+  private async filterCheckedInVolunteers(volunteers: User[]): Promise<User[]> {
+    try {
+      if (!volunteers || volunteers.length === 0) {
+        return [];
+      }
+
+      const volunteerIds = volunteers.map(v => v.id);
+      console.log('🔍 Checking check-in status for volunteers:', volunteerIds);
+
+      // Query user_locations to see which volunteers have recent location data (indicating they've checked in)
+      const { data: locationData, error } = await supabase
+        .from('user_locations')
+        .select('user_id, last_updated')
+        .in('user_id', volunteerIds)
+        .order('last_updated', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error checking volunteer check-in status:', error);
+        // If we can't check check-in status, return all volunteers as fallback
+        return volunteers;
+      }
+
+      // Consider a volunteer "checked in" if they have location data from the last 24 hours
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const checkedInVolunteerIds = new Set(
+        (locationData || [])
+          .filter(location => new Date(location.last_updated) > twentyFourHoursAgo)
+          .map(location => location.user_id)
+      );
+
+      console.log('✅ Checked-in volunteer IDs:', Array.from(checkedInVolunteerIds));
+
+      // Filter volunteers to only include those who have checked in
+      const checkedInVolunteers = volunteers.filter(volunteer =>
+        checkedInVolunteerIds.has(volunteer.id)
+      );
+
+      console.log(`🔐 Filtered ${volunteers.length} volunteers to ${checkedInVolunteers.length} checked-in volunteers`);
+
+      return checkedInVolunteers;
+    } catch (error) {
+      console.error('❌ Error filtering checked-in volunteers:', error);
+      // Return original list as fallback
+      return volunteers;
     }
   }
 
@@ -308,13 +382,13 @@ class AutoAssignmentService {
   private async calculateMatchScore(request: AssistanceRequest, volunteer: any): Promise<VolunteerMatch> {
     // Skill matching score (35% weight) - reduced to allow for more flexibility
     const skillMatch = this.calculateSkillMatch(request.type, volunteer.skills || []);
-    
+
     // Distance score (25% weight) - reduced emphasis on distance
     const distanceScore = this.calculateDistanceScore(volunteer.distance_meters || 0);
-    
+
     // Availability score (30% weight) - increased to prioritize available volunteers
-    const availabilityScore = this.calculateAvailabilityScore(volunteer.volunteer_status, volunteer.rating || 0);
-    
+    const availabilityScore = await this.calculateAvailabilityScore(volunteer.volunteer_id || volunteer.id, volunteer.volunteer_status, volunteer.rating || 0);
+
     // Priority urgency bonus (10% weight)
     const urgencyBonus = this.calculateUrgencyBonus(request.priority);
 
@@ -459,11 +533,11 @@ class AutoAssignmentService {
   }
 
   /**
-   * Calculate availability and rating score
+   * Calculate availability and rating score with check-in status consideration
    */
-  private calculateAvailabilityScore(status: string, rating: number): number {
+  private async calculateAvailabilityScore(volunteerId: string, status: string, rating: number): Promise<number> {
     let baseScore = 0;
-    
+
     // Status-based scoring with more lenient approach
     switch (status) {
       case 'available':
@@ -479,10 +553,50 @@ class AutoAssignmentService {
         baseScore = 0.7; // More optimistic default
     }
 
+    // Check-in bonus: Give higher score to volunteers who have checked in recently
+    const checkInBonus = await this.calculateCheckInBonus(volunteerId);
+    baseScore += checkInBonus;
+
     // Rating bonus (0-5 scale) with more generous scaling
     const ratingBonus = (rating || 3) / 5 * 0.3; // Default to 3 if no rating, increased bonus
-    
+
     return Math.min(baseScore + ratingBonus, 1.0);
+  }
+
+  /**
+   * Calculate bonus for volunteers who have checked in recently
+   */
+  private async calculateCheckInBonus(volunteerId: string): Promise<number> {
+    try {
+      // Check if volunteer has recent location data (indicating they've checked in)
+      const { data: locationData, error } = await supabase
+        .from('user_locations')
+        .select('last_updated')
+        .eq('user_id', volunteerId)
+        .order('last_updated', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !locationData) {
+        // No location data means volunteer hasn't checked in
+        return 0;
+      }
+
+      const lastUpdate = new Date(locationData.last_updated);
+      const now = new Date();
+      const hoursSinceCheckIn = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+
+      // Bonus based on how recently they checked in
+      if (hoursSinceCheckIn <= 1) return 0.3;    // Within 1 hour - high bonus
+      if (hoursSinceCheckIn <= 4) return 0.2;    // Within 4 hours - medium bonus
+      if (hoursSinceCheckIn <= 12) return 0.1;   // Within 12 hours - small bonus
+      if (hoursSinceCheckIn <= 24) return 0.05;  // Within 24 hours - minimal bonus
+
+      return 0; // No bonus for check-ins older than 24 hours
+    } catch (error) {
+      console.error('❌ Error calculating check-in bonus:', error);
+      return 0; // No bonus on error
+    }
   }
 
   /**

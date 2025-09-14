@@ -1,20 +1,52 @@
 # 🗄️ BandhuConnect+ Database
 
 **Version:** 3.0.0 - **STREAMLINED EDITION**  
-**Last Updated:** September 6, 2025  
-**Status:** ✅ Production Ready & Professionally Organized
+**Last Updated:** September 7, 2025  
+**Status:** ✅ Production```te### **Te### **Testing Folder Structure**
+
+```text
+testing/
+├── AUTHENTICATION_DEMO_SETUP_GUIDE.md    # Authentication setup guide
+├── AUTHENTICATION_UPDATE_GUIDE.sql       # Authentication templates
+├── DEMO_USERS_CREDENTIALS.md             # Demo account credentials
+├── README.md                             # Testing documentation
+└── SCHEMA_COMPATIBLE_SETUP_GUIDE.md      # Schema compatibility guide
+```
+
+### **Testing Resources**
+
+- **Demo Credentials**: All demo accounts use password `password123`
+- **Authentication Guide**: Step-by-step auth setup instructions
+- **Schema Guide**: Compatibility and setup procedures
+- **User Credentials**: Complete list of test accountscture**
+
+```text
+testing/
+├── AUTHENTICATION_DEMO_SETUP_GUIDE.md    # Authentication setup guide
+├── AUTHENTICATION_UPDATE_GUIDE.sql       # Authentication templates
+├── DEMO_USERS_CREDENTIALS.md             # Demo account credentials
+├── README.md                             # Testing documentation
+└── SCHEMA_COMPATIBLE_SETUP_GUIDE.md      # Schema compatibility guide
+```g/
+├── AUTHENTICATION_DEMO_SETUP_GUIDE.md    # Authentication setup guide
+├── AUTHENTICATION_UPDATE_GUIDE.sql       # Authentication templates
+├── DEMO_USERS_CREDENTIALS.md             # Demo account credentials
+├── README.md                             # Testing documentation
+└── SCHEMA_COMPATIBLE_SETUP_GUIDE.md      # Schema compatibility guide
+``` Professionally Organized
 
 ## 📋 Quick Overview
 
-Streamlined, professional database organization with **13 essential files** (reduced from 70+):
+Streamlined, professional database organization with **22 essential files** (reduced from 70+):
 
-```
+```text
 database/
 ├── 📁 schema/           # Database structure (2 files)
-├── 📁 functions/        # Business logic (2 files)
-├── 📁 demo/            # Demo & testing (3 files)
-├── 📁 maintenance/     # Health & cleanup (3 files)
-└── 📋 Documentation    # Setup guides (3 files)
+├── 📁 functions/        # Business logic (3 files)
+├── 📁 demo/            # Demo & testing (7 files)
+├── 📁 maintenance/     # Health & cleanup (6 files)
+├── 📁 testing/         # Testing guides (5 files)
+└── 📋 Documentation    # Setup guides
 ```
 
 ## 🚀 Quick Start
@@ -137,13 +169,35 @@ user_locations.user_id -> profiles.id
 
 ---
 
-## 🔧 Maintenance Scripts
+## 🧪 Testing Environment
+
+### **Testing Folder Structure**
+
+```
+testing/
+├── � AUTHENTICATION_DEMO_SETUP_GUIDE.md    # Authentication setup guide
+├── �🔧 AUTHENTICATION_UPDATE_GUIDE.sql       # Authentication templates
+├── 🔑 DEMO_USERS_CREDENTIALS.md             # Demo account credentials
+├── 📖 README.md                             # Testing documentation
+└── 📋 SCHEMA_COMPATIBLE_SETUP_GUIDE.md      # Schema compatibility guide
+```
+
+### **Testing Resources**
+
+- **Demo Credentials**: All demo accounts use password `password123`
+- **Authentication Guide**: Step-by-step auth setup instructions
+- **Schema Guide**: Compatibility and setup procedures
+- **User Credentials**: Complete list of test accounts
+
+---
 
 ### **Current Active Scripts**
 
 | Script                            | Purpose                    | Status              |
 | --------------------------------- | -------------------------- | ------------------- |
-| `PARUL_UNIVERSITY_DEMO_SETUP.sql` | Create demo environment    | ✅ Ready to use     |
+| `database-health-check.sql`       | Database health verification | ✅ Ready to use     |
+| `professional-cleanup.sql`        | Professional cleanup       | ✅ Ready to use     |
+| `secure-selective-cleanup.sql`    | Secure selective cleanup   | ✅ Ready to use     |
 | `SELECTIVE_CLEANUP.sql`           | Clean unwanted accounts    | ✅ Successfully run |
 | `VERIFY_CLEANUP.sql`              | Verify database state      | ✅ Available        |
 | `INSPECT_DATABASE_SCHEMA.sql`     | Analyze database structure | ✅ Available        |
@@ -152,13 +206,13 @@ user_locations.user_id -> profiles.id
 
 ```sql
 -- Always verify before cleanup
-\i VERIFY_CLEANUP.sql
+\i maintenance/VERIFY_CLEANUP.sql
 
 -- Inspect schema changes
-\i INSPECT_DATABASE_SCHEMA.sql
+\i maintenance/INSPECT_DATABASE_SCHEMA.sql
 
 -- Create demo data
-\i PARUL_UNIVERSITY_DEMO_SETUP.sql
+\i demo/PARUL_UNIVERSITY_DEMO_SETUP.sql
 ```
 
 ---
@@ -199,7 +253,7 @@ user_locations.user_id -> profiles.id
 
 ---
 
-**Last Updated**: September 6, 2025  
+**Last Updated**: September 7, 2025  
 **Database Version**: PostgreSQL with PostGIS  
 **Supabase Project**: BandhuConnect+ Production  
 **Status**: ✅ Production Ready
