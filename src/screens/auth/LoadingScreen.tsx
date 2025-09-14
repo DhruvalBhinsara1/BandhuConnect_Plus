@@ -110,7 +110,7 @@ const LoadingScreen: React.FC = () => {
           ]}
         >
           <Image
-            source={require('../../assets/BandhuConnect+.png')}
+            source={require('../../../assets/BandhuConnect+.png')}
             style={styles.logo}
             resizeMode="contain"
           />

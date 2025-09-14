@@ -1,9 +1,9 @@
 # BandhuConnect+
 
-**Version:** 2.3.2  
+**Version:** 2.3.3  
 **Repository:** [GitHub](https://github.com/DhruvalBhinsara1/BandhuConnect_Plus)  
 **Status:** ✅ Production Ready  
-**Last Updated:** September 9, 2025
+**Last Updated:** September 14, 2025
 
 A comprehensive React Native application for connecting volunteers and pilgrims during large public events. Features real-time location tracking, intelligent assignment management, secure communication with automatic error recovery, and a modern administrative interface.
 

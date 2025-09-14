@@ -1,6 +1,6 @@
 -- =============================================================================
 -- BandhuConnect+ Professional Database Schema
--- Version: 2.2.0
+-- Version: 2.3.3
 -- Last Updated: September 14, 2025
 -- Description: Complete database schema for volunteer assistance platform
 -- =============================================================================

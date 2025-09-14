@@ -5,6 +5,21 @@ All notable changes to BandhuConnect+ will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.3] - 2025-09-14
+
+### 🐛 **Bug Fixes**
+
+- **Auto-Assignment Success Rate Bug**: Fixed critical bug where manual assignments incorrectly affected auto-assignment success rate calculations
+- **Assignment Method Tracking**: Ensured `assignment_method` column is properly set for both auto and manual assignments
+- **Success Rate Simulation**: Corrected simulation logic to properly query assignment methods from assignments table
+- **Hours Worked Metric**: Fixed VolunteerProfile to refresh statistics when assignments change
+
+### 🔧 **Technical Improvements**
+
+- **Database Schema Updates**: Updated assignment creation logic to properly track assignment methods
+- **Success Rate Calculation**: Implemented correct formula: `successful_auto_assignments / total_auto_attempts`
+- **Real-time Updates**: Enhanced profile and dashboard refresh logic for accurate metrics display
+
 ## [2.3.2] - 2025-09-09
 
 ### Added

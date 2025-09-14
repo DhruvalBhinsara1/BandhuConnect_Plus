@@ -123,7 +123,7 @@ const RoleSelectionScreen: React.FC = () => {
         {/* Logo and header */}
         <View style={getResponsiveStyles().header}>
           <Image
-            source={require('../../assets/BandhuConnect+.png')}
+            source={require('../../../assets/BandhuConnect+.png')}
             style={getResponsiveStyles().logo}
             resizeMode="contain"
           />
