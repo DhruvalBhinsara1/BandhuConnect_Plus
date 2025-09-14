@@ -2,12 +2,11 @@ export default {
   expo: {
     name: "BandhuConnect+ Volunteer",
     slug: "bandhuconnect-volunteer",
-    version: "2.3.1",
     version: "2.3.2",
     userInterfaceStyle: "light",
     main: "./index.ts",
     splash: {
-      backgroundColor: "#16A34A", // Green theme for volunteers
+      backgroundColor: "#16A34A",
       resizeMode: "contain"
     },
     assetBundlePatterns: [
