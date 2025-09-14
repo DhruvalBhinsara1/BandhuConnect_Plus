@@ -671,8 +671,7 @@ const VolunteerManagement: React.FC = () => {
         </SafeAreaView>
       </Modal>
 
-  {/* Task Assignment Restored */}
-  <TaskAssignment />
+  {/* TaskAssignment removed: should only be navigated to, not rendered here */}
     </SafeAreaView>
   );
 };

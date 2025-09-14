@@ -27,7 +27,6 @@ import PilgrimProfile from '../screens/pilgrim/PilgrimProfile';
 
 // Shared Screens
 import SecureMapScreen from '../screens/shared/SecureMapScreen';
-import NotificationScreen from '../screens/shared/NotificationScreen';
 import { DevicesScreen } from '../screens/DevicesScreen';
 // Debug screen removed for production
 

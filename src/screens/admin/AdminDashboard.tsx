@@ -1,3 +1,4 @@
+// ...existing styles above...
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, ScrollView, RefreshControl, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -362,43 +363,45 @@ const AdminDashboard: React.FC = () => {
           <View style={styles.quickActions}>
             <Text style={styles.sectionTitle}>Quick Actions</Text>
             <View style={styles.actionGrid}>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('VolunteerManagement')}
-              >
-                <Ionicons name="people" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.primary} />
-                <Text style={styles.actionButtonText}>Manage Volunteers</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('VolunteerManagement', { initialTab: 'requests' })}
-              >
-                <Ionicons name="clipboard" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.success} />
-                <Text style={styles.actionButtonText}>Manage Requests</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => {
-                  // Navigate to VolunteerManagement with auto-assign mode
-                  navigation.navigate('VolunteerManagement', { 
-                    initialTab: 'requests',
-                    autoAssignMode: true 
-                  });
-                }}
-              >
-                <Ionicons name="flash" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.warning} />
-                <Text style={styles.actionButtonText}>Auto-Assign Tasks</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => navigation.navigate('Profile')}
-              >
-                <Ionicons name="settings" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.info} />
-                <Text style={styles.actionButtonText}>Settings</Text>
-              </TouchableOpacity>
+              <View style={{ width: '44%' }}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate('Management', { screen: 'VolunteerManagement' })}
+                >
+                  <Ionicons name="people" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.primary} />
+                  <Text style={styles.actionButtonText}>Manage Volunteers</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ width: '44%' }}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate('Requests', { screen: 'RequestManagement' })}
+                >
+                  <Ionicons name="clipboard" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.success} />
+                  <Text style={styles.actionButtonText}>Manage Requests</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ width: '44%', marginTop: 12 }}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => {
+                    // Navigate to Management tab and TaskAssignment screen
+                    navigation.navigate('Management', { screen: 'TaskAssignment' });
+                  }}
+                >
+                  <Ionicons name="flash" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.warning} />
+                  <Text style={styles.actionButtonText}>Auto-Assign Tasks</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ width: '44%', marginTop: 12 }}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate('Profile')}
+                >
+                  <Ionicons name="settings" size={isSmallScreen ? 20 : 24} color={PROFESSIONAL_DESIGN.COLORS.info} />
+                  <Text style={styles.actionButtonText}>Settings</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -628,66 +631,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: PROFESSIONAL_DESIGN.SPACING.sm,
   },
-  statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.lg,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.md,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
-    flex: 1,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  statNumber: {
-    color: 'white',
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.h2,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    color: 'white',
-    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
-  },
-  content: {
-    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.xl,
-    paddingVertical: PROFESSIONAL_DESIGN.SPACING.lg,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
-    gap: PROFESSIONAL_DESIGN.SPACING.md,
-  },
-  gridCard: {
-    width: '48%',
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: PROFESSIONAL_DESIGN.SPACING.lg,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
-    borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
-  },
-  cardContent: {
-    alignItems: 'center',
-  },
-  gridNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 8,
-  },
-  gridLabel: {
-    color: '#6b7280',
-    fontSize: 14,
-  },
-  card: {
-    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
-    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: PROFESSIONAL_DESIGN.SPACING.lg,
-    marginBottom: PROFESSIONAL_DESIGN.SPACING.xl,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
-  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -782,24 +725,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   actionButton: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: isSmallScreen ? SCREEN_WIDTH * 0.2 : SCREEN_WIDTH * 0.22,
-    maxWidth: isSmallScreen ? SCREEN_WIDTH * 0.24 : SCREEN_WIDTH * 0.25,
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
     borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
-    padding: isSmallScreen ? PROFESSIONAL_DESIGN.SPACING.md : PROFESSIONAL_DESIGN.SPACING.lg,
-    marginHorizontal: isSmallScreen ? 2 : PROFESSIONAL_DESIGN.SPACING.xs,
-    borderWidth: 1,
-    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
-    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
-    aspectRatio: 1,
-    justifyContent: 'center',
+  padding: 16,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+  marginBottom: 0,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.05,
+  shadowRadius: 2,
+  elevation: 1,
+  height: 80,
   },
   actionIcon: {
     padding: 12,
@@ -810,6 +750,22 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 14,
     textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  gridCard: {
+    width: '48%',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   sectionHeader: {
     marginBottom: 12,
@@ -859,7 +815,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: isSmallScreen ? 8 : 12,
+    gap: 12,
+    marginTop: 8,
   },
   autoAssignSection: {
     backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
@@ -932,6 +889,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginLeft: 6,
+  },
+  statCard: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
+    padding: PROFESSIONAL_DESIGN.SPACING.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: PROFESSIONAL_DESIGN.COLORS.primary,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  content: {
+    padding: PROFESSIONAL_DESIGN.SPACING.xl,
+  },
+  cardContent: {
+    alignItems: 'center',
+  },
+  gridNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: PROFESSIONAL_DESIGN.COLORS.primary,
+    marginBottom: 4,
+  },
+  gridLabel: {
+    fontSize: 12,
+    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.xl,
+    padding: PROFESSIONAL_DESIGN.SPACING.xl,
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.lg,
+    ...PROFESSIONAL_DESIGN.SHADOWS.md,
   },
 });
 

@@ -1,5 +1,14 @@
 # BandhuConnect+ Project Structure
 
+## Version: 2.3.3 (Last updated: September 14, 2025)
+
+### Recent Changes
+
+- UI improvements: lighter borders, subtle shadows, modern card layouts
+- AdminProfile: pull-to-refresh, improved statistics and info cards
+- Quick Action navigation fixes in Admin Dashboard
+- Documentation and changelogs updated for all major features
+
 ## Root Folders
 
 - `src/` — Main application source code
@@ -51,6 +60,13 @@
 
 - `assets/` — Static assets
   - Images, icons, and other media files
+
+## Feature Highlights
+
+- Real-time location tracking and assignment
+- Role-based theming and professional design system
+- Secure, scalable backend with Supabase and PostgreSQL
+- Comprehensive admin dashboard and statistics
 
 - `scripts/` — Utility scripts
   - Build scripts, deployment scripts, and development utilities

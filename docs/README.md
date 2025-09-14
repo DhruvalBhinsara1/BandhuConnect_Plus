@@ -4,6 +4,14 @@
 **Last Updated:** September 14, 2025  
 **Status:** ✅ Production Ready
 
+## What's New in v2.3.3
+
+- Modernized UI: Subtle shadows, lighter borders, and improved card layouts
+- Quick Action navigation fixes for Admin Dashboard
+- AdminProfile screen now supports pull-to-refresh
+- Updated statistics and system info cards for clarity
+- Documentation and changelogs updated for all major features
+
 ## 📚 Documentation Structure
 
 This documentation is organized into the following sections:

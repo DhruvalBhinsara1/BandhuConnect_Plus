@@ -4,7 +4,14 @@
 **Last Updated:** September 14, 2025  
 **Status:** ✅ Production Ready
 
-## 📚 Documentation Structure
+## � What's New in v2.3.3
+
+- Improved schema documentation and migration scripts
+- Enhanced row-level security and assignment logic
+- Updated demo and testing data for new features
+- Documentation and changelogs updated for all major database changes
+
+## �📚 Documentation Structure
 
 This documentation is organized into the following sections:
 

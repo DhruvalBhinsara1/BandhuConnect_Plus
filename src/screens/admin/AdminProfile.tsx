@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, Alert, TouchableOpacity, StyleSheet, TextInput, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -10,13 +10,24 @@ const AdminProfile: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, updateProfile, signOut } = useAuth();
   const { theme } = useTheme();
-  
+
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
   });
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    // If you have a refreshUser function in your AuthContext, use it here.
+    // Otherwise, you can reload user data or simply sign out and back in for demo purposes.
+    // For now, just simulate a refresh delay:
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -51,35 +62,40 @@ const AdminProfile: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}> 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Admin Profile</Text>
-          <TouchableOpacity onPress={() => setEditing(!editing)}>
-            <Ionicons 
-              name={editing ? "close" : "pencil"} 
-              size={24} 
-              color={theme.primary} 
-            />
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.borderLight }]}> 
+        <View style={styles.headerRow}> 
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Admin Profile</Text> 
+          <TouchableOpacity onPress={() => setEditing(!editing)}> 
+            <Ionicons  
+              name={editing ? "close" : "pencil"}  
+              size={24}  
+              color={theme.primary}  
+            /> 
+          </TouchableOpacity> 
+        </View> 
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {/* Profile Info */}
-        <View style={[styles.card, { backgroundColor: theme.surface }]}>
-          <View style={styles.profileHeader}>
-            <View style={[styles.avatarContainer, { backgroundColor: theme.primary + '20' }]}>
-              <Ionicons name="shield-checkmark" size={32} color={theme.primary} />
-            </View>
-            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{user?.name}</Text>
-            <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>{user?.email}</Text>
-            <View style={styles.roleContainer}>
-              <View style={[styles.roleBadge, { backgroundColor: theme.primary + '20' }]}>
-                <Text style={[styles.roleText, { color: theme.primary }]}>Administrator</Text>
-              </View>
-            </View>
+        <View style={[styles.card, { backgroundColor: theme.surface }]}> 
+          <View style={styles.profileHeader}> 
+            <View style={[styles.avatarContainer, { backgroundColor: theme.primary + '20' }]}> 
+              <Ionicons name="shield-checkmark" size={32} color={theme.primary} /> 
+            </View> 
+            <Text style={[styles.profileName, { color: theme.textPrimary }]}>{user?.name}</Text> 
+            <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>{user?.email}</Text> 
+            <View style={styles.roleContainer}> 
+              <View style={[styles.roleBadge, { backgroundColor: theme.primary + '20' }]}> 
+                <Text style={[styles.roleText, { color: theme.primary }]}>Administrator</Text> 
+              </View> 
+            </View> 
           </View>
 
           {editing ? (
@@ -158,7 +174,7 @@ const AdminProfile: React.FC = () => {
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>App Version</Text>
-            <Text style={styles.infoValue}>1.0.0</Text>
+            <Text style={styles.infoValue}>2.3.3</Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -230,7 +246,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 20,
     paddingTop: 24,
-    borderBottomWidth: 1,
   },
   headerRow: {
     flexDirection: 'row',
@@ -251,10 +266,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e5e7eb', // subtle light gray
   },
   profileHeader: {
     alignItems: 'center',
