@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
@@ -20,6 +20,7 @@ interface Volunteer {
 interface Assignment {
   id: string;
   status: string;
+  created_at: string;
   assistance_requests?: {
     id: string;
     title: string;
@@ -37,6 +38,14 @@ const VolunteerManagementScreen: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [volunteerAssignments, setVolunteerAssignments] = useState<Assignment[]>([]);
+  
+  // Enhanced filter states
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dutyStatusFilter, setDutyStatusFilter] = useState<string>('all');
+  const [skillFilter, setSkillFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchVolunteers();
@@ -119,10 +128,10 @@ const VolunteerManagementScreen: React.FC = () => {
         updateData.duty_status = 'off_duty';
       }
       
-      // If volunteer is put on duty, automatically set them to active
-      if (statusType === 'duty_status' && newStatus === 'on_duty') {
-        updateData.volunteer_status = 'active';
-      }
+      // Remove hard-coded volunteer_status assignment - let assignment service handle this automatically
+      // if (statusType === 'duty_status' && newStatus === 'on_duty') {
+      //   updateData.volunteer_status = 'active';
+      // }
       
       const { error } = await supabase
         .from('profiles')
@@ -162,11 +171,60 @@ const VolunteerManagementScreen: React.FC = () => {
     }
   };
 
-  const filteredVolunteers = volunteers.filter(volunteer => 
-    volunteer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    volunteer.phone?.includes(searchTerm)
-  );
+  const filteredVolunteers = useMemo(() => {
+    let filtered = volunteers.filter(volunteer => {
+      // Text search
+      const matchesSearch = !searchTerm || 
+        volunteer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        volunteer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        volunteer.phone?.includes(searchTerm) ||
+        volunteer.skills?.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || volunteer.volunteer_status === statusFilter;
+      
+      // Duty status filter
+      const matchesDutyStatus = dutyStatusFilter === 'all' || volunteer.duty_status === dutyStatusFilter;
+      
+      // Skills filter
+      const matchesSkill = skillFilter === 'all' || 
+        volunteer.skills?.some(skill => skill.toLowerCase().includes(skillFilter.toLowerCase()));
+      
+      return matchesSearch && matchesStatus && matchesDutyStatus && matchesSkill;
+    });
+    
+    // Sorting
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name?.toLowerCase() || '';
+          bValue = b.name?.toLowerCase() || '';
+          break;
+        case 'date_joined':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        case 'status':
+          aValue = a.volunteer_status;
+          bValue = b.volunteer_status;
+          break;
+        case 'assignments':
+          aValue = a.assignments?.length || 0;
+          bValue = b.assignments?.length || 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return filtered;
+  }, [volunteers, searchTerm, statusFilter, dutyStatusFilter, skillFilter, sortBy, sortOrder]);
 
   if (selectedVolunteer) {
     return (
@@ -190,30 +248,28 @@ const VolunteerManagementScreen: React.FC = () => {
                   <Text style={styles.badgeText}>
                     {selectedVolunteer.volunteer_status === 'active' ? 'Active' : 'Inactive'}
                   </Text>
-                <ScrollView 
-                  style={styles.volunteersList}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                  }
-                >
-                  {loading && (
-                    <View style={{ alignItems: 'center', marginTop: 40 }}>
-                      <Text style={styles.loading}>Loading volunteers...</Text>
-                    </View>
-                  )}
-                  {!loading && filteredVolunteers.length === 0 && (
-                    <Text style={styles.noVolunteers}>
-                      {searchTerm ? 'No volunteers match your search' : 'No volunteers found'}
-                    </Text>
-                  )}
-                  {!loading && filteredVolunteers.length > 0 && (
-                    filteredVolunteers.map((volunteer) => (
-                      <View key={volunteer.id} style={styles.volunteerCard}>
-                        {/* ...existing code... */}
-                      </View>
-                    ))
-                  )}
-                </ScrollView>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: selectedVolunteer.duty_status === 'on_duty' ? '#3b82f6' : '#6b7280' }
+                ]}>
+                  <Text style={styles.badgeText}>
+                    {selectedVolunteer.duty_status === 'on_duty' ? 'On Duty' : 'Off Duty'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.profileDetails}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Email:</Text>
+                <Text style={styles.detailValue}>{selectedVolunteer.email}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Phone:</Text>
+                <Text style={styles.detailValue}>{selectedVolunteer.phone}</Text>
+              </View>
+              <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Age:</Text>
                 <Text style={styles.detailValue}>{selectedVolunteer.age || 'Not provided'}</Text>
               </View>
@@ -266,7 +322,7 @@ const VolunteerManagementScreen: React.FC = () => {
                       <Text style={styles.detailLabel}>Type:</Text> {assignment.assistance_requests?.type || 'Unknown'}
                     </Text>
                     <Text style={styles.assignmentDetail}>
-                      <Text style={styles.detailLabel}>Assigned:</Text> {new Date(assignment.created_at).toLocaleString()}
+                      <Text style={styles.detailLabel}>Assigned:</Text> {new Date(assignment.assistance_requests?.created_at || assignment.created_at).toLocaleString()}
                     </Text>
                   </View>
                 </View>
@@ -289,11 +345,112 @@ const VolunteerManagementScreen: React.FC = () => {
 
       <TextInput
         style={styles.searchInput}
-        placeholder="Search volunteers by name, email, or phone..."
+        placeholder="Search volunteers by name, email, phone, or skills..."
         value={searchTerm}
         onChangeText={setSearchTerm}
         placeholderTextColor="#9CA3AF"
       />
+
+      {/* Filter Controls */}
+      <View style={styles.filterContainer}>
+        <TouchableOpacity
+          style={styles.filterToggle}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Text style={styles.filterToggleText}>
+            {showFilters ? 'Hide Filters' : 'Show Filters'} ({filteredVolunteers.length} results)
+          </Text>
+        </TouchableOpacity>
+
+        {showFilters && (
+          <View style={styles.filterOptions}>
+            {/* Status Filter */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Status:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {['all', 'active', 'inactive'].map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.filterChip,
+                      statusFilter === status && styles.filterChipActive
+                    ]}
+                    onPress={() => setStatusFilter(status)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      statusFilter === status && styles.filterChipTextActive
+                    ]}>
+                      {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Duty Status Filter */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Duty:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {['all', 'on_duty', 'off_duty'].map((dutyStatus) => (
+                  <TouchableOpacity
+                    key={dutyStatus}
+                    style={[
+                      styles.filterChip,
+                      dutyStatusFilter === dutyStatus && styles.filterChipActive
+                    ]}
+                    onPress={() => setDutyStatusFilter(dutyStatus)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      dutyStatusFilter === dutyStatus && styles.filterChipTextActive
+                    ]}>
+                      {dutyStatus === 'all' ? 'All' : dutyStatus === 'on_duty' ? 'On Duty' : 'Off Duty'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Sort Options */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Sort by:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {[
+                  { key: 'name', label: 'Name' },
+                  { key: 'date_joined', label: 'Date Joined' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'assignments', label: 'Assignments' }
+                ].map((sortOption) => (
+                  <TouchableOpacity
+                    key={sortOption.key}
+                    style={[
+                      styles.filterChip,
+                      sortBy === sortOption.key && styles.filterChipActive
+                    ]}
+                    onPress={() => setSortBy(sortOption.key)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      sortBy === sortOption.key && styles.filterChipTextActive
+                    ]}>
+                      {sortOption.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.sortOrderButton}
+                onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                <Text style={styles.sortOrderText}>
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -472,31 +629,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-        {loading ? (
-          <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <Text style={styles.loading}>Loading volunteers...</Text>
-          </View>
-        ) : filteredVolunteers.length === 0 ? (
-          <Text style={styles.noVolunteers}>
-            {searchTerm ? 'No volunteers match your search' : 'No volunteers found'}
-          </Text>
-        ) : (
-          filteredVolunteers.map((volunteer) => (
-            <View key={volunteer.id} style={styles.volunteerCard}>
-              {/* ...existing code... */}
-            </View>
-          ))
-        )}
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
   volunteerInfo: {
     marginBottom: 12,
   },
@@ -647,6 +779,78 @@ const styles = StyleSheet.create({
   assignmentDetail: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  filterToggle: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  filterToggleText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  filterOptions: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterRow: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  filterChip: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterChipActive: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+  },
+  sortOrderButton: {
+    backgroundColor: '#e5e7eb',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  sortOrderText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
   },
 });
 

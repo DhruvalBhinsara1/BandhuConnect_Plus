@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,12 @@ const RequestManagement: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<'active' | 'completed' | 'archived'>('active');
   const [volunteers, setVolunteers] = useState<User[]>([]);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  
+  // Enhanced filter states
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -176,7 +182,7 @@ const RequestManagement: React.FC = () => {
     }
   };
 
-  const filterRequests = () => {
+  const filteredRequests = useMemo(() => {
     let filtered = requests || [];
 
     // Filter by search query
@@ -184,7 +190,10 @@ const RequestManagement: React.FC = () => {
       filtered = filtered.filter(
         (request) =>
           request.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          request.description?.toLowerCase().includes(searchQuery.toLowerCase())
+          request.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          request.type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          request.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          request.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -196,6 +205,11 @@ const RequestManagement: React.FC = () => {
     // Filter by priority
     if (filter.priority !== 'all') {
       filtered = filtered.filter((request) => request.priority === filter.priority);
+    }
+
+    // Filter by type
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((request) => request.type === typeFilter);
     }
 
     // Filter by tab selection
@@ -213,8 +227,40 @@ const RequestManagement: React.FC = () => {
         break;
     }
 
+    // Sorting
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortBy) {
+        case 'created_at':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        case 'priority':
+          const priorityOrder = { 'emergency': 4, 'high': 3, 'medium': 2, 'low': 1 };
+          aValue = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          bValue = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          break;
+        case 'status':
+          const statusOrder = { 'pending': 1, 'assigned': 2, 'in_progress': 3, 'completed': 4, 'cancelled': 5 };
+          aValue = statusOrder[a.status as keyof typeof statusOrder] || 0;
+          bValue = statusOrder[b.status as keyof typeof statusOrder] || 0;
+          break;
+        case 'title':
+          aValue = a.title?.toLowerCase() || '';
+          bValue = b.title?.toLowerCase() || '';
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
     return filtered;
-  };
+  }, [requests, searchQuery, filter, typeFilter, selectedTab, sortBy, sortOrder]);
 
   const renderFilterButton = (label: string, value: string, currentValue: string, onPress: () => void) => (
     <TouchableOpacity
@@ -335,8 +381,6 @@ const RequestManagement: React.FC = () => {
     }
   };
 
-  const filteredRequests = filterRequests();
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -400,6 +444,87 @@ const RequestManagement: React.FC = () => {
           {renderFilterButton('Medium', 'medium', filter.priority, () => setFilter({ ...filter, priority: 'medium' }))}
           {renderFilterButton('Low', 'low', filter.priority, () => setFilter({ ...filter, priority: 'low' }))}
         </ScrollView>
+
+        {/* Advanced Filters Toggle */}
+        <TouchableOpacity
+          style={styles.advancedFiltersToggle}
+          onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
+        >
+          <Text style={styles.advancedFiltersToggleText}>
+            {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+          </Text>
+          <Ionicons 
+            name={showAdvancedFilters ? 'chevron-up' : 'chevron-down'} 
+            size={16} 
+            color={PROFESSIONAL_DESIGN.COLORS.textSecondary} 
+          />
+        </TouchableOpacity>
+
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <View style={styles.advancedFiltersContainer}>
+            {/* Type Filter */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Type:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
+                {['all', 'medical', 'transportation', 'food', 'accommodation', 'general'].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.filterChip,
+                      typeFilter === type && styles.activeFilterChip
+                    ]}
+                    onPress={() => setTypeFilter(type)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      typeFilter === type && styles.activeFilterChipText
+                    ]}>
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Sort Options */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Sort by:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipContainer}>
+                {[
+                  { key: 'created_at', label: 'Date Created' },
+                  { key: 'priority', label: 'Priority' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'title', label: 'Title' }
+                ].map((sortOption) => (
+                  <TouchableOpacity
+                    key={sortOption.key}
+                    style={[
+                      styles.filterChip,
+                      sortBy === sortOption.key && styles.activeFilterChip
+                    ]}
+                    onPress={() => setSortBy(sortOption.key)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      sortBy === sortOption.key && styles.activeFilterChipText
+                    ]}>
+                      {sortOption.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.sortOrderButton}
+                onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                <Text style={styles.sortOrderText}>
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Auto-Assign Section */}
@@ -747,6 +872,69 @@ const styles = StyleSheet.create({
   autoAssignButtonText: {
     ...PROFESSIONAL_DESIGN.TYPOGRAPHY.button,
     color: 'white',
+    fontWeight: '600',
+  },
+  advancedFiltersToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
+  },
+  advancedFiltersToggleText: {
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.body,
+    color: PROFESSIONAL_DESIGN.COLORS.primary,
+    fontWeight: '600',
+    marginRight: PROFESSIONAL_DESIGN.SPACING.xs,
+  },
+  advancedFiltersContainer: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.surface,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.md,
+    padding: PROFESSIONAL_DESIGN.SPACING.md,
+    marginTop: PROFESSIONAL_DESIGN.SPACING.sm,
+    ...PROFESSIONAL_DESIGN.SHADOWS.sm,
+  },
+  filterRow: {
+    marginBottom: PROFESSIONAL_DESIGN.SPACING.md,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    marginTop: PROFESSIONAL_DESIGN.SPACING.xs,
+  },
+  filterChip: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.md,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.xs,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.lg,
+    marginRight: PROFESSIONAL_DESIGN.SPACING.sm,
+    borderWidth: 1,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.border,
+  },
+  activeFilterChip: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.primary,
+    borderColor: PROFESSIONAL_DESIGN.COLORS.primary,
+  },
+  filterChipText: {
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
+    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  activeFilterChipText: {
+    color: 'white',
+  },
+  sortOrderButton: {
+    backgroundColor: PROFESSIONAL_DESIGN.COLORS.background,
+    paddingHorizontal: PROFESSIONAL_DESIGN.SPACING.sm,
+    paddingVertical: PROFESSIONAL_DESIGN.SPACING.xs,
+    borderRadius: PROFESSIONAL_DESIGN.RADIUS.sm,
+    marginLeft: PROFESSIONAL_DESIGN.SPACING.sm,
+  },
+  sortOrderText: {
+    ...PROFESSIONAL_DESIGN.TYPOGRAPHY.caption,
+    color: PROFESSIONAL_DESIGN.COLORS.textSecondary,
     fontWeight: '600',
   },
 });

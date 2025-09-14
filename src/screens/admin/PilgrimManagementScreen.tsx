@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
@@ -41,6 +41,13 @@ const PilgrimManagementScreen: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPilgrim, setSelectedPilgrim] = useState<Pilgrim | null>(null);
   const [pilgrimRequests, setPilgrimRequests] = useState<AssistanceRequest[]>([]);
+  
+  // Enhanced filter states
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [requestCountFilter, setRequestCountFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchPilgrims();
@@ -126,11 +133,65 @@ const PilgrimManagementScreen: React.FC = () => {
     }
   };
 
-  const filteredPilgrims = pilgrims.filter(pilgrim => 
-    pilgrim.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pilgrim.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pilgrim.phone?.includes(searchTerm)
-  );
+  const filteredPilgrims = useMemo(() => {
+    let filtered = pilgrims.filter(pilgrim => {
+      // Text search
+      const matchesSearch = !searchTerm || 
+        pilgrim.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pilgrim.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        pilgrim.phone?.includes(searchTerm);
+      
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' && pilgrim.is_active) || 
+        (statusFilter === 'inactive' && !pilgrim.is_active);
+      
+      // Request count filter
+      const requestCount = pilgrim.assistance_requests?.length || 0;
+      let matchesRequestCount = true;
+      if (requestCountFilter === 'none') {
+        matchesRequestCount = requestCount === 0;
+      } else if (requestCountFilter === 'few') {
+        matchesRequestCount = requestCount > 0 && requestCount <= 5;
+      } else if (requestCountFilter === 'many') {
+        matchesRequestCount = requestCount > 5;
+      }
+      
+      return matchesSearch && matchesStatus && matchesRequestCount;
+    });
+    
+    // Sorting
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name?.toLowerCase() || '';
+          bValue = b.name?.toLowerCase() || '';
+          break;
+        case 'date_joined':
+          aValue = new Date(a.created_at);
+          bValue = new Date(b.created_at);
+          break;
+        case 'requests':
+          aValue = a.assistance_requests?.length || 0;
+          bValue = b.assistance_requests?.length || 0;
+          break;
+        case 'status':
+          aValue = a.is_active ? 1 : 0;
+          bValue = b.is_active ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+    
+    return filtered;
+  }, [pilgrims, searchTerm, statusFilter, requestCountFilter, sortBy, sortOrder]);
 
   if (selectedPilgrim) {
     return (
@@ -251,6 +312,112 @@ const PilgrimManagementScreen: React.FC = () => {
         onChangeText={setSearchTerm}
         placeholderTextColor="#9CA3AF"
       />
+
+      {/* Filter Controls */}
+      <View style={styles.filterContainer}>
+        <TouchableOpacity
+          style={styles.filterToggle}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Text style={styles.filterToggleText}>
+            {showFilters ? 'Hide Filters' : 'Show Filters'} ({filteredPilgrims.length} results)
+          </Text>
+        </TouchableOpacity>
+
+        {showFilters && (
+          <View style={styles.filterOptions}>
+            {/* Status Filter */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Status:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {['all', 'active', 'inactive'].map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[
+                      styles.filterChip,
+                      statusFilter === status && styles.filterChipActive
+                    ]}
+                    onPress={() => setStatusFilter(status)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      statusFilter === status && styles.filterChipTextActive
+                    ]}>
+                      {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Request Count Filter */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Requests:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'none', label: 'None' },
+                  { key: 'few', label: '1-5' },
+                  { key: 'many', label: '6+' }
+                ].map((filter) => (
+                  <TouchableOpacity
+                    key={filter.key}
+                    style={[
+                      styles.filterChip,
+                      requestCountFilter === filter.key && styles.filterChipActive
+                    ]}
+                    onPress={() => setRequestCountFilter(filter.key)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      requestCountFilter === filter.key && styles.filterChipTextActive
+                    ]}>
+                      {filter.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Sort Options */}
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Sort by:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChips}>
+                {[
+                  { key: 'name', label: 'Name' },
+                  { key: 'date_joined', label: 'Date Joined' },
+                  { key: 'requests', label: 'Requests' },
+                  { key: 'status', label: 'Status' }
+                ].map((sortOption) => (
+                  <TouchableOpacity
+                    key={sortOption.key}
+                    style={[
+                      styles.filterChip,
+                      sortBy === sortOption.key && styles.filterChipActive
+                    ]}
+                    onPress={() => setSortBy(sortOption.key)}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      sortBy === sortOption.key && styles.filterChipTextActive
+                    ]}>
+                      {sortOption.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.sortOrderButton}
+                onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                <Text style={styles.sortOrderText}>
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -581,6 +748,78 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 4,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  filterToggle: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  filterToggleText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  filterOptions: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterRow: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  filterChip: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterChipActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#f59e0b',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+  },
+  sortOrderButton: {
+    backgroundColor: '#e5e7eb',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  sortOrderText: {
+    fontSize: 12,
+    color: '#374151',
+    fontWeight: '600',
   },
 });
 

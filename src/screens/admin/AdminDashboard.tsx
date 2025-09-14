@@ -8,6 +8,7 @@ import { volunteerService } from '../../services/volunteerService';
 import { supabase } from '../../services/supabase';
 import { AdminStats } from '../../types';
 import { PROFESSIONAL_DESIGN } from '../../design/professionalDesignSystem';
+import { ACTIVE_ASSIGNMENT_STATUSES } from '../../services/assignmentService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isSmallScreen = SCREEN_WIDTH < 350;
@@ -165,22 +166,20 @@ const AdminDashboard: React.FC = () => {
     const assigned = requests.filter(r => r.status === 'assigned').length;
     const inProgress = requests.filter(r => r.status === 'in_progress').length;
     
-    // Get volunteers with active assignments
+    // Get volunteers with active assignments using consistent status definitions
     const volunteersWithAssignments = new Set(
       assignments
-        .filter(a => ['assigned', 'accepted', 'on_duty'].includes(a.status))
+        .filter(a => ACTIVE_ASSIGNMENT_STATUSES.includes(a.status as any))
         .map(a => a.volunteer_id)
     );
     
-    // Volunteer status breakdown with logical corrections
+    // Volunteer status breakdown - prioritize assignment-based status over stored status
     const availableVolunteers = volunteers.filter(v => 
-      v.is_active && 
-      (v.volunteer_status === 'available' || !volunteersWithAssignments.has(v.id))
+      v.is_active && !volunteersWithAssignments.has(v.id)
     ).length;
     
     const onDutyVolunteers = volunteers.filter(v => 
-      v.is_active && 
-      (v.volunteer_status === 'busy' || v.volunteer_status === 'on_duty' || volunteersWithAssignments.has(v.id))
+      v.is_active && volunteersWithAssignments.has(v.id)
     ).length;
     
     const offlineVolunteers = volunteers.filter(v => 
@@ -202,6 +201,63 @@ const AdminDashboard: React.FC = () => {
       completedRequests: completed,
       totalRequests: requests.length,
     });
+    
+    // Trigger volunteer status repair if there are inconsistencies
+    repairVolunteerStatuses(volunteers, volunteersWithAssignments);
+  };
+
+  const repairVolunteerStatuses = async (volunteers: any[], volunteersWithAssignments: Set<string>) => {
+    try {
+      const inconsistencies = [];
+      
+      for (const volunteer of volunteers) {
+        if (!volunteer.is_active) continue; // Skip inactive volunteers
+        
+        const hasActiveAssignment = volunteersWithAssignments.has(volunteer.id);
+        const currentStatus = volunteer.volunteer_status;
+        const expectedStatus = hasActiveAssignment ? 'busy' : 'available';
+        
+        // Check for inconsistency
+        if (currentStatus !== expectedStatus) {
+          inconsistencies.push({
+            volunteerId: volunteer.id,
+            name: volunteer.name,
+            currentStatus,
+            expectedStatus,
+            hasActiveAssignment
+          });
+        }
+      }
+      
+      if (inconsistencies.length > 0) {
+        console.log('🔧 Found volunteer status inconsistencies:', inconsistencies.length);
+        
+        // Repair inconsistencies
+        for (const inconsistency of inconsistencies) {
+          console.log(`🔧 Repairing volunteer ${inconsistency.name}: ${inconsistency.currentStatus} → ${inconsistency.expectedStatus}`);
+          
+          const { error } = await supabase
+            .from('profiles')
+            .update({ 
+              volunteer_status: inconsistency.expectedStatus,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', inconsistency.volunteerId);
+            
+          if (error) {
+            console.error(`❌ Failed to repair volunteer ${inconsistency.volunteerId}:`, error);
+          } else {
+            console.log(`✅ Repaired volunteer ${inconsistency.name}`);
+          }
+        }
+        
+        // Reload data after repairs
+        console.log('🔄 Reloading dashboard data after repairs...');
+        await loadDashboardData();
+      }
+    } catch (error) {
+      console.error('❌ Error during volunteer status repair:', error);
+    }
   };
 
   const formatLastAutoAssignTime = () => {
