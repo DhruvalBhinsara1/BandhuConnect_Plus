@@ -1,7 +1,7 @@
 -- =============================================================================
 -- BandhuConnect+ Professional Database Schema
--- Version: 2.1.0
--- Last Updated: September 6, 2025
+-- Version: 2.2.0
+-- Last Updated: September 14, 2025
 -- Description: Complete database schema for volunteer assistance platform
 -- =============================================================================
 
@@ -170,6 +170,44 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- =============================================================================
+-- DEVICE & LOCATION MANAGEMENT TABLES
+-- =============================================================================
+
+-- Device management for push notifications
+CREATE TABLE IF NOT EXISTS user_devices (
+    device_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    device_name TEXT,
+    device_token TEXT UNIQUE, -- FCM/APNS token for push notifications
+    last_active TIMESTAMPTZ,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, device_token) -- Prevent duplicate tokens per user
+);
+
+-- Basic location tracking (legacy/simple version)
+CREATE TABLE IF NOT EXISTS locations (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    latitude DECIMAL(10, 8) NOT NULL,
+    longitude DECIMAL(11, 8) NOT NULL,
+    accuracy DECIMAL(8, 2),
+    speed DECIMAL(5, 2),
+    bearing DECIMAL(5, 2),
+    last_updated TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Advanced location updates with PostGIS
+CREATE TABLE IF NOT EXISTS location_updates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    location GEOGRAPHY(POINT, 4326) NOT NULL,
+    accuracy DECIMAL(8, 2),
+    speed DECIMAL(5, 2),
+    heading DECIMAL(5, 2),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =============================================================================
 -- PERFORMANCE INDEXES
 -- =============================================================================
 
@@ -183,6 +221,20 @@ CREATE INDEX IF NOT EXISTS idx_profiles_is_active ON profiles(is_active);
 CREATE INDEX IF NOT EXISTS idx_user_locations_user_id ON user_locations(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_locations_active ON user_locations(is_active);
 CREATE INDEX IF NOT EXISTS idx_user_locations_updated ON user_locations(last_updated DESC);
+
+-- Device indexes
+CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_devices_active ON user_devices(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_devices_user_active ON user_devices(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_user_devices_user_token ON user_devices(user_id, device_token);
+
+-- Location tracking indexes
+CREATE INDEX IF NOT EXISTS idx_locations_updated ON locations(last_updated DESC);
+
+-- Location updates indexes
+CREATE INDEX IF NOT EXISTS idx_location_updates_user_id ON location_updates(user_id);
+CREATE INDEX IF NOT EXISTS idx_location_updates_created_at ON location_updates(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_location_updates_location ON location_updates USING GIST(location);
 
 -- Assistance request indexes
 CREATE INDEX IF NOT EXISTS idx_assistance_requests_user_id ON assistance_requests(user_id);
@@ -269,6 +321,9 @@ ALTER TABLE chat_channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE direct_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE location_updates ENABLE ROW LEVEL SECURITY;
 
 -- Profile policies
 CREATE POLICY "Users can view all profiles" ON profiles FOR SELECT USING (true);
@@ -336,6 +391,32 @@ CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT USI
 CREATE POLICY "Users can update own notifications" ON notifications FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "System can insert notifications" ON notifications FOR INSERT WITH CHECK (true);
 
+-- Device management policies
+CREATE POLICY "Users can view own devices" ON user_devices FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Users can insert their own devices" ON user_devices FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update own devices" ON user_devices FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "Users can delete their own devices" ON user_devices FOR DELETE USING (auth.uid() = user_id);
+
+-- Location tracking policies
+CREATE POLICY "locations_own" ON locations FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "locations_assigned_counterpart" ON locations FOR SELECT USING (
+    (EXISTS ( SELECT 1
+       FROM assignments
+      WHERE ((assignments.pilgrim_id = auth.uid()) AND (assignments.volunteer_id = locations.user_id) AND (assignments.is_active = true)))) OR 
+    (EXISTS ( SELECT 1
+       FROM assignments
+      WHERE ((assignments.volunteer_id = auth.uid()) AND (assignments.pilgrim_id = locations.user_id) AND (assignments.is_active = true)))) OR 
+    (EXISTS ( SELECT 1
+       FROM profiles
+      WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))
+);
+CREATE POLICY "locations_insert_own" ON locations FOR INSERT WITH CHECK (true);
+CREATE POLICY "locations_update_own" ON locations FOR UPDATE USING (auth.uid() = user_id);
+
+-- Location updates policies
+CREATE POLICY "Users can view location updates" ON location_updates FOR SELECT USING (true);
+CREATE POLICY "Users can insert own location" ON location_updates FOR INSERT WITH CHECK (true);
+
 -- =============================================================================
 -- COMMENTS FOR DOCUMENTATION
 -- =============================================================================
@@ -348,6 +429,9 @@ COMMENT ON TABLE chat_channels IS 'Group communication channels';
 COMMENT ON TABLE chat_messages IS 'Messages within chat channels';
 COMMENT ON TABLE direct_messages IS 'Private messages between users';
 COMMENT ON TABLE notifications IS 'System notifications for users';
+COMMENT ON TABLE user_devices IS 'Device tokens for push notifications';
+COMMENT ON TABLE locations IS 'Basic location tracking for users';
+COMMENT ON TABLE location_updates IS 'Advanced PostGIS location updates';
 
 -- =============================================================================
 -- END OF SCHEMA

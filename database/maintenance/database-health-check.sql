@@ -15,14 +15,14 @@
 SELECT 
     'Table Existence Check' as check_type,
     CASE 
-        WHEN COUNT(*) = 5 THEN '✅ All tables exist'
-        ELSE '❌ Missing tables'
+        WHEN COUNT(*) >= 8 THEN '✅ Core tables exist'
+        ELSE '❌ Missing core tables'
     END as status,
     COUNT(*) as existing_tables,
-    5 as expected_tables
+    8 as expected_tables
 FROM information_schema.tables 
 WHERE table_schema = 'public' 
-AND table_name IN ('profiles', 'requests', 'assignments', 'notifications', 'feedback');
+AND table_name IN ('profiles', 'assistance_requests', 'assignments', 'notifications', 'user_locations', 'user_devices', 'locations', 'location_updates');
 
 -- Check foreign key constraints
 SELECT 
@@ -49,7 +49,7 @@ SELECT
     END as status,
     COUNT(*) as orphaned_count
 FROM assignments a
-LEFT JOIN requests r ON a.request_id = r.id
+LEFT JOIN assistance_requests r ON a.request_id = r.id
 WHERE r.id IS NULL;
 
 -- Check for invalid user roles
@@ -102,7 +102,7 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 SELECT 
     'RLS Policies' as check_type,
     CASE 
-        WHEN COUNT(*) >= 5 THEN '✅ RLS policies active'
+        WHEN COUNT(*) >= 20 THEN '✅ RLS policies active'
         ELSE '⚠️ Check RLS configuration'
     END as status,
     COUNT(*) as policy_count
@@ -133,10 +133,10 @@ FROM profiles
 UNION ALL
 SELECT 
     'Record Counts',
-    'requests',
+    'assistance_requests',
     COUNT(*),
     'Total service requests'
-FROM requests
+FROM assistance_requests
 UNION ALL
 SELECT 
     'Record Counts',
@@ -154,8 +154,22 @@ FROM notifications
 UNION ALL
 SELECT 
     'Record Counts',
-    'feedback',
+    'user_devices',
     COUNT(*),
-    'Total feedback entries'
-FROM feedback
+    'Total device registrations'
+FROM user_devices
+UNION ALL
+SELECT 
+    'Record Counts',
+    'locations',
+    COUNT(*),
+    'Total location records'
+FROM locations
+UNION ALL
+SELECT 
+    'Record Counts',
+    'location_updates',
+    COUNT(*),
+    'Total location updates'
+FROM location_updates
 ORDER BY table_name;

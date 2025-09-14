@@ -59,32 +59,18 @@ const AdminDashboard: React.FC = () => {
 
   const loadAutoAssignStats = async () => {
     try {
-      // Simplified query without joins to avoid RLS recursion
+      // Get all assignments with assignment_method
       const { data: allAssignments, error: assignmentError } = await supabase
         .from('assignments')
-        .select('id, created_at, assigned_at, notes');
+        .select('id, created_at, assigned_at, assignment_method, status');
       
       if (assignmentError) {
         console.error('Error loading assignment stats:', assignmentError);
         return;
       }
 
-      // Filter for auto-assigned (assignments created very quickly after request or with auto-assign notes)
-      const autoAssigned = allAssignments?.filter(a => {
-        // Consider it auto-assigned if it has notes mentioning auto-assignment
-        // or if assigned very quickly (within 30 seconds of creation)
-        const hasAutoNotes = a.notes && (
-          a.notes.includes('auto') || 
-          a.notes.includes('Auto') || 
-          a.notes.includes('automatic') ||
-          a.notes.includes('batch')
-        );
-        
-        const quickAssignment = a.assigned_at && a.created_at && 
-          (new Date(a.assigned_at).getTime() - new Date(a.created_at).getTime()) < 30000;
-        
-        return hasAutoNotes || quickAssignment;
-      }) || [];
+      // Filter for auto-assigned assignments only
+      const autoAssigned = allAssignments?.filter(a => a.assignment_method === 'auto') || [];
 
       // Get today's auto-assignments
       const today = new Date();
@@ -105,29 +91,38 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Calculate auto-assignment success rate properly
-      // Since we don't have assignment_method column, we'll use a different approach:
-      // Track success rate based on completed vs pending requests over time
+      // Success rate = (successful auto-assignments) / (total auto-assignment attempts)
       
       // Get requests that are still pending (potential auto-assign failures)
+      // We need to find requests that were attempted by auto-assignment but failed
       const { data: pendingRequests, error: pendingError } = await supabase
         .from('assistance_requests')
         .select('id, created_at')
         .eq('status', 'pending')
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
 
-      // For now, use a simplified success rate calculation
-      // In the future, we should add an assignment_method column to track this properly
-      const totalRecentRequests = autoAssigned.length + (pendingRequests?.length || 0);
-      const successRate = totalRecentRequests > 0 
-        ? Math.round((autoAssigned.length / totalRecentRequests) * 100)
+      // For auto success rate, we need to count:
+      // - Numerator: Auto assignments that were completed successfully
+      // - Denominator: All auto assignment attempts (successful + failed)
+      
+      // Get successful auto assignments (completed status)
+      const successfulAutoAssignments = autoAssigned.filter(a => a.status === 'completed');
+      
+      // Get failed auto assignments (those that were cancelled or represent failed attempts)
+      // For now, we'll use a simplified approach: total auto assignments vs pending requests
+      // In a more sophisticated system, we'd track explicit auto-attempt failures
+      const totalAutoAttempts = autoAssigned.length + (pendingRequests?.length || 0);
+      const successRate = totalAutoAttempts > 0 
+        ? Math.round((successfulAutoAssignments.length / totalAutoAttempts) * 100)
         : 0;
 
-      console.log(`📊 Auto-assignment success rate calculation (simplified):`, {
-        autoAssignedCount: autoAssigned.length,
+      console.log(`📊 Auto-assignment success rate calculation (FIXED):`, {
+        totalAutoAssignments: autoAssigned.length,
+        successfulAutoAssignments: successfulAutoAssignments.length,
         pendingRequestsCount: pendingRequests?.length || 0,
-        totalRecentRequests,
+        totalAutoAttempts,
         successRate: `${successRate}%`,
-        note: 'Consider adding assignment_method column for accurate tracking'
+        note: 'Now correctly excludes manual assignments from calculation'
       });
 
       // Mock average match score (since we don't have the actual column)

@@ -101,7 +101,8 @@ export class AssignmentService {
       .insert({
         request_id: requestId,
         volunteer_id: volunteerId,
-        status: 'pending'
+        status: 'pending',
+        assignment_method: 'manual'
       })
       .select()
       .single();

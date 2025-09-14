@@ -685,6 +685,7 @@ class AutoAssignmentService {
             request_id: request.id,
             volunteer_id: volunteer.id,
             status: 'pending',
+            assignment_method: 'auto',
             assigned_at: new Date().toISOString()
           })
           .select()

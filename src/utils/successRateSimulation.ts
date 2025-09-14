@@ -119,6 +119,7 @@ export class SuccessRateSimulation {
           volunteer_id: volunteers[i % 5].id,
           pilgrim_id: pilgrims[i - 1].id,
           status: 'completed',
+          assignment_method: 'auto',
           assigned_at: new Date(baseTime - (i * 60000)).toISOString(),
           completed_at: new Date(baseTime - (i * 30000)).toISOString()
         });
@@ -132,6 +133,7 @@ export class SuccessRateSimulation {
           volunteer_id: volunteers[i % 5].id,
           pilgrim_id: pilgrims[i + 9].id,
           status: 'completed',
+          assignment_method: 'manual',
           assigned_at: new Date(baseTime - (i * 60000)).toISOString(),
           completed_at: new Date(baseTime - (i * 30000)).toISOString()
         });
@@ -202,13 +204,22 @@ export class SuccessRateSimulation {
       // Scenario 2: Test NEW logic (correct calculation)
       console.log('\n📊 Scenario 2: NEW Logic (Fixed)');
 
+      // Get pending requests that have auto-assignment attempts
+      // We need to find requests that were attempted by auto-assignment but are still pending
       const { data: pendingRequests } = await supabase
         .from('assistance_requests')
         .select('id')
-        .eq('assignment_method', 'auto')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()); // Last 7 days
 
-      const totalAutoAttempts = (autoAssigned?.length || 0) + (pendingRequests?.length || 0);
+      // Get the count of auto-assignment attempts for these pending requests
+      const { data: autoAttemptsForPending } = await supabase
+        .from('assignments')
+        .select('request_id')
+        .eq('assignment_method', 'auto')
+        .in('request_id', pendingRequests?.map(r => r.id) || []);
+
+      const totalAutoAttempts = (autoAssigned?.length || 0) + (autoAttemptsForPending?.length || 0);
       const newSuccessRate = totalAutoAttempts > 0 
         ? Math.round((autoAssigned?.length || 0) / totalAutoAttempts * 100)
         : 0;
@@ -217,7 +228,7 @@ export class SuccessRateSimulation {
         scenario: 'NEW Logic (Fixed)',
         autoAssigned: autoAssigned?.length || 0,
         manualAssigned: (allCompleted?.length || 0) - (autoAssigned?.length || 0),
-        pendingRequests: pendingRequests?.length || 0,
+        pendingRequests: autoAttemptsForPending?.length || 0,
         calculatedSuccessRate: newSuccessRate,
         expectedSuccessRate: 77, // 10 auto-success / 13 auto-attempts = 76.9%
         passed: Math.abs(newSuccessRate - 77) <= 2 // Allow 2% tolerance
