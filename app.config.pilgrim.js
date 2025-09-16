@@ -15,7 +15,7 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      jsEngine: "jsc",
+      jsEngine: "hermes",
       bundleIdentifier: "com.dhruvalbhinsara.bandhuconnect.pilgrim",
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "This app needs precise location access to help volunteers find and assist you during emergencies.",
@@ -27,10 +27,10 @@ export default {
       adaptiveIcon: {
         backgroundColor: "#DC2626"
       },
-      jsEngine: "jsc",
+      jsEngine: "hermes",
       package: "com.dhruvalbhinsara.bandhuconnect.pilgrim",
       config: {
-        ndkVersion: "29.0.13846066"
+        ndkVersion: "26.1.10909125"
       },
       minSdkVersion: 24,
       permissions: [

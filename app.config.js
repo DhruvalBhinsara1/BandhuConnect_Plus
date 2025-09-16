@@ -15,7 +15,7 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      jsEngine: "jsc",
+      jsEngine: "hermes",
       bundleIdentifier: "com.dhruvalbhinsara.bandhuconnectplus",
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "This app needs access to location when open to track volunteer locations for emergency assistance coordination.",
@@ -27,10 +27,10 @@ export default {
       adaptiveIcon: {
         backgroundColor: "#121212"
       },
-      jsEngine: "jsc",
+      jsEngine: "hermes",
       package: "com.anonymous.bandhuconnectplus",
       config: {
-        ndkVersion: "29.0.13846066"
+        ndkVersion: "26.1.10909125"
       },
       minSdkVersion: 24,
       permissions: [

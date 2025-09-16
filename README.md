@@ -1,7 +1,9 @@
 # BandhuConnect+
 
+
 **Version:** 2.3.3  
 **Repository:** [GitHub](https://github.com/DhruvalBhinsara1/BandhuConnect_Plus)  
+**Website:** [bandhuconnectplus.vercel.app](https://bandhuconnectplus.vercel.app)  
 **Status:** ✅ Production Ready  
 **Last Updated:** September 14, 2025
 
